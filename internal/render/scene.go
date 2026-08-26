@@ -27,6 +27,11 @@ type BodyDraw struct {
 	Selected      bool // whole-body selection: accent silhouette
 	EdgeColor     color.RGBA
 
+	// HideTexture draws the body in its own colour with the paint suppressed,
+	// which is what the Textures eye in the paint panel is for: seeing the bare
+	// geometry under the pixels (SPEC-UX §13.2).
+	HideTexture bool
+
 	// NoDim exempts this body from the scene's DimFactor. A mode that dims the
 	// scene is dimming it to make one thing stand out, and that thing is
 	// usually a body in this list — dimming it along with everything else

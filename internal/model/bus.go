@@ -3,9 +3,11 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"image"
 	"time"
 
 	"modeler/internal/geom"
+	"modeler/internal/geom/mesh"
 )
 
 // The command bus (SPEC-DATA §3). Every document mutation goes through it, so
@@ -14,6 +16,16 @@ import (
 
 // UndoCap is how many steps the history keeps before dropping the oldest.
 const UndoCap = 200
+
+// UndoBytesCap bounds the memory the history may hold in bulky snapshots —
+// paint strokes, in practice (SPEC-DATA §3.3).
+//
+// Depth alone is the wrong measure once pixels are involved: two hundred
+// geometry commands are a rounding error, while two hundred strokes on 512 px
+// faces are gigabytes. The heuristic is deliberately blunt — drop whole steps
+// from the oldest end until the total fits, and never drop the only step, so
+// the thing you just did can always be taken back.
+const UndoBytesCap = 40 << 20
 
 // Command is one undoable document mutation.
 //
@@ -27,6 +39,12 @@ type Command interface {
 	Do(doc *Document) error
 	// Undo restores the state captured during Do.
 	Undo(doc *Document)
+}
+
+// Heavy is implemented by commands whose undo data is large enough to count
+// against the history's memory budget. Everything else is assumed free.
+type Heavy interface {
+	UndoBytes() int
 }
 
 // Feature is implemented by commands that want a specific feature-log entry.
@@ -49,6 +67,12 @@ const (
 	EvSketchChanged
 	EvSketchAdded
 	EvSketchRemoved
+	// EvBodyPainted means texels changed on one face's texture and nothing
+	// else did. It is deliberately not EvBodyChanged: the geometry is
+	// untouched, so the renderer re-uploads a rectangle instead of rebuilding
+	// and re-uploading the whole body, which is the difference between a
+	// smooth stroke and a slideshow.
+	EvBodyPainted
 	// EvPlanesChanged means a default plane was shown or hidden.
 	EvPlanesChanged
 	// EvDocReplaced means everything must be rebuilt: load, new, undo of a
@@ -62,6 +86,11 @@ type Event struct {
 	BodyID uint32
 	Sketch uint32
 	Plane  geom.PlaneKind
+
+	// Paint and Rect carry an EvBodyPainted: which texture changed, and which
+	// of its texels.
+	Paint *mesh.FacePaint
+	Rect  image.Rectangle
 }
 
 // Events is a tiny synchronous publisher. Listeners run on the caller's
@@ -134,9 +163,29 @@ func (b *Bus) push(cmd Command) {
 	if len(b.undo) > UndoCap {
 		b.undo = append(b.undo[:0], b.undo[len(b.undo)-UndoCap:]...)
 	}
+	b.evictOverBudget()
 	b.redo = b.redo[:0]
 	b.doc.Features = append(b.doc.Features, b.record(cmd))
 	b.doc.DirtySinceSave = true
+}
+
+// UndoBytes is what the history is currently holding in bulky snapshots.
+func (b *Bus) UndoBytes() int {
+	total := 0
+	for _, cmd := range b.undo {
+		if h, ok := cmd.(Heavy); ok {
+			total += h.UndoBytes()
+		}
+	}
+	return total
+}
+
+// evictOverBudget drops the oldest steps until the history fits its memory
+// budget, always leaving at least one.
+func (b *Bus) evictOverBudget() {
+	for len(b.undo) > 1 && b.UndoBytes() > UndoBytesCap {
+		b.undo = append(b.undo[:0], b.undo[1:]...)
+	}
 }
 
 func (b *Bus) record(cmd Command) FeatureRec {

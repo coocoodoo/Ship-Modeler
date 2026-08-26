@@ -1,6 +1,8 @@
 package render
 
 import (
+	"image"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"modeler/internal/geom"
@@ -36,6 +38,10 @@ type BodyGPU struct {
 	VertCount int
 	Bounds    geom.AABB
 
+	// Paint is the body's packed face textures, or nil when nothing on it is
+	// painted (SPEC-GEOMETRY §8.1).
+	Paint *atlas
+
 	// Retained CPU arrays: rl.Mesh holds raw pointers into them, so they must
 	// stay reachable for as long as the mesh is alive.
 	positions []float32
@@ -59,6 +65,7 @@ type EdgeSeg struct {
 func BuildBodyGPU(m *mesh.Mesh) *BodyGPU {
 	g := &BodyGPU{Bounds: m.AABB()}
 	g.Verts = append(g.Verts, m.Verts...)
+	g.Paint = buildAtlas(m)
 
 	tris := m.Triangulate()
 	g.TriCount = len(tris)
@@ -81,11 +88,21 @@ func BuildBodyGPU(m *mesh.Mesh) *BodyGPU {
 			g.MeshFaces = append(g.MeshFaces, t.Face)
 		}
 		nrm := m.FaceNormal(t.Face)
-		// Paint UVs arrive with M7; unpainted faces sample nothing.
+		// The UVs are the face's own paint mapping, which is affine within the
+		// face's plane — so interpolating it across the face's triangles is
+		// exact, and a stroke never has to touch the vertex buffer. Vertices
+		// are already duplicated per face for flat shading, so each face
+		// carries its own. An unpainted face samples the atlas nowhere and the
+		// shader is told to ignore it.
+		fp := m.Faces[t.Face].Paint
 		for _, vi := range [3]int{t.A, t.B, t.C} {
 			p := m.Verts[vi]
 			g.positions = append(g.positions, float32(p.X), float32(p.Y), float32(p.Z))
-			g.texcoords = append(g.texcoords, 0, 0)
+			if u, v, ok := g.Paint.uvOf(fp, p); ok {
+				g.texcoords = append(g.texcoords, u, v)
+			} else {
+				g.texcoords = append(g.texcoords, 0, 0)
+			}
 			g.normals = append(g.normals, float32(nrm.X), float32(nrm.Y), float32(nrm.Z))
 			g.colors = append(g.colors,
 				uint8(local&0xFF), uint8((local>>8)&0xFF), 0, 255)
@@ -104,8 +121,22 @@ func BuildBodyGPU(m *mesh.Mesh) *BodyGPU {
 	return g
 }
 
+// HasPaint reports whether this body has any painted face to sample.
+func (g *BodyGPU) HasPaint() bool { return g.Paint != nil && g.Paint.ready }
+
+// PaintOverflowed reports that some of the body's textures did not fit its
+// atlas, so those faces are rendering bare.
+func (g *BodyGPU) PaintOverflowed() bool { return g.Paint != nil && g.Paint.Overflow }
+
+// UpdatePaint re-uploads the changed texels of one face texture, and reports
+// false when the atlas layout no longer fits and the body must be rebuilt.
+func (g *BodyGPU) UpdatePaint(p *mesh.FacePaint, texels image.Rectangle) bool {
+	return g.Paint.updateRect(p, texels)
+}
+
 // Upload sends the geometry to the GPU. Safe to call more than once.
 func (g *BodyGPU) Upload() {
+	g.Paint.upload()
 	if g.uploaded || g.VertCount == 0 {
 		return
 	}
@@ -123,6 +154,7 @@ func (g *BodyGPU) Upload() {
 
 // Unload frees GPU buffers.
 func (g *BodyGPU) Unload() {
+	g.Paint.unload()
 	if !g.uploaded {
 		return
 	}

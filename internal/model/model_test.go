@@ -685,3 +685,54 @@ func TestCommandsOnMissingObjectsFail(t *testing.T) {
 		t.Error("failed commands landed on the undo stack")
 	}
 }
+
+// heavyCmd is a stand-in for a paint stroke: a command whose undo data is big
+// enough that the history has to be bounded by bytes as well as by depth
+// (SPEC-DATA §3.3).
+type heavyCmd struct {
+	bytes int
+	label string
+	done  bool
+}
+
+func (c *heavyCmd) Name() string       { return c.label }
+func (c *heavyCmd) Do(*Document) error { c.done = true; return nil }
+func (c *heavyCmd) Undo(*Document)     { c.done = false }
+func (c *heavyCmd) UndoBytes() int     { return c.bytes }
+func (c *heavyCmd) Events() []Event    { return nil }
+
+func TestHistoryEvictsOldestStepsPastTheByteCap(t *testing.T) {
+	_, bus := testDoc(t)
+	const chunk = UndoBytesCap / 4
+	for i := 0; i < 4; i++ {
+		if err := bus.Run(&heavyCmd{bytes: chunk, label: "Paint"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if bus.UndoDepth() != 4 {
+		t.Fatalf("undo depth = %d, want 4 before the cap is exceeded", bus.UndoDepth())
+	}
+	// One more tips it over, and the oldest goes rather than the newest: the
+	// step you just took is the one you are most likely to want back.
+	if err := bus.Run(&heavyCmd{bytes: chunk, label: "Paint"}); err != nil {
+		t.Fatal(err)
+	}
+	if bus.UndoDepth() != 4 {
+		t.Errorf("undo depth = %d after exceeding the cap, want 4", bus.UndoDepth())
+	}
+	if got := bus.UndoBytes(); got > UndoBytesCap {
+		t.Errorf("history holds %d bytes, over the %d cap", got, UndoBytesCap)
+	}
+}
+
+func TestTheByteCapNeverEatsTheOnlyStep(t *testing.T) {
+	_, bus := testDoc(t)
+	// A single stroke larger than the whole budget still has to be undoable:
+	// dropping it would mean the one thing you just did cannot be taken back.
+	if err := bus.Run(&heavyCmd{bytes: UndoBytesCap * 2, label: "Paint"}); err != nil {
+		t.Fatal(err)
+	}
+	if bus.UndoDepth() != 1 {
+		t.Errorf("undo depth = %d, want 1", bus.UndoDepth())
+	}
+}

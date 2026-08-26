@@ -203,11 +203,24 @@ func (r *Renderer) drawBody(b *BodyDraw, dim float64) {
 	if dim > 0 && dim < 1 {
 		col = ui.Shade(col, dim)
 	}
+
+	// Paint composites over the body colour by texel alpha, so an unpainted
+	// texel shows the body through and the two are one surface rather than a
+	// decal on top of one. Binding the body's own atlas is the whole render-side
+	// cost of paint mode.
+	textured := b.GPU.HasPaint() && !b.HideTexture
+	tex := r.blankTex
+	use := float32(0)
+	if textured {
+		tex, use = b.GPU.Paint.tex, 1
+	}
+	r.shadedMat.GetMap(rl.MapDiffuse).Texture = tex
 	r.shadedMat.GetMap(rl.MapDiffuse).Color = col
 	rl.SetShaderValue(r.shaded, r.locTint, colorToVec4(b.Tint), rl.ShaderUniformVec4)
 	rl.SetShaderValue(r.shaded, r.locAlphaScale, []float32{float32(b.Alpha)}, rl.ShaderUniformFloat)
-	rl.SetShaderValue(r.shaded, r.locUseTexture, []float32{0}, rl.ShaderUniformFloat)
+	rl.SetShaderValue(r.shaded, r.locUseTexture, []float32{use}, rl.ShaderUniformFloat)
 	rl.DrawMesh(*b.GPU.rlMesh, r.shadedMat, toRLMatrix(b.Transform))
+	r.shadedMat.GetMap(rl.MapDiffuse).Texture = r.blankTex
 }
 
 // drawPlanes renders the default planes as two-sided translucent quads with a

@@ -46,6 +46,33 @@ type FacePaint struct {
 	Off   image.Point // texel index of Img's origin, so the image can grow
 }
 
+// UV maps a world point to continuous texel coordinates on this face's texture
+// (SPEC-GEOMETRY §8.3).
+//
+// It lives on the struct rather than in package paint so that the renderer,
+// which builds vertex UVs, and the brush, which decides which texel the cursor
+// is over, are running the same arithmetic rather than two copies of it. The
+// normal component is discarded, so a point anywhere along the face's normal
+// maps to the same texel — which is exactly what a cursor ray hitting the
+// surface needs.
+func (p *FacePaint) UV(world geom.Vec3) geom.Vec2 {
+	if p == nil || p.Texel == 0 {
+		return geom.Vec2{}
+	}
+	local := p.Frame.ToLocal(world)
+	return geom.Vec2{X: local.X / p.Texel, Y: local.Y / p.Texel}
+}
+
+// TexelBounds is the texel rectangle the image currently covers. Texel
+// coordinates and image coordinates differ by Off, and everything that reads or
+// writes a texel goes through this rather than doing that sum by hand.
+func (p *FacePaint) TexelBounds() image.Rectangle {
+	if p == nil || p.Img == nil {
+		return image.Rectangle{}
+	}
+	return p.Img.Bounds().Add(p.Off)
+}
+
 // Face is a planar polygon with optional holes.
 //
 // Loops[0] is the outer loop, counter-clockwise seen from outside the body;

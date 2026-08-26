@@ -204,3 +204,56 @@ func TestAllocateOnASlantedFace(t *testing.T) {
 		}
 	}
 }
+
+func TestFaceRectCoversTheFaceAndNotTheMargin(t *testing.T) {
+	m, fi := plate()
+	p, err := Allocate(m, fi, 32)
+	if err != nil {
+		t.Fatalf("allocate: %v", err)
+	}
+	r := FaceRect(m, fi, p)
+	// The face is 8x4 units at 1/4 u per texel: 32 by 16 texels, starting at
+	// the origin because Allocate put texel (0,0) on the bbox corner.
+	want := image.Rect(0, 0, 32, 16)
+	if r != want {
+		t.Errorf("face rect = %v, want %v", r, want)
+	}
+	// It is strictly inside the image, which is what leaves the fill somewhere
+	// to stop and the atlas a texel of padding.
+	if !r.In(Bounds(p)) {
+		t.Errorf("face rect %v is not inside the image %v", r, Bounds(p))
+	}
+	// Every corner of the face is in it.
+	for _, vi := range m.Faces[fi].Outer() {
+		tx := Texel(p, m.Verts[vi])
+		// A corner sits exactly on the boundary, so clamp it inwards the way a
+		// cursor on the edge is clamped.
+		tx.X = clampInt(tx.X, r.Min.X, r.Max.X-1)
+		tx.Y = clampInt(tx.Y, r.Min.Y, r.Max.Y-1)
+		if !tx.In(r) {
+			t.Errorf("corner %v maps outside the face rect", m.Verts[vi])
+		}
+	}
+}
+
+func TestFaceRectFollowsAGrownImage(t *testing.T) {
+	m, fi := plate()
+	p, _ := Allocate(m, fi, 32)
+	before := FaceRect(m, fi, p)
+	// Painting far outside grows the image; the face has not moved, so the
+	// rectangle the face occupies must not move either.
+	Set(p, image.Point{X: 40, Y: 40}, color.RGBA{R: 255, A: 255})
+	if got := FaceRect(m, fi, p); got != before {
+		t.Errorf("face rect moved from %v to %v when the image grew", before, got)
+	}
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}

@@ -142,17 +142,32 @@ func clampSize(v int) int {
 	return v
 }
 
-// UV maps a world point to continuous texel coordinates
-// (SPEC-GEOMETRY §8.3). The normal component is discarded, so a point anywhere
-// along the face's normal maps to the same texel — which is exactly what a
-// cursor ray hitting the surface needs.
-func UV(p *mesh.FacePaint, world geom.Vec3) geom.Vec2 {
-	if p == nil || p.Texel == 0 {
-		return geom.Vec2{}
+// FaceRect is the texel rectangle the face itself occupies, which is not the
+// same as the rectangle the image covers: the image carries a margin outside
+// the face, and grows further whenever a stroke runs off the edge.
+//
+// The distinction matters wherever "on the face" is the question rather than
+// "in the image" — a flood fill has to stop at the face's edge instead of
+// flooding the margin, and the atlas packer wants the texels that can actually
+// be seen.
+func FaceRect(m *mesh.Mesh, fi int, p *mesh.FacePaint) image.Rectangle {
+	if p == nil || m == nil || fi < 0 || fi >= len(m.Faces) || p.Texel <= 0 {
+		return image.Rectangle{}
 	}
-	local := p.Frame.ToLocal(world)
-	return geom.Vec2{X: local.X / p.Texel, Y: local.Y / p.Texel}
+	lo, hi, ok := faceExtent(m, fi, p.Frame)
+	if !ok {
+		return image.Rectangle{}
+	}
+	return image.Rect(
+		floor(lo.X/p.Texel), floor(lo.Y/p.Texel),
+		ceil(hi.X/p.Texel), ceil(hi.Y/p.Texel),
+	)
 }
+
+// UV maps a world point to continuous texel coordinates
+// (SPEC-GEOMETRY §8.3). The arithmetic lives on mesh.FacePaint so the renderer
+// shares it rather than reimplementing it a package away.
+func UV(p *mesh.FacePaint, world geom.Vec3) geom.Vec2 { return p.UV(world) }
 
 // Texel maps a world point to the integer texel containing it.
 func Texel(p *mesh.FacePaint, world geom.Vec3) image.Point {
@@ -187,15 +202,8 @@ func Corners(p *mesh.FacePaint, t image.Point) [4]geom.Vec3 {
 	}
 }
 
-// Bounds is the texel rectangle the image currently covers. Texel coordinates
-// and image coordinates differ by Off, and every read and write goes through
-// here rather than doing that arithmetic by hand.
-func Bounds(p *mesh.FacePaint) image.Rectangle {
-	if p == nil || p.Img == nil {
-		return image.Rectangle{}
-	}
-	return p.Img.Bounds().Add(p.Off)
-}
+// Bounds is the texel rectangle the image currently covers.
+func Bounds(p *mesh.FacePaint) image.Rectangle { return p.TexelBounds() }
 
 // At reads a texel. Anything outside the image is unpainted, which is the same
 // answer as a transparent texel inside it: the body colour shows through.
@@ -294,4 +302,10 @@ func Blit(p *mesh.FacePaint, r image.Rectangle, src *image.RGBA) {
 // int() conversion truncates toward zero and puts texel -0.5 in texel 0.
 func floor(v float64) int {
 	return int(math.Floor(v))
+}
+
+// ceil is math.Ceil for ints, with the same slack Allocate uses so a face whose
+// extent lands a rounding error past a texel boundary does not gain a row.
+func ceil(v float64) int {
+	return int(math.Ceil(v - 1e-9))
 }
