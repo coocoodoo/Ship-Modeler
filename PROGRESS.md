@@ -30,6 +30,14 @@ thing that matters is how far it has come. They are hidden for the duration of
 the tool and back the instant it closes; their eye toggles are untouched. The
 sketch grid stays, because that is what makes the depth readable.
 
+**And then the same for push/pull, with a second screenshot showing why.** A
+push/pull drag had none of this: the model stayed at full strength, the planes
+stayed put, and a translucent plane blending against a translucent preview in
+the same pass produced exactly the muddle the user called an eye sore. Both
+tools now go through one predicate, `previewOwnsView` — an open extrude, or a
+push/pull drag that has moved — and both get the same treatment. Blue material
+going on, red coming off, against a dimmed model and nothing else.
+
 **Verified:** rendered an extrude in progress on the user's scene — the prism
 is now unmistakably the brightest thing in the frame. Sketch mode re-checked:
 the sketch still reads first, and the plane quads no longer compete with it.

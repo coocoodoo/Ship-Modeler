@@ -52,12 +52,13 @@ func (a *App) BuildScene() render.Scene {
 		s.Bodies = append(s.Bodies, d)
 	}
 
-	// The default planes step out of the way entirely while an extrude is being
-	// dragged. Dimming them was not enough: three translucent quads spanning the
-	// viewport still cross the solid you are pulling out, and the one thing that
+	// The default planes step out of the way entirely while material is being
+	// dragged out or in. Dimming them was not enough: three translucent quads
+	// spanning the viewport still cross the solid you are pulling, they blend
+	// against a translucent preview in the same pass, and the one thing that
 	// matters at that moment is how far it has come. They are back the instant
-	// the tool closes, and their eye toggles are untouched.
-	if !a.InExtrude() {
+	// the drag ends, and their eye toggles are untouched.
+	if !a.previewOwnsView() {
 		s.Planes = a.buildPlaneDraws()
 	}
 
@@ -92,7 +93,9 @@ func (a *App) BuildScene() render.Scene {
 
 	// Sketch mode dims the rest of the model and puts the grid on the sketch
 	// plane, so the profile being drawn is what the eye lands on (SPEC-UX §8.1).
-	if a.InSketch() || a.InExtrude() {
+	// A push/pull drag gets the same treatment for as long as it lasts: it is
+	// the same question — how far has this come — asked with a different tool.
+	if a.InSketch() || a.previewOwnsView() {
 		s.DimFactor = SketchDimFactor
 		if sk := a.ActiveSketch(); sk != nil {
 			s.Grid = scene.SketchGridFor(sk)
@@ -221,6 +224,20 @@ func (a *App) FrameSelection(vp render.Viewport) {
 	}
 	to.FrameBox(box, vp.Aspect())
 	a.Anim.Start(a.Camera, to)
+}
+
+// previewOwnsView reports that a translucent preview is the subject of the
+// view: an open extrude, or a push/pull drag that has moved.
+//
+// Both put a see-through solid in front of the model and ask one question about
+// it. Everything else — planes included — gets out of the way until the answer
+// is given.
+func (a *App) previewOwnsView() bool {
+	if a.InExtrude() {
+		return true
+	}
+	t := a.pushPull.tool
+	return t != nil && (t.Dragging() || t.Active())
 }
 
 // selectedFacesOf collects the selected faces belonging to one body, which is
