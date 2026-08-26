@@ -188,3 +188,45 @@ defaults when headless. Otherwise a golden shot would depend on whatever tree
 width or collapse state the developer last left behind, which is not a property
 of the document.
 
+### 2026-08-26 — M2
+
+**V-12 · Sketch overlays draw on top of the model, not depth-tested against it.**
+SPEC-RENDER §1 lists the in-sketch overlays inside the scene pass, which would
+leave them fighting the depth buffer. In practice a default plane passes
+*through* the model, so a profile drawn on it disappears behind whatever
+geometry is in front — the very first sketch on the Front plane was completely
+hidden by the test scene's hull. The rest of the scene is already dimmed to 30%
+(SPEC-UX §8.1); the sketch pass now also disables depth testing, so the thing
+being edited is always visible. This is what every CAD tool does and what makes
+sketching on an interior plane possible at all.
+
+**V-13 · Collinear overlaps are resolved by construction, not by interval
+arithmetic.** SPEC-GEOMETRY §4.2 describes projecting collinear segments onto
+their shared line, merging into an interval union and re-emitting maximal
+pieces. The implementation reaches the identical result more simply: both
+segments are cut at the shared interval's endpoints like any other meeting
+point, and the overlapping pieces then arrive at the graph as the same node
+pair, where edge deduplication merges them. Covered by the "collinear partial
+overlap" and "duplicate segments" cases.
+
+**V-14 · A line chain commits one Line entity per placed segment.**
+SPEC-GEOMETRY §3 lists Line, Rect, Circle and Ref as the entity kinds, without
+saying whether a click-chain is one entity or many. Each segment is its own
+entity, so every click is an independent undo step and deleting one segment of
+a chain leaves the rest — which is what the Select tool's per-entity delete
+needs. A rectangle stays a single Rect entity, as specified, because dragging
+one later has to move all four sides together.
+
+**V-15 · A sketch row's double-click re-enters editing; renaming is the pencil.**
+SPEC-UX §7 splits the gesture by where it lands — double-click the *name* to
+rename, double-click the *row* to re-enter editing. Distinguishing the two by
+hit position inside a row is fiddly and easy to get wrong by a few pixels, so
+the row's double-click always re-enters editing and the pencil hover action is
+the only way to rename. Both actions stay reachable and neither can be
+triggered by accident.
+
+**V-16 · Ops added for M2 flows.** `sketch.tool` selects the active drawing
+tool, and the `dump` op grew a `sketch active=...` line reporting the entity,
+region and open-end counts. The specified `sketch.begin`, `sketch.line`,
+`sketch.rect`, `sketch.circle` and `sketch.finish` all landed as written.
+

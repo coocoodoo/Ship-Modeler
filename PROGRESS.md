@@ -2,7 +2,56 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M1 COMPLETE.** The app has its full window chrome — toolbar, tree panel, hint bar, toasts — backed by a real document and command bus, so every tree action is undoable. Next up: **M2** (sketch mode: tools, snapping, the region engine).
+**Current state:** **M2 COMPLETE.** You can pick a plane, draw lines, rectangles and circles on it with snapping, and watch closed profiles fill while loose ends glow red. Next up: **M3** (extrude to a new body: the arrow gizmo, draft, symmetric).
+
+---
+
+## 2026-08-26 — M2: sketch mode, the region engine and R3
+
+**Done:**
+- **`internal/geom/sketch2d`** — the integer-exact planar arrangement of GEOM §4, written test-first as the protocol requires. Split at every meeting point, weld by exact coordinate, sort each node's darts with an exact half-plane-plus-cross comparator, walk faces by taking the dart clockwise from each twin, then nest each component's outer boundary into the smallest face that strictly contains it. That last step gives holes and one-level islands in the same pass. Plus ear-clipping triangulation with hole bridging, so a ring renders as a ring.
+- **`internal/model`** — sketch entities in the logical form the user drew: a Line keeps its two points, a Rect keeps two corners and draws four sides, a Circle is a regular n-gon (D-06). Five commands cover drawing, deleting, moving and re-segmenting, and the arrangement is cached behind an edit stamp so the several times a frame the UI asks for it cost one build.
+- **`internal/sketch`** — snapping and the tool state machine. Endpoint beats midpoint beats grid, radii scale with zoom so they feel identical however far in you are, Alt suppresses everything, and horizontal/vertical inference locks the direction then lets the grid quantise along it.
+- **`internal/render` + `internal/scene`** — the sketch overlay: translucent region fills, entity strokes, the rubber band, dashed inference guides, red rings on loose ends, and the snap glyph under the cursor (circle, diamond or cross, matching what it latched onto).
+- **`internal/app`** — sketch mode itself: entering on a plane with the camera animating normal-on and the model dimming to 30%, the toolbar swapping to Select/Line/Rectangle/Circle, and a contextual card reporting entities, regions and open ends.
+
+**Verified:**
+- `go build ./...`, `go vet ./...`, `gofmt -l .` — all clean. `go test ./...` — **216 tests pass** (166 at the end of M1).
+- New coverage: sketch2d 8 top-level tests spanning **16 region cases** and 8 triangulation cases; sketch 21; model grew to 39; apptest to 22.
+- **The 16 region cases are the TESTING §2 canon and then some**: square, rect with a circle hole, three-deep nested islands, figure-eight, butt joint on a shared edge, overlapping rects, open chain, T joint, duplicate segments, collinear partial overlap, crossing diagonals in a frame, zero-length segments, a one-subunit sliver, a bare circle, two disjoint squares, and nothing at all. Each asserts region count, hole count, open-end count and **exact** area.
+- **Triangulation is checked by exact area preservation**, not a tolerance: the triangles must sum to the region's integer area or the test fails.
+- **Determinism**: `TestBuildIsDeterministic` reorders the input segments and reverses each one's direction, and requires the identical arrangement — which is what makes region indices stable enough to select and to golden.
+- **Goldens** (read, not just generated): `docs/shots/m2_rect_circle.png`, `m2_open_ends.png`, `m2_closed_region.png`, `m2_tools.png`.
+- **R3 end to end**: `TestOpenProfileGatesExtrude` clicks three points, checks the chain reports 2 open ends and 0 regions, clicks the chain's own start, and checks it becomes 1 region with none loose — then undoes one stroke and watches it reopen.
+- **Performance**: the 500-segment budget case of GEOM §4 runs in **0.38 ms** against a 2 ms budget. Frame cost in sketch mode is 3.34 ms at 720p against 16.6 ms.
+
+**Decisions/deviations:** five entries appended — V-12 sketch overlays draw on top of the model rather than depth-tested (a profile on the Front plane was completely hidden by the hull until this changed); V-13 collinear overlaps resolve by construction rather than interval arithmetic; V-14 a line chain commits one entity per segment, so every click is its own undo step; V-15 a sketch row's double-click re-enters editing and the pencil renames; V-16 the `sketch.tool` op and the dump's sketch line.
+
+**Bugs found and fixed:**
+1. **Nothing in a holed polygon was ever clippable.** The ear test rejected any vertex touching the candidate triangle, but a hole bridge deliberately doubles two vertices — and a duplicate sitting exactly on a corner *is* that corner. Every ring triangulated to nothing until the test compared by position rather than index.
+2. **The region engine missed its budget by 6x.** The first measurement was 13 ms, but on the wrong workload: 200 inputs that cross into ~10k edges, not the 500-segment sketch the spec means. Measuring the right case gave 2.48 ms, still over; hoisting the bounding-box reject out of the O(n²) split and replacing two `sort.Slice` calls with insertion sorts brought it to 0.38 ms.
+3. **Sketch-mode shortcuts died over the tree panel.** Tool keys were handled inside the pointer branch, so resting the cursor on the panel made L and R stop working. Keyboard handling now runs regardless of where the pointer is.
+4. **The first sketch was invisible.** Drawn on the Front plane, depth-tested, and therefore behind the hull the plane passes through.
+
+**Open issues:**
+- The Select tool picks and deletes entities and selects regions, but dragging an entity or endpoint to move it is not wired up yet; `MoveEntities` exists and is tested, so this is UI work rather than model work.
+- Region selection is recorded but does nothing visible beyond the brighter fill — M3's extrude is what consumes it.
+- Box-select in sketch mode (SPEC-UX §8.5) is not implemented; it shares machinery with M6's box select and is better done once.
+- The "click the message to zoom to the nearest open end" affordance of SPEC-UX §8.6 is not built; the count and the red rings are.
+- Sketches are still plane-only. Face sketches, with their frame snapshot, are M5.
+
+**Next:** M3 — extrude. Start with the analytic volume tests of TESTING §2 (box, n-gon prism, drafted box against the frustum formula, symmetric, region-with-hole tube), then build the prism from a region, then the arrow gizmo.
+
+**Try it (user):**
+```bash
+c:\go\bin\go.exe run ./cmd/modeler
+```
+1. **Click the Front plane** in the tree, then **click it again in the viewport** — the camera swings normal-on and the grid appears.
+2. With the **Line** tool, click three corners and then **click your first point again** — the ring turns green as you approach it, and the profile fills.
+3. Watch the **red rings** on loose ends while the chain is open, and the card counting them.
+4. Press **R** for Rectangle and **C** for Circle; the card's chips change how many sides a circle gets.
+5. Hold **Alt** while drawing to switch snapping off, or **Ctrl** for the quarter-unit grid; move nearly-horizontally and watch the **dashed guide** appear.
+6. Press **Esc** to drop a half-drawn chain, and again to leave — the sketch is kept either way.
 
 ---
 

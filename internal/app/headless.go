@@ -14,6 +14,7 @@ import (
 	"modeler/internal/io"
 	"modeler/internal/model"
 	"modeler/internal/render"
+	"modeler/internal/sketch"
 )
 
 // Headless mode is the executing agent's eyes (SPEC-RENDER §9): a hidden window
@@ -177,6 +178,50 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 
 	case "dump":
 		r.dump()
+
+	case "sketch.begin":
+		k, ok := geom.ParsePlaneKind(op.Plane)
+		if !ok {
+			return op.Errorf("unknown plane %q", op.Plane)
+		}
+		if !a.BeginSketchOnPlane(k) {
+			return op.Errorf("could not start a sketch on the %s plane", op.Plane)
+		}
+
+	case "sketch.line":
+		if err := r.addEntity(op, model.NewLine(vec(op.From), vec(op.To))); err != nil {
+			return err
+		}
+
+	case "sketch.rect":
+		if err := r.addEntity(op, model.NewRect(vec(op.A), vec(op.B))); err != nil {
+			return err
+		}
+
+	case "sketch.circle":
+		segs := op.Segs
+		if segs == 0 {
+			segs = model.DefaultCircleSegs
+		}
+		if err := r.addEntity(op, model.NewCircle(vec(op.C), geom.ToSubunits(op.R), segs)); err != nil {
+			return err
+		}
+
+	case "sketch.finish":
+		if !a.InSketch() {
+			return op.Errorf("no sketch is being edited")
+		}
+		a.ExitSketch(true)
+
+	case "sketch.tool":
+		if !a.InSketch() {
+			return op.Errorf("no sketch is being edited")
+		}
+		t, ok := parseSketchTool(op.Kind)
+		if !ok {
+			return op.Errorf("unknown sketch tool %q", op.Kind)
+		}
+		a.sketch.session.SetTool(t)
 
 	default:
 		return op.Errorf("op is not implemented yet in this build")
@@ -371,6 +416,40 @@ func (r *ScriptRunner) Bench(frames int) {
 		sum/float64(len(samples)), pct(0.5), pct(0.95), pct(0.99), samples[len(samples)-1])
 }
 
+// vec converts an op's world-unit point into sketch subunits.
+func vec(p *[2]float64) geom.Vec2i {
+	if p == nil {
+		return geom.Vec2i{}
+	}
+	return geom.Vec2i{X: geom.ToSubunits(p[0]), Y: geom.ToSubunits(p[1])}
+}
+
+func parseSketchTool(s string) (sketch.Tool, bool) {
+	switch s {
+	case "select":
+		return sketch.ToolSelect, true
+	case "line":
+		return sketch.ToolLine, true
+	case "rect":
+		return sketch.ToolRect, true
+	case "circle":
+		return sketch.ToolCircle, true
+	}
+	return 0, false
+}
+
+// addEntity commits a scripted entity through the same command the UI uses.
+func (r *ScriptRunner) addEntity(op io.Op, e model.Entity) error {
+	s := r.App.ActiveSketch()
+	if s == nil {
+		return op.Errorf("no sketch is being edited — call sketch.begin first")
+	}
+	if err := r.App.Bus.Run(&model.AddEntity{Sketch: s.ID, Entity: e}); err != nil {
+		return op.Wrap(err)
+	}
+	return nil
+}
+
 // dump prints the document and selection state as machine-readable lines. Flow
 // tests assert on these rather than on pixels, so a behavioural regression is
 // reported as a behaviour, not as a picture that changed.
@@ -393,6 +472,12 @@ func (r *ScriptRunner) dump() {
 	}
 	for _, s := range doc.Sketches {
 		fmt.Printf("sketch id=%d name=%q visible=%d\n", s.ID, s.Name, boolBit(s.Visible))
+	}
+	if sk := a.ActiveSketch(); sk != nil {
+		arr := sk.Arrangement()
+		fmt.Printf("sketch active=%q entities=%d regions=%d openends=%d tool=%q\n",
+			sk.Name, len(sk.Entities), len(arr.Regions), len(arr.OpenEnds),
+			a.sketch.session.Tool.String())
 	}
 	fmt.Printf("sel count=%d desc=%q\n", a.Sel.Len(), a.Sel.Describe(doc))
 	fmt.Printf("hint %q\n", a.HintText())

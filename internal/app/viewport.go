@@ -44,6 +44,19 @@ func (a *App) BuildScene() render.Scene {
 	}
 
 	s.Planes = a.buildPlaneDraws()
+
+	// Sketch mode dims the rest of the model and puts the grid on the sketch
+	// plane, so the profile being drawn is what the eye lands on (SPEC-UX §8.1).
+	if a.InSketch() {
+		s.DimFactor = SketchDimFactor
+		if sk := a.ActiveSketch(); sk != nil {
+			s.Grid = scene.SketchGridFor(sk)
+		}
+		s.Sketch = a.buildSketchDraw()
+		for i := range s.Bodies {
+			s.Bodies[i].Pickable = false
+		}
+	}
 	return s
 }
 
@@ -244,6 +257,17 @@ func (a *App) handleViewportClick(in InputFrame, vp render.Viewport) {
 	}
 	switch hit.Kind {
 	case render.PickPlane:
+		if a.sketch.awaitingPlane {
+			a.sketch.awaitingPlane = false
+			a.BeginSketchOnPlane(hit.Plane)
+			return
+		}
+		// A second click on an already-selected plane starts a sketch there,
+		// which is the implicit affordance of SPEC-UX §5.
+		if a.Sel.Contains(model.PlaneRef(hit.Plane)) && !in.Shift && !in.Ctrl {
+			a.BeginSketchOnPlane(hit.Plane)
+			return
+		}
 		a.selectRef(model.PlaneRef(hit.Plane))
 	case render.PickFace, render.PickEdge, render.PickVert:
 		// Sub-element selection arrives with the selection model in M6; until
@@ -252,8 +276,9 @@ func (a *App) handleViewportClick(in InputFrame, vp render.Viewport) {
 	}
 }
 
-// handleKeys implements the M1 slice of the keyboard map (SPEC-UX §16).
-func (a *App) handleKeys(in InputFrame, vp render.Viewport) {
+// handleGlobalKeys are the shortcuts that work in every mode: history,
+// projection, framing and the shortcut sheet (SPEC-UX §16).
+func (a *App) handleGlobalKeys(in InputFrame, vp render.Viewport) {
 	switch {
 	case in.Ctrl && in.KeyPressed(rl.KeyZ) && in.Shift:
 		a.Redo()
@@ -265,7 +290,6 @@ func (a *App) handleKeys(in InputFrame, vp render.Viewport) {
 	if in.Ctrl {
 		return
 	}
-
 	if in.KeyPressed(rl.KeyO) {
 		a.Anim.Cancel()
 		a.Camera.Perspective = !a.Camera.Perspective
@@ -274,18 +298,46 @@ func (a *App) handleKeys(in InputFrame, vp render.Viewport) {
 	if in.KeyPressed(rl.KeyF) {
 		a.FrameSelection(vp)
 	}
+	if in.KeyPressed(rl.KeySlash) && in.Shift {
+		a.showShortcuts = !a.showShortcuts
+	}
+}
+
+// handleKeys implements the Idle-mode keyboard map (SPEC-UX §16).
+func (a *App) handleKeys(in InputFrame, vp render.Viewport) {
+	a.handleGlobalKeys(in, vp)
+	if in.Ctrl {
+		return
+	}
+
+	if in.KeyPressed(rl.KeyS) {
+		a.beginSketchFromSelection()
+	}
 	if in.KeyPressed(rl.KeyH) {
 		a.hideSelection()
 	}
 	if in.KeyPressed(rl.KeyDelete) {
 		a.deleteSelection()
 	}
-	if in.KeyPressed(rl.KeySlash) && in.Shift {
-		a.showShortcuts = !a.showShortcuts
-	}
 	if in.KeyPressed(rl.KeyEscape) {
 		a.escape()
 	}
+}
+
+// beginSketchFromSelection is what pressing S does in Idle: sketch on the
+// selected plane, or arm the pointer to pick one (SPEC-UX §8.1).
+func (a *App) beginSketchFromSelection() {
+	if ref, ok := a.Sel.Primary(); ok {
+		switch ref.Kind {
+		case model.SelPlane:
+			a.BeginSketchOnPlane(ref.Plane)
+			return
+		case model.SelSketch:
+			a.EditSketch(a.Doc().SketchByID(ref.Sketch))
+			return
+		}
+	}
+	a.sketch.awaitingPlane = true
 }
 
 // escape walks one level back up the interaction stack (SPEC-UX §1).

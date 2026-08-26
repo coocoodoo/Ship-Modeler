@@ -60,6 +60,8 @@ type Scene struct {
 	Bodies []BodyDraw
 	Planes []PlaneDraw
 	Grid   *GridDraw
+	// Sketch is the sketch-mode overlay: region fills, strokes and snap glyphs.
+	Sketch *SketchDraw
 
 	// DimFactor fades non-focus geometry while a mode owns the view, e.g.
 	// sketch mode dims the rest of the model to 30% (SPEC-UX §8.1).

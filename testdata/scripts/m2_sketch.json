@@ -1,0 +1,13 @@
+[
+  {"op":"sketch.begin","plane":"Front"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"sketch.rect","a":[-4,-3],"b":[4,3]},
+  {"op":"sketch.circle","c":[0,0],"r":1.5,"segs":16},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m2_rect_circle"},
+  {"op":"sketch.finish"},
+  {"op":"settle"},
+  {"op":"dump"}
+]

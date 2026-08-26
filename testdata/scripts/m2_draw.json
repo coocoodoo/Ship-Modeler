@@ -1,0 +1,19 @@
+[
+  {"op":"sketch.begin","plane":"Front"},
+  {"op":"settle"},
+  {"op":"click","at":[678,421]},
+  {"op":"click","at":[842,421]},
+  {"op":"click","at":[760,312]},
+  {"op":"hover","at":[700,380]},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m2_open_ends"},
+  {"op":"click","at":[678,421]},
+  {"op":"hover","at":[760,380]},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m2_closed_region"},
+  {"op":"undo"},
+  {"op":"settle"},
+  {"op":"dump"}
+]

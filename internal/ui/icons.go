@@ -260,3 +260,52 @@ func DrawSettingsIcon(cx, cy, size float64, col color.RGBA) {
 			v2(cx+math.Cos(a)*h*0.92, cy+math.Sin(a)*h*0.92), w, col)
 	}
 }
+
+// Sketch tool icons (SPEC-UX §8.2).
+
+// DrawCursorIcon is the arrow of the Select tool.
+func DrawCursorIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	tip := v2(cx-h*0.5, cy-h*0.85)
+	closedPoly(w, col, tip, v2(cx+h*0.35, cy+h*0.25), v2(cx-h*0.05, cy+h*0.25),
+		v2(cx-h*0.5, cy+h*0.75))
+	line(v2(cx-h*0.02, cy+h*0.25), v2(cx+h*0.4, cy+h*0.9), w, col)
+}
+
+// DrawLineToolIcon is a stroke with a node at each end.
+func DrawLineToolIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	a := v2(cx-h*0.75, cy+h*0.7)
+	b := v2(cx+h*0.75, cy-h*0.7)
+	line(a, b, w, col)
+	rl.DrawCircleV(a, float32(h*0.22), col)
+	rl.DrawCircleV(b, float32(h*0.22), col)
+}
+
+// DrawRectToolIcon is an outlined rectangle with corner nodes.
+func DrawRectToolIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	l, t := cx-h*0.8, cy-h*0.6
+	r, b := cx+h*0.8, cy+h*0.6
+	closedPoly(w, col, v2(l, t), v2(r, t), v2(r, b), v2(l, b))
+	rl.DrawCircleV(v2(l, t), float32(h*0.2), col)
+	rl.DrawCircleV(v2(r, b), float32(h*0.2), col)
+}
+
+// DrawCircleToolIcon is a polygon-ish circle with a centre dot, because a
+// circle in this app is a regular n-gon (D-06).
+func DrawCircleToolIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	const sides = 8
+	pts := make([]rl.Vector2, sides)
+	for i := 0; i < sides; i++ {
+		a := 2*math.Pi*float64(i)/sides + math.Pi/sides
+		pts[i] = v2(cx+math.Cos(a)*h*0.82, cy+math.Sin(a)*h*0.82)
+	}
+	closedPoly(w, col, pts...)
+	rl.DrawCircleV(v2(cx, cy), float32(h*0.16), col)
+}

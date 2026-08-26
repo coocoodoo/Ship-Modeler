@@ -128,7 +128,7 @@ func LoadScript(path string) (*Script, error) {
 // executes them; the executor reports the unimplemented op at run time.
 var knownOps = map[string]bool{
 	"sketch.begin": true, "sketch.line": true, "sketch.rect": true,
-	"sketch.circle": true, "sketch.finish": true,
+	"sketch.circle": true, "sketch.finish": true, "sketch.tool": true,
 	"extrude": true, "boolean": true,
 	"select": true, "move": true, "rotate": true,
 	"paint.res": true, "paint.color": true, "paint.pixel": true,

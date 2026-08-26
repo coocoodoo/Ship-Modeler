@@ -1,0 +1,14 @@
+[
+  {"op":"sketch.begin","plane":"Top"},
+  {"op":"settle"},
+  {"op":"sketch.tool","kind":"rect"},
+  {"op":"click","at":[650,300]},
+  {"op":"click","at":[880,450]},
+  {"op":"sketch.tool","kind":"circle"},
+  {"op":"click","at":[760,375]},
+  {"op":"click","at":[820,375]},
+  {"op":"hover","at":[700,330]},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m2_tools"}
+]

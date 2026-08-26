@@ -14,6 +14,7 @@ import (
 
 	"modeler/internal/geom"
 	"modeler/internal/geom/mesh"
+	"modeler/internal/geom/sketch2d"
 )
 
 // FormatVersion is the .ship document version this build writes (SPEC-DATA §4).
@@ -70,20 +71,31 @@ func (b *Body) TriangleCount() int {
 	return b.Mesh.TriangleCount()
 }
 
-// Sketch is a 2D profile on a plane or a face. M2 fills in the entity list and
-// the region engine; M1 only needs the identity and visibility a tree row shows.
+// Sketch is a 2D profile on a plane. Its entities are stored in the logical
+// form the user drew — a rectangle stays a rectangle — and expand to segments
+// only for the region engine (SPEC-GEOMETRY §3).
 type Sketch struct {
 	ID      uint32 `json:"id"`
 	Name    string `json:"name"`
 	Visible bool   `json:"visible"`
 
-	// Plane is the default plane a sketch was drawn on. M2 extends this to a
+	// Plane is the default plane a sketch was drawn on. M5 extends this to a
 	// face reference with a frame snapshot (SPEC-GEOMETRY §3).
 	Plane geom.PlaneKind `json:"plane"`
+
+	// Entities are what was drawn, in draw order.
+	Entities []Entity `json:"entities"`
 
 	// Consumed records that an extrude has already used this sketch, which the
 	// UI must say out loud rather than pretend otherwise (SPEC-UX §8.8).
 	Consumed bool `json:"consumed"`
+
+	// Derived arrangement cache, never serialized. stamp advances on every
+	// edit; arrStamp records which stamp the cache was built from.
+	stamp       uint64
+	arrStamp    uint64
+	arrCached   bool
+	arrangement sketch2d.Arrangement
 }
 
 // CameraState is the saved view. It mirrors render.Camera without importing it:

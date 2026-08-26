@@ -74,7 +74,8 @@ type App struct {
 	// body changed.
 	gpu map[uint32]*render.BodyGPU
 
-	tree treeState
+	tree   treeState
+	sketch sketchState
 
 	// cubeDrag, orbiting and panning track camera navigation drags.
 	cubeDrag          bool
@@ -270,13 +271,25 @@ func (a *App) update(in InputFrame) {
 	if !a.chromeOwnsPointer(in) {
 		a.handleCubeInput(in, vp)
 		a.handleCameraInput(in, vp)
-		a.handleViewportClick(in, vp)
-		a.updateHover(in, vp)
+		if a.InSketch() {
+			a.updateSketch(in, vp)
+		} else {
+			a.handleViewportClick(in, vp)
+			a.updateHover(in, vp)
+		}
 	} else {
 		a.Hover = render.PickResult{}
+		a.sketch.hasSnap = false
 	}
+	// Keyboard shortcuts never depend on where the pointer is: pressing L while
+	// the cursor rests over the tree panel must still pick the Line tool.
 	if !a.UI.WantKeyboard() {
-		a.handleKeys(in, vp)
+		if a.InSketch() {
+			a.handleGlobalKeys(in, vp)
+			a.handleSketchKeys(in)
+		} else {
+			a.handleKeys(in, vp)
+		}
 	}
 }
 
@@ -326,6 +339,12 @@ func (a *App) draw(in InputFrame) {
 func (a *App) HintText() string {
 	if a.hintOverride != "" {
 		return a.hintOverride
+	}
+	if a.sketch.awaitingPlane {
+		return "Click a plane to sketch on it · Esc to cancel"
+	}
+	if a.InSketch() {
+		return a.sketchHint()
 	}
 	if a.Cube.HoverHome {
 		return "Home view"

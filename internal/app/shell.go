@@ -8,6 +8,7 @@ import (
 	"modeler/internal/geom"
 	"modeler/internal/io"
 	"modeler/internal/model"
+	"modeler/internal/sketch"
 	"modeler/internal/ui"
 )
 
@@ -48,11 +49,18 @@ func (t *treeState) init(s *io.Settings) {
 func (a *App) buildShell(l Layout) {
 	a.tree.hovered = model.Ref{}
 
-	a.buildToolbar(l.Toolbar)
+	if a.InSketch() {
+		a.buildSketchToolbar(l.Toolbar)
+	} else {
+		a.buildToolbar(l.Toolbar)
+	}
 	if !a.tree.collapsed {
 		a.buildTree(l.Tree)
 	}
 	a.buildTreeHandle(l.Handle)
+	if a.InSketch() {
+		a.buildSketchCard(l.Viewport)
+	}
 	a.UI.HintBar(l.HintBar, a.HintText(), Version)
 
 	// The tree's hover feeds the viewport highlight, and the viewport's hover
@@ -303,7 +311,11 @@ func (a *App) sketchRow(r rl.Rectangle, s *model.Sketch) {
 		a.Run(&model.SetSketchVisible{ID: s.ID, Visible: !s.Visible})
 	case res.ClickedDelete:
 		a.deleteRef(ref)
-	case res.ClickedRename || res.DoubleClicked:
+	case res.DoubleClicked:
+		// Double-clicking a sketch row re-enters editing (SPEC-UX §7); renaming
+		// is the pencil, so the two never fight over the same gesture.
+		a.EditSketch(s)
+	case res.ClickedRename:
 		a.beginRename(ref, s.Name)
 	case res.Clicked:
 		a.selectRef(ref)
@@ -470,4 +482,154 @@ func itoa(n int) string {
 		buf[i] = '-'
 	}
 	return string(buf[i:])
+}
+
+// buildSketchToolbar replaces the modelling tools with the drawing ones while a
+// sketch is being edited (SPEC-UX §8.2).
+func (a *App) buildSketchToolbar(r rl.Rectangle) {
+	a.UI.Panel(r)
+	a.UI.HairlineH(r.X, r.Y+r.Height-a.px(1), r.Width, ui.ColorStroke)
+
+	sess := a.sketch.session
+	inner := ui.InsetXY(r, a.px(ui.Spacing), a.px(4))
+	btnH := inner.Height
+	rest := inner
+
+	tools := []struct {
+		tool sketch.Tool
+		icon ui.IconFunc
+	}{
+		{sketch.ToolSelect, ui.DrawCursorIcon},
+		{sketch.ToolLine, ui.DrawLineToolIcon},
+		{sketch.ToolRect, ui.DrawRectToolIcon},
+		{sketch.ToolCircle, ui.DrawCircleToolIcon},
+	}
+	for _, t := range tools {
+		label := t.tool.String()
+		w := a.px(ui.IconSize+ui.Spacing) + a.UI.TextWidth(label, ui.FontSizeUI) + a.px(ui.Spacing)
+		var box rl.Rectangle
+		box, rest = ui.SplitLeft(rest, w)
+		box.Height = btnH
+		if a.UI.IconButton(ui.MakeID("sketchtool."+label), box, t.icon, ui.IconOpts{
+			Label:    label,
+			Active:   sess.Tool == t.tool,
+			Tooltip:  label,
+			Shortcut: t.tool.Shortcut(),
+		}) {
+			sess.SetTool(t.tool)
+		}
+		var gap rl.Rectangle
+		gap, rest = ui.SplitLeft(rest, a.px(2))
+		_ = gap
+	}
+
+	// Finish and cancel sit on the right, mirroring the card's footer.
+	btnW := a.px(96)
+	var doneBox, cancelBox rl.Rectangle
+	doneBox, rest = ui.SplitRight(rest, btnW)
+	doneBox.Height = btnH
+	if a.UI.Button(ui.MakeID("sketch.done"), doneBox, "Finish", ui.ButtonOpts{
+		Style:   ui.ButtonPrimary,
+		Tooltip: "Keep this sketch and go back",
+	}) {
+		a.ExitSketch(true)
+	}
+	cancelBox, _ = ui.SplitRight(rest, btnW+a.px(6))
+	cancelBox.Width -= a.px(6)
+	cancelBox.Height = btnH
+	if a.UI.Button(ui.MakeID("sketch.cancel"), cancelBox, "Close", ui.ButtonOpts{
+		Style:   ui.ButtonGhost,
+		Tooltip: "Leave sketch mode — the sketch is kept either way",
+	}) {
+		a.ExitSketch(true)
+	}
+}
+
+// buildSketchCard is the contextual panel on the right of the viewport: what
+// the sketch contains, and the circle segment count (SPEC-UX §8.1, §8.3).
+func (a *App) buildSketchCard(viewport rl.Rectangle) {
+	s := a.ActiveSketch()
+	sess := a.sketch.session
+	if s == nil || sess == nil {
+		return
+	}
+
+	w := a.px(232)
+	h := a.px(150)
+	if s.Consumed {
+		h += a.px(44)
+	}
+	// Below the view cube, never covering it (SPEC-UX §2).
+	box := ui.Rect(
+		viewport.X+viewport.Width-w-a.px(ui.Spacing*2),
+		viewport.Y+a.px(ui.ViewCubeSize+ui.ViewCubeMargin*2+34),
+		w, h)
+
+	card := a.UI.FloatingCard(ui.MakeID("sketch.card"), box, s.Name, ui.FloatingCardOpts{})
+	body := card.Body
+	line := a.UI.Fonts.LineHeight(ui.FontSizeUI) + a.px(2)
+
+	arr := s.Arrangement()
+	var row rl.Rectangle
+	row, body = ui.SplitTop(body, line)
+	a.UI.Text(row, s.Summary(), ui.FontSizeSmall, ui.ColorTextDim)
+
+	// Open ends are the thing that blocks extrude, so they get their own line
+	// in the error colour (SPEC-UX §8.6).
+	row, body = ui.SplitTop(body, line)
+	if n := len(arr.OpenEnds); n > 0 {
+		a.UI.Text(row, plural(n, "open end", "open ends")+" — close them to extrude",
+			ui.FontSizeSmall, ui.ColorError)
+	} else if len(arr.Regions) > 0 {
+		a.UI.Text(row, "Profile is closed", ui.FontSizeSmall, ui.ColorSuccess)
+	}
+
+	body.Y += a.px(4)
+	body.Height -= a.px(4)
+
+	// The segment count applies to new circles, and to a selected one.
+	row, body = ui.SplitTop(body, line)
+	a.UI.Text(row, "Circle segments", ui.FontSizeSmall, ui.ColorTextDim)
+
+	row, body = ui.SplitTop(body, a.px(24))
+	segs := sess.CircleSegs
+	if i, ok := a.selectedCircle(s, sess); ok {
+		segs = s.Entities[i].Segs
+	}
+	labels := []string{"8", "16", "32", "64"}
+	values := []int{8, 16, 32, 64}
+	selected := -1
+	for i, v := range values {
+		if v == segs {
+			selected = i
+		}
+	}
+	if pick, changed := a.UI.ChipGroup(ui.MakeID("sketch.segs"), row, labels, selected,
+		ui.ChipGroupOpts{Tooltip: "Sides of a circle"}); changed {
+		sess.CircleSegs = values[pick]
+		if i, ok := a.selectedCircle(s, sess); ok {
+			a.Run(&model.SetCircleSegs{Sketch: s.ID, Index: i, Segs: values[pick]})
+		}
+	}
+
+	// Re-editing a consumed sketch says so, rather than pretending the bodies
+	// will follow along (SPEC-UX §8.8).
+	if s.Consumed {
+		row, _ = ui.SplitTop(body, line*2)
+		a.UI.Text(row, "Editing this sketch won't change existing bodies.",
+			ui.FontSizeSmall, ui.ColorWarn)
+	}
+}
+
+// selectedCircle returns the index of the single selected circle, if that is
+// what the selection is.
+func (a *App) selectedCircle(s *model.Sketch, sess *sketch.Session) (int, bool) {
+	if len(sess.Selected) != 1 {
+		return 0, false
+	}
+	i := sess.Selected[0]
+	if i < 0 || i >= len(s.Entities) || s.Entities[i].Kind != model.EntCircle {
+		return 0, false
+	}
+	return i, true
 }

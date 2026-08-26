@@ -159,14 +159,14 @@ Specs: UX §3–7.
 
 ### M2 — Sketch mode (L)
 Specs: UX §8, GEOM §3–4.
-- [ ] Enter: click a plane (viewport or tree) → camera animates normal-on, model dims, sketch grid + origin appear
-- [ ] Tools: Select, Line (click-chain), Rectangle, Circle (center-radius, segment count field, default 16); Delete entity; Esc semantics per UX §8.7
-- [ ] Snapping: grid (default 1 u), endpoint, midpoint, H/V inference with dashed guides + glyphs (Alt disables) per UX §8.4
-- [ ] Region engine (GEOM §4): quantize → split at intersections → weld → merge collinear overlaps → planar-graph face walk → regions with holes; live translucent fill of closed regions; **open endpoints drawn as red rings** (R3)
-- [ ] Sketch objects: tree section, rename/hide/delete, re-enter edit; per-sketch entity storage (Line/Rect/Circle logical form)
-- [ ] Unit tests: ≥12 region cases (square, nested hole, figure-8, shared-edge butt, overlapping rects, open chain, crossing lines, duplicate segments, collinear overlap, circle-in-rect, sliver, degenerate zero-length)
-- [ ] Golden shots: sketch with fills + open-end markers
-**Accept:** draw "rect + circle hole" and see two regions filled; tests+goldens green.
+- [x] Enter: click a plane (viewport or tree) → camera animates normal-on, model dims, sketch grid + origin appear
+- [x] Tools: Select, Line (click-chain), Rectangle, Circle (center-radius, segment count field, default 16); Delete entity; Esc semantics per UX §8.7
+- [x] Snapping: grid (default 1 u), endpoint, midpoint, H/V inference with dashed guides + glyphs (Alt disables) per UX §8.4
+- [x] Region engine (GEOM §4): quantize → split at intersections → weld → merge collinear overlaps → planar-graph face walk → regions with holes; live translucent fill of closed regions; **open endpoints drawn as red rings** (R3)
+- [x] Sketch objects: tree section, rename/hide/delete, re-enter edit; per-sketch entity storage (Line/Rect/Circle logical form)
+- [x] Unit tests: ≥12 region cases (square, nested hole, figure-8, shared-edge butt, overlapping rects, open chain, crossing lines, duplicate segments, collinear overlap, circle-in-rect, sliver, degenerate zero-length) — **16 cases**
+- [x] Golden shots: sketch with fills + open-end markers
+**Accept:** draw "rect + circle hole" and see two regions filled; tests+goldens green. — **MET** (`TestRectAndCircleGiveTwoRegions`; goldens `m2_rect_circle`, `m2_open_ends`, `m2_closed_region`, `m2_tools`). The region engine runs the 500-segment budget case in 0.38 ms against GEOM §4's 2 ms. Sketch overlays draw on top of the model rather than depth-tested against it — see DECISIONS V-12.
 
 ### M3 — Extrude to new body (L)
 Specs: UX §9, GEOM §5.
