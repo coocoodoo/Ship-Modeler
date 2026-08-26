@@ -2,7 +2,57 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M0 COMPLETE.** The app builds, runs, renders a real 3D scene with a working view cube, axis triad and hint bar, and can screenshot itself headlessly. Next up: **M1** (UI shell: widget kit, toolbar, tree panel, plane toggles).
+**Current state:** **M1 COMPLETE.** The app has its full window chrome — toolbar, tree panel, hint bar, toasts — backed by a real document and command bus, so every tree action is undoable. Next up: **M2** (sketch mode: tools, snapping, the region engine).
+
+---
+
+## 2026-08-26 — M1: UI shell, document model and command bus
+
+**Done:**
+- **`internal/model`** — the document (bodies, sketches, the three permanent planes, sequences, feature log, camera state) and the command bus of SPEC-DATA §3: targeted-snapshot undo capped at 200, redo, drag coalescing (`BeginDrag`/`UpdateDrag`/`CommitDrag`/`CancelDrag`), change events that derived caches listen to, and the selection model. Ten commands cover everything the tree can do.
+- **`internal/ui`** — the frozen SPEC-UX §4 widget set, all fifteen: button, icon button, toggle, eye, slider, drag-number field (scrub with snapping, click to type, Enter commits, Escape reverts), text field with caret and selection, tree row, colour swatch with an HSV popover, chip group, tooltip on a 600 ms delay, toast, floating card, hint bar, modal and the `?` shortcut sheet. Plus fifteen stroke icons.
+- **`internal/app`** — the window chrome: a toolbar whose tools are present but disabled with tooltips naming the milestone that turns each on, undo/redo buttons wired to the bus, the Planes/Sketches/Bodies tree with counts and a stats footer, a collapsible panel, and the always-populated hint bar.
+- **Bidirectional highlighting** — hovering a tree row outlines its body in the viewport, and hovering geometry names it in the hint bar. Selection shows as an accent silhouette in 3D and an accent row in the tree.
+- **Plane name tags** — each visible plane labels itself in its axis colour at the corner nearest the camera.
+- **`internal/io/settings.go`** — `%APPDATA%\Modeler\settings.json` with an atomic writer and a reader that returns defaults rather than failing, so preferences can never stop the app from starting.
+
+**Verified:**
+- `go build ./...`, `go vet ./...`, `gofmt -l .` — all clean. `go test ./...` — **166 tests pass** (98 at the end of M0).
+- Coverage by package: geom 25, geom/mesh 23, model 26, ui 25, render 23, io 18, scene 12, apptest 14.
+- **Goldens** (read, not just generated): `docs/shots/m1_shell.png`, `m1_tree_collapsed.png`, `m1_planes_hidden.png`, `m1_planes_restored.png`, `m1_tree_click.png`, `m1_plane_delete_toast.png`.
+- **Flows are asserted on behaviour, not pixels.** A new `dump` op prints the document, selection, hint and toasts as machine-readable lines, and a new `click` op synthesizes a real press-and-release through the widget code. So `TestTreeClicksToggleAndSelect` genuinely clicks the Top plane's eye toggle at (24, 80) and the Hull row at (120, 224), then checks the plane is hidden, exactly one undo step exists, and the selection reads "Hull".
+- **R1 is covered from both sides**: `TestPlaneVisibilityIsUndoable` hides two planes and undoes them; `TestDefaultPlanesCannotBeDeleted` tries to delete one and requires a toast that says what to do instead.
+- **Frame cost** with the full chrome: mean **3.43 ms** at 1280x720 (p95 4.12, max 5.55) against a 16.6 ms budget — up from 2.32 ms for the 3D view alone, still comfortable.
+- The windowed app launches and runs clean.
+
+**Decisions/deviations:** five entries appended to `docs/DECISIONS.md` — V-07 the widget kit runs once per frame inside the drawing block, with pointer ownership decided geometrically; V-08 the ops added for M1 flows, including `click` and `dump`; V-09 the glyph atlas limited to what Go Regular empirically contains; V-10 `internal/model` built here rather than deferred, since every tree action must be undoable; V-11 headless runs ignore the user's saved settings so goldens stay deterministic.
+
+**Bugs found and fixed** (all had visible symptoms, all now covered):
+1. **No click ever fired.** The widget kit cleared the active widget in `Begin`, before the widgets could see the release — but the release frame *is* the frame a click happens on. Moved to `End`. The scripted `click` op is what caught it: the first attempt hovered beautifully and did nothing.
+2. **The window position was never saved.** `WindowRect` gave both `X` and `Y` the JSON tag `"x"`, and both `Width` and `Height` the tag `"w"`; encoding/json silently drops conflicting fields, so the rect round-tripped as zeros.
+3. **The two-pass UI design was unsound.** Running widgets once in `Update` for input and again in `Draw` for pixels issued raylib draw calls outside `BeginDrawing` and would have reset drag state mid-drag. Replaced with a single pass.
+4. **An em dash rendered as `?`.** The glyph atlas had been trimmed too far in M0; the characters Go Regular actually carries are now determined empirically.
+5. **Goldens depended on the developer's machine.** Headless runs were loading the real `%APPDATA%` settings, so a collapsed tree panel left over from a manual session would have changed every baseline.
+6. **Stale pick probes.** The M0 picking test used window coordinates that moved when the tree panel claimed 240 px; re-derived them with a sweep of `pick` ops rather than nudging by hand, and the test now says so.
+
+**Open issues:**
+- The toolbar tools are all disabled by design; each says which milestone turns it on. The `Move` entry currently maps to Idle because its mode arrives with M6.
+- Face, edge and vertex selection resolve to the whole body for now. The sub-element selection model and its overlay highlighting are M6.
+- The colour picker commits through the drag machinery, so scrubbing hue is one undo step — but it has no golden yet, because the popover needs a two-stage scripted interaction (click the swatch, then drag inside the popover) that would be clearer to write once M2 adds drag ops.
+- DPI scaling above 1.0 is still untested in practice; this machine reports 1.0.
+
+**Next:** M2 — start with `internal/geom/sketch2d`: write the twelve-plus region cases of TESTING §2 as failing tests first, then the integer arrangement pipeline (quantize, split, weld, face walk, nesting) behind them.
+
+**Try it (user):**
+```bash
+c:\goin\go.exe run ./cmd/modeler
+```
+1. **Click an eye** next to Top, Front or Right — the plane vanishes, the row dims, and **Ctrl+Z** brings it back.
+2. **Click a body row** — it gets an accent silhouette in the viewport; **hover** a row instead and watch that body outline in accent too.
+3. **Hover a body row** and use the **pencil** to rename it, or the **trash** to delete it — the toast that appears carries an **Undo** button.
+4. **Click a body's colour swatch** to open the HSV picker and drag around the square.
+5. **Select a plane and press Del** — it refuses, and says you can hide it instead.
+6. Press **?** for the shortcut sheet, and click the **‹** handle on the panel edge to collapse the tree.
 
 ---
 

@@ -1,0 +1,11 @@
+[
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"shot","name":"m1_shell"},
+  {"op":"ui.tree","visible":false},
+  {"op":"settle"},
+  {"op":"shot","name":"m1_tree_collapsed"},
+  {"op":"ui.tree","visible":true},
+  {"op":"settle"}
+]

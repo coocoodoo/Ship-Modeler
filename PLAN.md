@@ -150,12 +150,12 @@ Specs: GEOM §1–2, RENDER all, UX §6.
 
 ### M1 — UI shell: panels, theme, widgets, planes (M)
 Specs: UX §3–7.
-- [ ] `internal/ui`: exactly the widget set of UX §4 (button, icon button, toggle/eye, slider, drag-number field, text field, tree row, color swatch, chip group, tooltip, toast, floating card, hint bar, modal, shortcut overlay). Theme tokens from UX §3. No additions without DECISIONS entry.
-- [ ] Layout: top toolbar (tools stubbed/disabled), left tree panel (collapsible sections), viewport, bottom hint bar
-- [ ] Default planes Top/Front/Right as translucent tinted bounded quads with labels; eye toggles in tree; **no delete/rename affordance** (R1); click plane in tree or viewport → highlight (planes join the pick pass)
-- [ ] Toasts + hint bar working; settings (`%APPDATA%\Modeler\settings.json`): window size/pos, persisted
-- [ ] Golden shots incl. plane visibility toggling via script
-**Accept:** shell matches UX §2 mock; planes toggle; hover states everywhere; goldens.
+- [x] `internal/ui`: exactly the widget set of UX §4 (button, icon button, toggle/eye, slider, drag-number field, text field, tree row, color swatch, chip group, tooltip, toast, floating card, hint bar, modal, shortcut overlay). Theme tokens from UX §3. No additions without DECISIONS entry.
+- [x] Layout: top toolbar (tools stubbed/disabled), left tree panel (collapsible sections), viewport, bottom hint bar
+- [x] Default planes Top/Front/Right as translucent tinted bounded quads with labels; eye toggles in tree; **no delete/rename affordance** (R1); click plane in tree or viewport → highlight (planes join the pick pass)
+- [x] Toasts + hint bar working; settings (`%APPDATA%\Modeler\settings.json`): window size/pos, persisted
+- [x] Golden shots incl. plane visibility toggling via script
+**Accept:** shell matches UX §2 mock; planes toggle; hover states everywhere; goldens. — **MET** (goldens `m1_shell`, `m1_tree_collapsed`, `m1_planes_hidden/restored`, `m1_tree_click`, `m1_plane_delete_toast`; flows driven by synthetic clicks and asserted on document dumps, not pixels alone). `internal/model` — the document, command bus and undo — was built here rather than later, because every tree action must be undoable (DECISIONS V-10).
 
 ### M2 — Sketch mode (L)
 Specs: UX §8, GEOM §3–4.

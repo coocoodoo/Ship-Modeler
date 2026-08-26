@@ -10,7 +10,9 @@ import (
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"modeler/internal/geom"
 	"modeler/internal/io"
+	"modeler/internal/model"
 	"modeler/internal/render"
 )
 
@@ -53,6 +55,13 @@ type ScriptRunner struct {
 	rt      rl.RenderTexture2D
 	rtReady bool
 	shots   []string
+
+	// mouse is the scripted cursor position, which persists between ops so a
+	// hover op can be followed by a click at the same place.
+	mouse [2]float64
+	// moved marks that the next frame should report pointer motion, which is
+	// what wakes the throttled hover pick.
+	moved bool
 }
 
 // NewScriptRunner prepares a runner writing PNGs into outDir.
@@ -110,11 +119,48 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		a.Camera.Normalize()
 
 	case "body.visible":
-		b := a.FindBody(op.Body)
+		b := a.Doc().BodyByName(op.Body)
 		if b == nil {
 			return op.Errorf("no body named %q", op.Body)
 		}
-		b.Visible = *op.Visible
+		if !a.Run(&model.SetBodyVisible{ID: b.ID, Visible: *op.Visible}) {
+			return op.Errorf("could not change the visibility of %q", op.Body)
+		}
+
+	case "plane.visible":
+		k, ok := geom.ParsePlaneKind(op.Plane)
+		if !ok {
+			return op.Errorf("unknown plane %q", op.Plane)
+		}
+		if !a.Run(&model.SetPlaneVisible{Plane: k, Visible: *op.Visible}) {
+			return op.Errorf("could not change the visibility of the %s plane", op.Plane)
+		}
+
+	case "select":
+		if err := r.selectOp(op); err != nil {
+			return err
+		}
+
+	case "deselect":
+		a.Sel.Clear()
+
+	case "delete":
+		a.deleteSelection()
+
+	case "undo":
+		a.Undo()
+
+	case "redo":
+		a.Redo()
+
+	case "hover":
+		r.mouse = [2]float64{op.At[0], op.At[1]}
+
+	case "click":
+		r.click(op.At[0], op.At[1], op.Kind)
+
+	case "ui.tree":
+		a.tree.collapsed = op.Visible != nil && !*op.Visible
 
 	case "settle":
 		if err := r.settle(); err != nil {
@@ -129,6 +175,9 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 	case "pick":
 		r.pick(op.At[0], op.At[1])
 
+	case "dump":
+		r.dump()
+
 	default:
 		return op.Errorf("op is not implemented yet in this build")
 	}
@@ -139,14 +188,96 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 	return nil
 }
 
-// step advances one virtual frame of app logic with no user input.
-func (r *ScriptRunner) step() {
+// step advances one virtual frame with no button activity.
+func (r *ScriptRunner) step() { r.runFrame(r.frame()) }
+
+// runFrame drives one whole app frame into the capture target. Headless renders
+// every scripted frame, because the widget kit handles its input during the
+// draw pass: a scripted click is only seen if a frame actually runs.
+func (r *ScriptRunner) runFrame(in InputFrame) {
+	r.ensureTarget()
+	rl.BeginDrawing()
+	rl.BeginTextureMode(r.rt)
+	r.App.Frame(in)
+	rl.EndTextureMode()
+	rl.EndDrawing()
+}
+
+// ensureTarget lazily creates the offscreen render target.
+func (r *ScriptRunner) ensureTarget() {
+	if !r.rtReady {
+		r.rt = rl.LoadRenderTexture(int32(r.Size.W), int32(r.Size.H))
+		r.rtReady = true
+	}
+}
+
+// frame builds an input frame at the scripted cursor position.
+func (r *ScriptRunner) frame() InputFrame {
 	in := NewInputFrame()
 	in.WindowW, in.WindowH = r.Size.W, r.Size.H
 	in.DeltaMillis = VirtualFrameMillis
-	// Park the cursor outside the viewport so hover picking stays off.
-	in.MouseX, in.MouseY = -1, -1
-	r.App.Update(in)
+	in.MouseX, in.MouseY = r.mouse[0], r.mouse[1]
+	if r.moved {
+		// A nominal delta so hover picking treats this as real motion.
+		in.MouseDX, in.MouseDY = 1, 0
+		r.moved = false
+	}
+	return in
+}
+
+// click synthesizes a full press and release at a point, driving the same
+// widget code a real click would. kind selects the button: "right" and
+// "middle" are accepted, anything else is the left button.
+func (r *ScriptRunner) click(x, y float64, kind string) {
+	button := MouseLeft
+	switch kind {
+	case "right":
+		button = MouseRight
+	case "middle":
+		button = MouseMiddle
+	}
+	r.mouse = [2]float64{x, y}
+	r.moved = true
+	// Move first, so hover state settles before the button goes down.
+	r.step()
+
+	down := r.frame()
+	down.Pressed[button] = true
+	down.Down[button] = true
+	r.runFrame(down)
+
+	up := r.frame()
+	up.Released[button] = true
+	r.runFrame(up)
+}
+
+// selectOp implements the select op for whole objects. Sub-element selection
+// arrives with M6.
+func (r *ScriptRunner) selectOp(op io.Op) error {
+	a := r.App
+	switch op.Kind {
+	case "", "body":
+		b := a.Doc().BodyByName(op.Body)
+		if b == nil {
+			return op.Errorf("no body named %q", op.Body)
+		}
+		a.Sel.Set(model.BodyRef(b.ID))
+	case "plane":
+		k, ok := geom.ParsePlaneKind(op.Plane)
+		if !ok {
+			return op.Errorf("unknown plane %q", op.Plane)
+		}
+		a.Sel.Set(model.PlaneRef(k))
+	case "sketch":
+		sk := a.Doc().SketchByName(op.Sketch)
+		if sk == nil {
+			return op.Errorf("no sketch named %q", op.Sketch)
+		}
+		a.Sel.Set(model.SketchRef(sk.ID))
+	default:
+		return op.Errorf("cannot select %q yet", op.Kind)
+	}
+	return nil
 }
 
 // settle steps the clock until every animation has finished.
@@ -165,16 +296,7 @@ func (r *ScriptRunner) shot(name string) error {
 	if err := os.MkdirAll(r.OutDir, 0o755); err != nil {
 		return fmt.Errorf("create output dir: %w", err)
 	}
-	if !r.rtReady {
-		r.rt = rl.LoadRenderTexture(int32(r.Size.W), int32(r.Size.H))
-		r.rtReady = true
-	}
-
-	rl.BeginDrawing()
-	rl.BeginTextureMode(r.rt)
-	r.App.Draw(r.Size.W, r.Size.H)
-	rl.EndTextureMode()
-	rl.EndDrawing()
+	r.step() // one fresh frame so the shot shows the current state
 
 	img := rl.LoadImageFromTexture(r.rt.Texture)
 	if img == nil {
@@ -206,6 +328,7 @@ func (r *ScriptRunner) pick(x, y float64) {
 	rl.EndDrawing()
 
 	a.Hover = res
+	r.mouse = [2]float64{x, y}
 	if !res.Hit {
 		fmt.Printf("pick at=%.0f,%.0f kind=none\n", x, y)
 		return
@@ -222,18 +345,11 @@ func (r *ScriptRunner) Bench(frames int) {
 	if frames <= 0 {
 		return
 	}
-	if !r.rtReady {
-		r.rt = rl.LoadRenderTexture(int32(r.Size.W), int32(r.Size.H))
-		r.rtReady = true
-	}
+	r.ensureTarget()
 	samples := make([]float64, 0, frames)
 	for i := 0; i < frames; i++ {
 		start := time.Now()
-		rl.BeginDrawing()
-		rl.BeginTextureMode(r.rt)
-		r.App.Draw(r.Size.W, r.Size.H)
-		rl.EndTextureMode()
-		rl.EndDrawing()
+		r.step()
 		// A readback forces the GPU to finish, so the number is honest rather
 		// than the time it took to queue the commands.
 		if img := rl.LoadImageFromTexture(r.rt.Texture); img != nil {
@@ -253,6 +369,43 @@ func (r *ScriptRunner) Bench(frames int) {
 	fmt.Printf("bench frames=%d size=%dx%d mean=%.2fms p50=%.2fms p95=%.2fms p99=%.2fms max=%.2fms budget=16.60ms\n",
 		len(samples), r.Size.W, r.Size.H,
 		sum/float64(len(samples)), pct(0.5), pct(0.95), pct(0.99), samples[len(samples)-1])
+}
+
+// dump prints the document and selection state as machine-readable lines. Flow
+// tests assert on these rather than on pixels, so a behavioural regression is
+// reported as a behaviour, not as a picture that changed.
+func (r *ScriptRunner) dump() {
+	a := r.App
+	doc := a.Doc()
+
+	planes := make([]string, 0, geom.PlaneCount)
+	for i := 0; i < geom.PlaneCount; i++ {
+		k := geom.PlaneKind(i)
+		planes = append(planes, fmt.Sprintf("%s:%d", k, boolBit(doc.PlaneVisible(k))))
+	}
+	fmt.Printf("doc planes=%s bodies=%d sketches=%d undo=%d redo=%d dirty=%d\n",
+		strings.Join(planes, ","), len(doc.Bodies), len(doc.Sketches),
+		a.Bus.UndoDepth(), a.Bus.RedoDepth(), boolBit(doc.DirtySinceSave))
+
+	for _, b := range doc.Bodies {
+		fmt.Printf("body id=%d name=%q visible=%d tris=%d color=%02X%02X%02X\n",
+			b.ID, b.Name, boolBit(b.Visible), b.TriangleCount(), b.Color.R, b.Color.G, b.Color.B)
+	}
+	for _, s := range doc.Sketches {
+		fmt.Printf("sketch id=%d name=%q visible=%d\n", s.ID, s.Name, boolBit(s.Visible))
+	}
+	fmt.Printf("sel count=%d desc=%q\n", a.Sel.Len(), a.Sel.Describe(doc))
+	fmt.Printf("hint %q\n", a.HintText())
+	for _, t := range a.UI.Toasts() {
+		fmt.Printf("toast %q\n", t.Text)
+	}
+}
+
+func boolBit(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // RunHeadless opens a hidden window, runs a script and writes its shots.

@@ -26,10 +26,11 @@ func buildGlyphRange() []rune {
 	for c := rune(32); c < 127; c++ {
 		rs = append(rs, c)
 	}
-	// Only glyphs the Go Regular typeface actually carries; every other symbol
-	// the UI needs (undo arrows, chevrons, ticks, the home icon) is drawn as a
-	// stroke icon instead (D-11).
-	rs = append(rs, '·', '×', '°')
+	// The punctuation the UI copy actually uses, all verified present in the
+	// Go Regular typeface. The symbols it does NOT carry — ticks, crosses,
+	// chevrons, the undo arrows — are stroke icons instead (D-11), so nothing
+	// here can fall back to a missing-glyph box.
+	rs = append(rs, '·', '×', '°', '—', '–', '‹', '›', '“', '”', '‘', '’', '…', '±', '→', '↔')
 	return rs
 }
 

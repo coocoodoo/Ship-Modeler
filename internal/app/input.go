@@ -4,6 +4,8 @@ package app
 
 import (
 	rl "github.com/gen2brain/raylib-go/raylib"
+
+	"modeler/internal/ui"
 )
 
 // InputFrame is one frame of user input. The app consumes only this struct, so
@@ -26,6 +28,24 @@ type InputFrame struct {
 
 	WindowW, WindowH int
 	DeltaMillis      float64
+}
+
+// ToUI converts a frame into the widget kit's input form. The kit deliberately
+// takes its own struct so it stays independent of how the app polls.
+func (f *InputFrame) ToUI() ui.Input {
+	return ui.Input{
+		MouseX: f.MouseX, MouseY: f.MouseY,
+		MouseDX: f.MouseDX, MouseDY: f.MouseDY,
+		Wheel:       f.Wheel,
+		Down:        f.Down,
+		Pressed:     f.Pressed,
+		Released:    f.Released,
+		Chars:       f.Chars,
+		KeysPressed: f.KeysPressed,
+		KeysDown:    f.KeysDown,
+		Shift:       f.Shift, Ctrl: f.Ctrl, Alt: f.Alt,
+		DeltaMillis: f.DeltaMillis,
+	}
 }
 
 // Mouse buttons, indexed into the InputFrame arrays.
@@ -63,7 +83,9 @@ var watchedKeys = []int32{
 	rl.KeyLeftShift, rl.KeyRightShift,
 	rl.KeyLeftControl, rl.KeyRightControl,
 	rl.KeyLeftAlt, rl.KeyRightAlt,
-	rl.KeyZ, rl.KeyY, rl.KeyD, rl.KeyN,
+	rl.KeyZ, rl.KeyY, rl.KeyD, rl.KeyN, rl.KeyA,
+	rl.KeyBackspace, rl.KeyLeft, rl.KeyRight, rl.KeyHome, rl.KeyEnd,
+	rl.KeySlash,
 }
 
 // PollInput reads raylib's state into an InputFrame.

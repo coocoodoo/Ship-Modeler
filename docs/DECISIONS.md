@@ -146,3 +146,45 @@ unpinned Go pointer sharing that object — our vertex slices, edge list, face
 table — makes `UploadMesh` panic with "Go pointer to unpinned Go pointer".
 raylib-go pins the mesh's own array fields, so an `rl.Mesh` allocated alone
 passes. See `render.BodyGPU.Upload`.
+
+### 2026-08-26 — M1
+
+**V-07 · The widget kit runs exactly once per frame, inside the drawing block.**
+An immediate-mode kit holds real state — which widget is being dragged, where
+the caret is, how long a tooltip has waited — so running the widget code twice
+per frame (once to read input, once to paint) corrupts it, and running it
+outside `BeginDrawing` queues geometry into the wrong framebuffer. The app
+therefore has one `Frame` entry point: logic, then the 3D view, then the chrome.
+Whether the pointer belongs to the chrome or the viewport is decided
+*geometrically* (`Layout.Viewport`, the view cube's rect, an open popover or
+modal) before the widgets run, so the viewport never has to ask the kit what it
+did.
+
+**V-08 · Ops added for M1 flows.**
+`plane.visible`, `select`, `deselect`, `delete`, `undo`, `redo`, `ui.tree`,
+`hover`, `click` and `dump`. The last three are what make the chrome testable:
+`click` synthesizes a full press-and-release through the real widget code, and
+`dump` prints the document, selection, hint and toasts as machine-readable
+lines, so a flow test asserts on behaviour rather than on a picture that
+happened to change. SPEC-DATA §7 anticipates the op set growing as tools land.
+
+**V-09 · The glyph atlas carries only what Go Regular actually has.**
+Determined empirically rather than assumed: `·  ×  °  —  –  ‹  ›  “  ”  ‘  ’  …
+±  →  ↔` are present; `✓ ✕ ▾ ▸ ⇄ ↶ ↷ ` are **not**. Those are stroke icons
+(D-11), so no UI string can fall back to a missing-glyph box. An em dash in a
+toast rendered as `?` until this was fixed.
+
+**V-10 · `internal/model` was built in M1, not deferred.**
+The milestone list does not name it until later, but the tree panel's own
+actions — show/hide, rename, recolour, delete — must all be undoable
+(SPEC-DATA §3.4), and retrofitting a command bus under a UI that already mutates
+state directly is worse than building it first. The bus, the targeted-snapshot
+undo, drag coalescing and the change events all landed here; the geometry
+commands join them from M3.
+
+**V-11 · Headless runs ignore the user's saved settings.**
+`app.New` loads `%APPDATA%\Modeler\settings.json` interactively but uses
+defaults when headless. Otherwise a golden shot would depend on whatever tree
+width or collapse state the developer last left behind, which is not a property
+of the document.
+

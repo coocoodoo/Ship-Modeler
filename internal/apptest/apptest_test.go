@@ -219,7 +219,9 @@ func TestPickPassResolvesGeometry(t *testing.T) {
 	}
 
 	// The script front-frames the test scene, so the geometry under each probe
-	// is known: see testdata/scripts/m0_pick.json for the coordinates.
+	// is known: see testdata/scripts/m0_pick.json for the coordinates. They are
+	// window pixels, so they move whenever the chrome layout changes; re-derive
+	// them with a sweep of pick ops rather than nudging them by hand.
 	cases := []struct {
 		desc string
 		kind string

@@ -1,0 +1,15 @@
+[
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"click","at":[24,80]},
+  {"op":"click","at":[120,224]},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m1_tree_click"},
+  {"op":"select","kind":"plane","plane":"Front"},
+  {"op":"delete"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m1_plane_delete_toast"}
+]

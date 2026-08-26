@@ -40,7 +40,8 @@ func Run() {
 	a := New(false)
 	defer a.Close()
 	a.LoadTestScene()
-	a.FrameSelection(a.Viewport(rl.GetRenderWidth(), rl.GetRenderHeight()))
+	a.layout = a.Layout(rl.GetRenderWidth(), rl.GetRenderHeight())
+	a.FrameSelection(a.layout.RenderViewport())
 
 	for !rl.WindowShouldClose() {
 		dt := float64(rl.GetFrameTime()) * 1000
@@ -48,10 +49,9 @@ func Run() {
 			dt = 1000.0 / 60.0 // first frame, or after a long stall
 		}
 		in := PollInput(dt)
-		a.Update(in)
 
 		rl.BeginDrawing()
-		a.Draw(in.WindowW, in.WindowH)
+		a.Frame(in)
 		rl.EndDrawing()
 	}
 }
