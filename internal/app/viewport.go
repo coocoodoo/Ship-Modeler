@@ -125,13 +125,10 @@ func (a *App) buildPlaneDraws() []render.PlaneDraw {
 // viewportHoverRef maps the pick result into a document reference, so the tree
 // can highlight the row for whatever the cursor is over in 3D.
 func (a *App) viewportHoverRef() model.Ref {
-	// A sketch under the pointer wins over the plane it was drawn on, for the
-	// same reason a click does: the sketch is what is in front, and the hint
-	// bar has to describe what a click will actually select.
+	// A sketch under the pointer wins, for the same reason a click does: it is
+	// drawn over everything, so it is what you can see there.
 	if a.hoverSketch != nil {
-		if !a.Hover.Hit || a.Hover.Kind == render.PickPlane {
-			return model.SketchRef(a.hoverSketch.ID)
-		}
+		return model.SketchRef(a.hoverSketch.ID)
 	}
 	if !a.Hover.Hit {
 		return model.Ref{}
@@ -310,15 +307,17 @@ func (a *App) handleViewportClick(in InputFrame, vp render.Viewport) {
 	hit := a.Renderer.Pick(&s, vp, in.MouseX, in.MouseY)
 	a.Hover = hit
 
-	// A visible sketch is an overlay, not geometry, so it is not in the ID
-	// buffer. It still has to be clickable: selecting a sketch is how you
-	// extrude one without going to the tree, and a closed profile that cannot
-	// be clicked looks broken. A body in front of it still wins.
-	if !hit.Hit || hit.Kind == render.PickPlane {
-		if sk := a.sketchAt(in.MouseX, in.MouseY, vp); sk != nil {
-			a.selectRef(model.SketchRef(sk.ID))
-			return
-		}
+	// A visible sketch wins over anything behind it, including a body.
+	//
+	// Sketches are drawn with the depth test off (V-12), so one is always on top
+	// of whatever it overlaps — that is what makes sketching on a plane running
+	// through a hull possible at all. Clicking has to agree with that: if the
+	// sketch is the thing you can see there, it is the thing you get. A sketch
+	// that gets in the way has an eye in the tree, and a consumed one hides
+	// itself.
+	if sk := a.sketchAt(in.MouseX, in.MouseY, vp); sk != nil {
+		a.selectRef(model.SketchRef(sk.ID))
+		return
 	}
 
 	if !hit.Hit {

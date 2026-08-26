@@ -240,42 +240,56 @@ func TestDuplicateOffsetsACopy(t *testing.T) {
 	}
 }
 
-// TestClickingASketchSelectsIt is a regression, reported by the user: a closed
-// sketch could not be selected to extrude it.
+// TestClickingASketchSelectsIt is a regression, reported by the user twice.
 //
 // A finished sketch is drawn as an overlay, not as geometry, so it was never in
 // the ID buffer the pick pass reads. Clicking one selected whatever was behind
-// it — which, on the plane it was drawn on, is that plane. The sketch was
-// perfectly selectable from the tree, so nothing failed loudly; it just looked
-// as though closed profiles could not be picked.
+// it. The first fix only let the sketch win over a plane, which missed the case
+// that was actually being hit: the hull sits on the Top plane, so a sketch drawn
+// there has a *body* behind it, not a plane.
+//
+// The rule now matches the rendering. Sketches draw with the depth test off
+// (V-12), so one is always on top of whatever it overlaps — that is what makes
+// sketching on a plane that runs through a hull possible. A click has to agree
+// with what you can see there.
+//
+// This test therefore leaves every body visible, which is what the user had.
 func TestClickingASketchSelectsIt(t *testing.T) {
 	stdout, _ := runScript(t, "m6_sketchclick")
 	dumps := parseM3Dumps(t, stdout)
 	sels, _ := parseM6Dumps(t, stdout)
-	if len(dumps) != 4 {
-		t.Fatalf("expected 4 dumps, got %d:\n%s", len(dumps), stdout)
+	if len(dumps) != 5 {
+		t.Fatalf("expected 5 dumps, got %d:\n%s", len(dumps), stdout)
 	}
-	hovered, clicked, open, done := dumps[0], dumps[1], dumps[2], dumps[3]
+	hovered, clicked, elsewhere, open, done :=
+		dumps[0], sels[1], sels[2], dumps[3], dumps[4]
 
-	// Hovering names the sketch, not the plane under it, so the hint bar
-	// describes what a click will actually do.
+	// The hull is right behind the sketch, so this is the case that was broken.
+	if !hovered.hasBody("Hull") {
+		t.Fatal("the hull is not in the scene, so nothing is behind the sketch")
+	}
 	if !strings.Contains(hovered.hint, "Sketch 1") {
 		t.Errorf("hovering a sketch says %q, want it to name the sketch", hovered.hint)
 	}
-	if strings.Contains(hovered.hint, "plane") {
-		t.Errorf("hovering a sketch says %q, which is the plane behind it", hovered.hint)
+	if strings.Contains(hovered.hint, "Hull") {
+		t.Errorf("hovering a sketch says %q, which is the body behind it", hovered.hint)
 	}
 	if sels[0].count != 0 {
 		t.Errorf("hovering selected something: %q", sels[0].desc)
 	}
 
-	// Clicking selects the sketch itself.
-	if sels[1].desc != "Sketch 1" {
-		t.Errorf("clicking a sketch selected %q, want Sketch 1", sels[1].desc)
+	if clicked.desc != "Sketch 1" {
+		t.Errorf("clicking a sketch selected %q, want Sketch 1", clicked.desc)
 	}
-	_ = clicked
 
-	// And from there E extrudes it, with its region already picked.
+	// And a body away from the sketch is still perfectly clickable: the sketch
+	// wins where it is, not everywhere.
+	if !strings.Contains(elsewhere.desc, "face of") {
+		t.Errorf("clicking a body away from the sketch selected %q, want a face",
+			elsewhere.desc)
+	}
+
+	// From there E extrudes it, with its region already picked.
 	if !open.extrude.present {
 		t.Fatal("the extrude tool did not open on the selected sketch")
 	}

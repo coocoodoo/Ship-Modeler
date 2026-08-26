@@ -1,7 +1,4 @@
 [
-  {"op":"body.visible","body":"Hull","visible":false},
-  {"op":"body.visible","body":"Engine pod","visible":false},
-  {"op":"body.visible","body":"Wing pod","visible":false},
   {"op":"sketch.begin","plane":"Top"},
   {"op":"sketch.rect","a":[-3,-3],"b":[3,3]},
   {"op":"sketch.finish"},
@@ -14,6 +11,10 @@
   {"op":"click","at":[760,375]},
   {"op":"settle"},
   {"op":"dump"},
+  {"op":"click","at":[520,375]},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"click","at":[760,375]},
   {"op":"extrude.begin","depth":3},
   {"op":"settle"},
   {"op":"dump"},

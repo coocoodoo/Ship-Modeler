@@ -22,11 +22,20 @@ went unnoticed for four milestones. Every automated route into extrude went
 through the tree or through the `extrude` op directly. Nothing clicked a sketch
 in the viewport, because until now nothing needed to.
 
-**Fixed:** a click that lands on nothing, or on a plane, now tests the visible
-sketches first, in the sketch's own plane rather than by rendering ids — the
-same point-in-region code the sketch-mode hover already uses, and exact. A body
-in front still wins; the nearest of two overlapping sketches wins. Open profiles
-are pickable by their strokes, closed ones anywhere inside.
+**Fixed twice.** The first attempt let a sketch win over a *plane*, and the user
+reported it still broken — correctly. The hull sits on the Top plane, so a
+sketch drawn there has a body behind it, not a plane, and my rule of "a body in
+front still wins" was simply the wrong rule.
+
+Sketches draw with the depth test off (V-12) so that sketching on a plane
+running through a hull is possible at all. That means a sketch is *always* the
+thing you can see at its own position, and a click has to agree with the
+rendering. A visible sketch under the cursor now wins outright. Bodies away from
+the sketch are unaffected; a sketch that gets in the way has an eye in the tree,
+and a consumed one hides itself. The test is done in the sketch's own plane
+rather than by rendering ids — the same point-in-region code the sketch-mode
+hover uses, and exact. Open profiles are pickable by their strokes, closed ones
+anywhere inside.
 
 **The hint bar disagreed with the click, and that took longer to find than the
 bug.** With the click fixed, hovering a sketch still read "Top plane". The hint
@@ -35,10 +44,15 @@ fix belonged in `viewportHoverRef`, not in a special case inside `HintText`.
 Putting it there means the tree row highlights too, which is what hovering
 anything else already does.
 
-**Verified:** `TestClickingASketchSelectsIt` covers the whole path — hover names
-the sketch, click selects it, E opens the extrude with its region picked, and
-the committed solid is 108 (a 6x6 square pulled 3). Full suite green, no golden
-drift.
+**Verified:** `TestClickingASketchSelectsIt` runs with every body visible —
+which is what the user had, and what the first fix missed. Hover names the
+sketch and not the hull behind it, clicking selects it, clicking the body away
+from the sketch still selects that body, and E opens the extrude with its region
+picked for a committed solid of 108. Full suite green, no golden drift.
+
+**The lesson:** the first fix was tested against a scene with the bodies hidden,
+because that is how the other sketch scripts are written. The bug lived exactly
+in the case the test scene had been tidied out of.
 
 ---
 
