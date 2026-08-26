@@ -137,16 +137,16 @@ Sizes: S ≈ a focused session, M ≈ 1–2 sessions, L ≈ 2–4, XL ≈ budget
 ---
 ### M0 — Foundation: cgo+raylib up, camera, passes, picking, headless (L)
 Specs: GEOM §1–2, RENDER all, UX §6.
-- [ ] Verify toolchain: hello-world cgo build; then `git init`, `go.mod` (module `modeler`, go 1.26), package skeleton per §4, `.gitignore` (modeler.exe; keep docs/shots)
-- [ ] raylib window 1600×900 resizable "Modeler", dark clear color, MSAA 4× hint, VSync; embedded Go Regular font rendering at 13/15 px (crisp at DPI scales 1.0/1.25/1.5/2.0)
-- [ ] `internal/geom`: vectors/Mat4/AABB, 2D exact predicates (int64 cross), grid snap helpers — unit tests
-- [ ] `internal/render`: shaded pass (flat-shading GLSL 330 shader: per-face normal via `flat` varying, hemispheric fill light per RENDER §4), edge overlay pass (camera-offset trick per RENDER §5), overlay pass (gizmos later); render-to-texture proven
-- [ ] **Pick pass**: 64×64 ID render around cursor (pick-matrix projection), readback, decode to {type, bodyID, faceID/edge/vert} per RENDER §6; prove on a test mesh (log hovered face)
-- [ ] Camera: turntable orbit (up-locked)/pan/zoom-to-cursor; ortho (default) + perspective; animated transitions (220 ms cubic) per RENDER §7
-- [ ] View cube (top-right): 26 hover zones via its own tiny pick render, click → animated snap, drag → orbit; home button. Axis triad (bottom-right): mirrors orientation, display-only
-- [ ] Headless mode: `-headless -script x.json -out y.png` (hidden window) runs op script (io.ScriptRunner) → PNG; golden harness with tolerance policy (TESTING §5: MSAA off in test shots)
-- [ ] Golden shots: iso/front/perspective of a test mesh → `docs/shots/m0_*.png`
-**Accept:** 60 fps orbit; cube/triad behave; pick pass returns correct IDs at cursor; goldens pass twice in a row (determinism check); PROGRESS updated.
+- [x] Verify toolchain: hello-world cgo build; then `git init`, `go.mod` (module `modeler`, go 1.26), package skeleton per §4, `.gitignore` (modeler.exe; keep docs/shots)
+- [x] raylib window 1600×900 resizable "Modeler", dark clear color, MSAA 4× hint, VSync; embedded Go Regular font rendering at 13/15 px (crisp at DPI scales 1.0/1.25/1.5/2.0)
+- [x] `internal/geom`: vectors/Mat4/AABB, 2D exact predicates (int64 cross), grid snap helpers — unit tests
+- [x] `internal/render`: shaded pass (flat-shading GLSL 330 shader: per-face normal via `flat` varying, hemispheric fill light per RENDER §4), edge overlay pass (camera-offset trick per RENDER §5), overlay pass (gizmos later); render-to-texture proven
+- [x] **Pick pass**: 64×64 ID render around cursor (pick-matrix projection), readback, decode to {type, bodyID, faceID/edge/vert} per RENDER §6; prove on a test mesh (log hovered face)
+- [x] Camera: turntable orbit (up-locked)/pan/zoom-to-cursor; ortho (default) + perspective; animated transitions (220 ms cubic) per RENDER §7
+- [x] View cube (top-right): 26 hover zones via its own tiny pick render, click → animated snap, drag → orbit; home button. Axis triad (bottom-right): mirrors orientation, display-only
+- [x] Headless mode: `-headless -script x.json -out y.png` (hidden window) runs op script (io.ScriptRunner) → PNG; golden harness with tolerance policy (TESTING §5: MSAA off in test shots)
+- [x] Golden shots: iso/front/perspective of a test mesh → `docs/shots/m0_*.png`
+**Accept:** 60 fps orbit; cube/triad behave; pick pass returns correct IDs at cursor; goldens pass twice in a row (determinism check); PROGRESS updated. — **MET** (frame cost 2.3 ms @720p / 4.3 ms @1080p vs a 16.6 ms budget; picking verified by `TestPickPassResolvesGeometry`; goldens bit-identical across runs via `TestRenderIsDeterministic`). Cube zone picking is analytic rather than a second ID render — see DECISIONS V-02.
 
 ### M1 — UI shell: panels, theme, widgets, planes (M)
 Specs: UX §3–7.

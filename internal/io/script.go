@@ -1,0 +1,187 @@
+// Package io owns file formats: the .ship project container, exports, settings
+// and the op-script format that drives headless runs and end-to-end tests.
+// It is raylib-free so its tests need no window.
+package io
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+)
+
+// Op is one step of an op script (SPEC-DATA §7). The struct is a flat union of
+// every op's fields; Parse validates that the ones an op needs are present.
+//
+// Ops are executed through the real command bus and camera controller, so a
+// script and a user session go down identical code paths.
+type Op struct {
+	Op string `json:"op"`
+
+	// Sketch ops.
+	Plane string      `json:"plane,omitempty"`
+	From  *[2]float64 `json:"from,omitempty"`
+	To    *[2]float64 `json:"to,omitempty"`
+	A     *[2]float64 `json:"a,omitempty"`
+	B     *[2]float64 `json:"b,omitempty"`
+	C     *[2]float64 `json:"c,omitempty"`
+	R     float64     `json:"r,omitempty"`
+	Segs  int         `json:"segs,omitempty"`
+
+	// Extrude and boolean ops.
+	Sketch  string   `json:"sketch,omitempty"`
+	Regions []int    `json:"regions,omitempty"`
+	Depth   float64  `json:"depth,omitempty"`
+	Draft   float64  `json:"draft,omitempty"`
+	Dir     string   `json:"dir,omitempty"`
+	Result  string   `json:"result,omitempty"`
+	Kind    string   `json:"kind,omitempty"`
+	Target  string   `json:"target,omitempty"`
+	Tools   []string `json:"tools,omitempty"`
+
+	// Selection and transform ops.
+	Body    string      `json:"body,omitempty"`
+	Face    int         `json:"face,omitempty"`
+	Delta   *[3]float64 `json:"delta,omitempty"`
+	Axis    string      `json:"axis,omitempty"`
+	Degrees float64     `json:"degrees,omitempty"`
+
+	// Paint ops.
+	Res int     `json:"res,omitempty"`
+	Hex string  `json:"hex,omitempty"`
+	UV  *[2]int `json:"uv,omitempty"`
+
+	// Visibility, camera and capture ops.
+	Visible *bool  `json:"visible,omitempty"`
+	View    string `json:"view,omitempty"`
+	Name    string `json:"name,omitempty"`
+
+	// At is a window pixel, used by the pick op to interrogate the ID pass.
+	At *[2]float64 `json:"at,omitempty"`
+
+	// Index is the op's position in the script, filled in by Parse so error
+	// messages can name it (SPEC-RENDER §9).
+	Index int `json:"-"`
+}
+
+// Script is a parsed op script.
+type Script struct {
+	Ops []Op
+}
+
+// OpError names the failing op by index and kind, which is what golden tests
+// print when a script fails.
+type OpError struct {
+	Index int
+	Op    string
+	Err   error
+}
+
+func (e *OpError) Error() string {
+	return fmt.Sprintf("op %d (%s): %v", e.Index, e.Op, e.Err)
+}
+
+func (e *OpError) Unwrap() error { return e.Err }
+
+// Errorf builds an OpError for an op.
+func (o Op) Errorf(format string, args ...any) error {
+	return &OpError{Index: o.Index, Op: o.Op, Err: fmt.Errorf(format, args...)}
+}
+
+// Wrap attaches op context to an existing error.
+func (o Op) Wrap(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &OpError{Index: o.Index, Op: o.Op, Err: err}
+}
+
+// ParseScript decodes an op script and checks that every op is one we know and
+// carries the fields it needs. Unknown ops are an error rather than a silent
+// skip, so a stale script fails loudly.
+func ParseScript(data []byte) (*Script, error) {
+	var ops []Op
+	dec := json.NewDecoder(newTrimReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&ops); err != nil {
+		return nil, fmt.Errorf("parse op script: %w", err)
+	}
+	for i := range ops {
+		ops[i].Index = i
+		if err := ops[i].validate(); err != nil {
+			return nil, err
+		}
+	}
+	return &Script{Ops: ops}, nil
+}
+
+// LoadScript reads and parses a script file.
+func LoadScript(path string) (*Script, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read op script: %w", err)
+	}
+	return ParseScript(data)
+}
+
+// knownOps is the set of ops the format defines. Ops whose tools have not
+// landed yet still parse, so scripts can be written ahead of the milestone that
+// executes them; the executor reports the unimplemented op at run time.
+var knownOps = map[string]bool{
+	"sketch.begin": true, "sketch.line": true, "sketch.rect": true,
+	"sketch.circle": true, "sketch.finish": true,
+	"extrude": true, "boolean": true,
+	"select": true, "move": true, "rotate": true,
+	"paint.res": true, "paint.color": true, "paint.pixel": true,
+	"body.visible": true,
+	"camera.view":  true, "camera.frame": true, "camera.orbit": true,
+	"camera.zoom": true, "camera.project": true,
+	"settle": true, "shot": true, "pick": true,
+}
+
+func (o Op) validate() error {
+	if o.Op == "" {
+		return o.Errorf("missing op name")
+	}
+	if !knownOps[o.Op] {
+		return o.Errorf("unknown op %q", o.Op)
+	}
+	switch o.Op {
+	case "sketch.begin":
+		if o.Plane == "" {
+			return o.Errorf("needs a plane")
+		}
+	case "sketch.line":
+		if o.From == nil || o.To == nil {
+			return o.Errorf("needs from and to")
+		}
+	case "sketch.rect":
+		if o.A == nil || o.B == nil {
+			return o.Errorf("needs a and b")
+		}
+	case "sketch.circle":
+		if o.C == nil || o.R <= 0 {
+			return o.Errorf("needs c and a positive r")
+		}
+	case "camera.view":
+		if o.View == "" {
+			return o.Errorf("needs a view name")
+		}
+	case "camera.project":
+		if o.Kind != "ortho" && o.Kind != "perspective" {
+			return o.Errorf("kind must be ortho or perspective")
+		}
+	case "shot":
+		if o.Name == "" {
+			return o.Errorf("needs a name")
+		}
+	case "pick":
+		if o.At == nil {
+			return o.Errorf("needs at [x,y]")
+		}
+	case "body.visible":
+		if o.Body == "" || o.Visible == nil {
+			return o.Errorf("needs body and visible")
+		}
+	}
+	return nil
+}

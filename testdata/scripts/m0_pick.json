@@ -1,0 +1,13 @@
+[
+  {"op":"camera.view","view":"front"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"pick","at":[640,380]},
+  {"op":"pick","at":[640,340]},
+  {"op":"pick","at":[413,357]},
+  {"op":"pick","at":[866,378]},
+  {"op":"pick","at":[100,600]},
+  {"op":"pick","at":[640,424]},
+  {"op":"pick","at":[504,424]},
+  {"op":"shot","name":"m0_pick"}
+]

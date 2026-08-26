@@ -13,9 +13,9 @@ type Frame struct {
 type PlaneKind int
 
 const (
-	PlaneTop PlaneKind = iota // XZ, normal +Y
-	PlaneFront                // XY, normal +Z
-	PlaneRight                // YZ, normal +X
+	PlaneTop   PlaneKind = iota // XZ, normal +Y
+	PlaneFront                  // XY, normal +Z
+	PlaneRight                  // YZ, normal +X
 	numPlanes
 )
 

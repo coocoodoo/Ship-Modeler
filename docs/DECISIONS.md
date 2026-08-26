@@ -88,3 +88,61 @@ These decisions were made deliberately at planning time (2026-08-26). The execut
 ## Deviations log
 
 *(Executor appends here: date, spec section, what changed, why, evidence.)*
+
+### 2026-08-26 — M0
+
+**V-01 · Camera transitions interpolate azimuth/elevation, not quaternions.**
+SPEC-RENDER §7 specifies "quaternion slerp of orientation". The camera model is
+an up-locked turntable with no roll by construction (§7 also says "no roll
+ever"), and slerping between two up-locked orientations passes through
+orientations that carry roll. `CameraAnim` therefore interpolates azimuth along
+the shorter arc and elevation linearly, which is the roll-free equivalent and
+keeps the view cube's mirrored orientation exact throughout the animation.
+Evidence: `TestCameraAnimTakesTheShorterArc`, `TestCameraBasisIsRollFree`.
+
+**V-02 · View cube zones are hit-tested analytically, not with an ID render.**
+SPEC-RENDER §6.3 specifies a dedicated pick render for the cube's 26 zones. The
+cube is drawn as projected 2D sub-quads (one 3x3 grid per visible face), so
+point-in-polygon over exactly those quads is both cheaper — no GPU readback on
+every hover frame — and guaranteed consistent with what is on screen. The zone
+set, the snap orientations and the 1:1 drag orbit are unchanged.
+Evidence: `TestCubeHitTestMatchesWhatIsDrawn` walks every drawn cell.
+
+**V-03 · `FacePaint` is declared in `geom/mesh`, not in `internal/paint`.**
+SPEC-GEOMETRY §2 puts a `Paint *FacePaint` field on `mesh.Face` while §8.1
+introduces the struct under the paint heading. The dependency direction of
+PLAN §4 runs `geom` <- `paint`, so the type has to live below `paint` for
+`mesh.Face` to name it. `internal/paint` keeps ownership of everything that
+operates on it: mapping, brushes, palette, growth.
+
+**V-04 · A float ear-clipping triangulator lives in `geom/mesh`.**
+SPEC-GEOMETRY §5.2 places the triangulator in `geom/sketch2d` and §6.3 has the
+boolean handoff reuse it. Mesh faces arriving from booleans may legitimately sit
+off the subunit lattice, so they cannot be fed to an integer-exact triangulator
+without quantising them first. `mesh` therefore carries a float ear-clipper with
+hole bridging for rendering and MeshGL handoff; the integer sketch triangulator
+still lands in M2 for sketch regions. Revisit at M4 whether the boolean handoff
+should share one of them.
+Evidence: `TestFaceWithHoleTriangulates`, `TestConcaveFaceTriangulationPreservesArea`.
+
+**V-05 · `internal/render` imports `internal/ui` for theme tokens.**
+PLAN §4 lists `ui` as standalone, meaning it depends on nothing above it; it
+does not forbid others from reading its tokens. SPEC-UX §3 requires the theme to
+be centralised in `ui/theme.go`, and duplicating the colours in `render` would
+break that. The import is acyclic: `ui` pulls in only raylib and the stdlib.
+
+**V-06 · Two additions to the headless toolset.**
+The `pick` op (`{"op":"pick","at":[x,y]}`) runs the ID pass at a window pixel and
+prints a machine-readable line; it is how the flow tests prove picking resolves
+the right element, since the executor cannot watch the cursor. The `-bench N`
+flag renders N frames after a script and reports the frame-cost distribution,
+which is how the SPEC-RENDER §8 budget is checked. Both are executor tools and
+neither changes the documented op semantics.
+
+**Implementation note (not a deviation) · cgo pointer pinning.**
+`rl.Mesh` must be its own heap allocation rather than a field of `BodyGPU`. Go's
+cgo pointer check scans the *entire* heap object a C pointer lands in, so any
+unpinned Go pointer sharing that object — our vertex slices, edge list, face
+table — makes `UploadMesh` panic with "Go pointer to unpinned Go pointer".
+raylib-go pins the mesh's own array fields, so an `rl.Mesh` allocated alone
+passes. See `render.BodyGPU.Upload`.

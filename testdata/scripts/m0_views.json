@@ -1,0 +1,14 @@
+[
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"shot","name":"m0_iso"},
+  {"op":"camera.view","view":"front"},
+  {"op":"settle"},
+  {"op":"shot","name":"m0_front"},
+  {"op":"camera.project","kind":"perspective"},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"shot","name":"m0_perspective"}
+]
