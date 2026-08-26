@@ -1,0 +1,11 @@
+[
+  {"op":"sketch.begin","plane":"Front"},
+  {"op":"sketch.rect","a":[-1,-1],"b":[1,1]},
+  {"op":"extrude.begin","depth":1,"draft":0,"dir":"symmetric","through":true},
+  {"op":"dump"},
+  {"op":"extrude.commit"},
+  {"op":"camera.view","view":"right"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m3_through"}
+]

@@ -1,0 +1,10 @@
+[
+  {"op":"sketch.begin","plane":"Top"},
+  {"op":"sketch.rect","a":[-3,-3],"b":[3,3]},
+  {"op":"extrude","depth":6,"draft":0},
+  {"op":"dump"},
+  {"op":"undo"},
+  {"op":"dump"},
+  {"op":"redo"},
+  {"op":"dump"}
+]

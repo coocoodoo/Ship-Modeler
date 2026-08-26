@@ -1,0 +1,13 @@
+[
+  {"op":"sketch.begin","plane":"Top"},
+  {"op":"sketch.rect","a":[-2,-2],"b":[2,2]},
+  {"op":"sketch.rect","a":[5,-1],"b":[9,1]},
+  {"op":"sketch.finish"},
+  {"op":"select","kind":"sketch","sketch":"Sketch 1"},
+  {"op":"dump"},
+  {"op":"extrude.begin","depth":3},
+  {"op":"dump"},
+  {"op":"extrude.commit"},
+  {"op":"settle"},
+  {"op":"dump"}
+]

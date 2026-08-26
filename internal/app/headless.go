@@ -11,6 +11,8 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"modeler/internal/geom"
+	extrudegeom "modeler/internal/geom/extrude"
+	"modeler/internal/geom/mesh"
 	"modeler/internal/io"
 	"modeler/internal/model"
 	"modeler/internal/render"
@@ -56,6 +58,9 @@ type ScriptRunner struct {
 	rt      rl.RenderTexture2D
 	rtReady bool
 	shots   []string
+	// dumped records that the script printed at least one dump, which makes it
+	// a state probe rather than a capture and exempts it from needing a shot.
+	dumped bool
 
 	// mouse is the scripted cursor position, which persists between ops so a
 	// hover op can be followed by a click at the same place.
@@ -63,6 +68,8 @@ type ScriptRunner struct {
 	// moved marks that the next frame should report pointer motion, which is
 	// what wakes the throttled hover pick.
 	moved bool
+	// mods are the modifier keys the next pointer op holds down.
+	mods mods
 }
 
 // NewScriptRunner prepares a runner writing PNGs into outDir.
@@ -165,9 +172,12 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 
 	case "hover":
 		r.mouse = [2]float64{op.At[0], op.At[1]}
+		r.mods = mods{shift: op.Shift, ctrl: op.Ctrl, alt: op.Alt}
 
 	case "click":
+		r.mods = mods{shift: op.Shift, ctrl: op.Ctrl, alt: op.Alt}
 		r.click(op.At[0], op.At[1], op.Kind)
+		r.mods = mods{}
 
 	case "ui.tree":
 		a.tree.collapsed = op.Visible != nil && !*op.Visible
@@ -186,6 +196,7 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		r.pick(op.At[0], op.At[1])
 
 	case "dump":
+		r.dumped = true
 		r.dump()
 
 	case "sketch.begin":
@@ -215,6 +226,30 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		if err := r.addEntity(op, model.NewCircle(vec(op.C), geom.ToSubunits(op.R), segs)); err != nil {
 			return err
 		}
+
+	case "extrude":
+		if err := r.extrudeOp(op, true); err != nil {
+			return err
+		}
+
+	case "extrude.begin":
+		if err := r.extrudeOp(op, false); err != nil {
+			return err
+		}
+
+	case "extrude.commit":
+		if !a.InExtrude() {
+			return op.Errorf("the extrude tool is not open")
+		}
+		if !a.CommitExtrude() {
+			return op.Errorf("the extrude was refused")
+		}
+
+	case "extrude.cancel":
+		if !a.InExtrude() {
+			return op.Errorf("the extrude tool is not open")
+		}
+		a.CancelExtrude()
 
 	case "sketch.finish":
 		if !a.InSketch() {
@@ -271,6 +306,7 @@ func (r *ScriptRunner) frame() InputFrame {
 	in.WindowW, in.WindowH = r.Size.W, r.Size.H
 	in.DeltaMillis = VirtualFrameMillis
 	in.MouseX, in.MouseY = r.mouse[0], r.mouse[1]
+	in.Shift, in.Ctrl, in.Alt = r.mods.shift, r.mods.ctrl, r.mods.alt
 	if r.moved {
 		// A nominal delta so hover picking treats this as real motion.
 		in.MouseDX, in.MouseDY = 1, 0
@@ -278,6 +314,9 @@ func (r *ScriptRunner) frame() InputFrame {
 	}
 	return in
 }
+
+// mods is the modifier state a scripted pointer op runs under.
+type mods struct{ shift, ctrl, alt bool }
 
 // click synthesizes a full press and release at a point, driving the same
 // widget code a real click would. kind selects the button: "right" and
@@ -425,6 +464,70 @@ func (r *ScriptRunner) Bench(frames int) {
 		sum/float64(len(samples)), pct(0.5), pct(0.95), pct(0.99), samples[len(samples)-1])
 }
 
+// extrudeOp runs a scripted extrude through the same tool and command the UI
+// uses, so a script and a drag are the same code path.
+func (r *ScriptRunner) extrudeOp(op io.Op, commit bool) error {
+	a := r.App
+	s := a.ActiveSketch()
+	if s == nil && op.Sketch != "" {
+		if found := a.Doc().SketchByName(op.Sketch); found != nil {
+			a.EditSketch(found)
+			s = found
+		}
+	}
+	if s == nil && op.Sketch != "" {
+		return op.Errorf("no sketch named %q was found", op.Sketch)
+	}
+	// With no sketch open and none named, the op is deliberately testing the
+	// entry point that starts from a sketch picked in the tree, so leave the
+	// selection alone and let BeginExtrude find it.
+	// Naming regions overrides whatever is selected; naming none leaves a
+	// selection built by earlier click ops alone, and falls back to the first
+	// region only when there is nothing to preserve.
+	if s != nil && (len(op.Regions) > 0 || len(a.sketch.selectedRegions) == 0) {
+		regions := op.Regions
+		if len(regions) == 0 {
+			regions = []int{0}
+		}
+		a.sketch.selectedRegions = map[int]bool{}
+		for _, i := range regions {
+			a.sketch.selectedRegions[i] = true
+		}
+	}
+	if !a.BeginExtrude() {
+		return op.Errorf("could not open the extrude tool")
+	}
+
+	t := a.extrude.tool
+	if op.Depth != 0 {
+		t.SetDepth(op.Depth)
+	}
+	t.SetDraft(op.Draft)
+	switch op.Dir {
+	case "", "normal":
+		t.Dir = extrudegeom.Normal
+	case "reverse":
+		t.Dir = extrudegeom.Reverse
+	case "symmetric":
+		t.Dir = extrudegeom.Symmetric
+	default:
+		return op.Errorf("unknown direction %q", op.Dir)
+	}
+	t.ThroughAll = op.Through
+	if op.Result != "" && op.Result != "new" {
+		return op.Errorf("result %q needs the boolean kernel, which arrives with M4", op.Result)
+	}
+	a.rebuildExtrudePreview()
+
+	if !commit {
+		return nil
+	}
+	if !a.CommitExtrude() {
+		return op.Errorf("the extrude was refused")
+	}
+	return nil
+}
+
 // vec converts an op's world-unit point into sketch subunits.
 func vec(p *[2]float64) geom.Vec2i {
 	if p == nil {
@@ -476,8 +579,9 @@ func (r *ScriptRunner) dump() {
 		a.Bus.UndoDepth(), a.Bus.RedoDepth(), boolBit(doc.DirtySinceSave))
 
 	for _, b := range doc.Bodies {
-		fmt.Printf("body id=%d name=%q visible=%d tris=%d color=%02X%02X%02X\n",
-			b.ID, b.Name, boolBit(b.Visible), b.TriangleCount(), b.Color.R, b.Color.G, b.Color.B)
+		fmt.Printf("body id=%d name=%q visible=%d tris=%d vol=%.4f color=%02X%02X%02X\n",
+			b.ID, b.Name, boolBit(b.Visible), b.TriangleCount(), bodyVolume(b),
+			b.Color.R, b.Color.G, b.Color.B)
 	}
 	for _, s := range doc.Sketches {
 		fmt.Printf("sketch id=%d name=%q visible=%d\n", s.ID, s.Name, boolBit(s.Visible))
@@ -488,11 +592,25 @@ func (r *ScriptRunner) dump() {
 			sk.Name, len(sk.Entities), len(arr.Regions), len(arr.OpenEnds),
 			a.sketch.session.Tool.String())
 	}
+	if t := a.extrude.tool; t != nil {
+		fmt.Printf("extrude depth=%.4f draft=%.2f achieved=%.2f clamped=%d dir=%q "+
+			"through=%d regions=%d\n",
+			t.EffectiveDepth(), t.Draft, t.AchievedDraft, boolBit(t.Clamped),
+			t.Dir.String(), boolBit(t.ThroughAll), len(t.Regions))
+	}
 	fmt.Printf("sel count=%d desc=%q\n", a.Sel.Len(), a.Sel.Describe(doc))
 	fmt.Printf("hint %q\n", a.HintText())
 	for _, t := range a.UI.Toasts() {
 		fmt.Printf("toast %q\n", t.Text)
 	}
+}
+
+// bodyVolume is a body's solid volume, or zero when it has no mesh.
+func bodyVolume(b *model.Body) float64 {
+	if b.Mesh == nil {
+		return 0
+	}
+	return mesh.Volume(b.Mesh)
 }
 
 func boolBit(b bool) int {
@@ -526,8 +644,10 @@ func RunHeadless(scriptPath, outDir string, size ShotSize, benchFrames int) erro
 		return err
 	}
 	runner.Bench(benchFrames)
-	if len(runner.Shots()) == 0 && benchFrames == 0 {
-		return fmt.Errorf("script produced no shots; add a {\"op\":\"shot\"} step")
+	// A script has to observe something, or running it proved nothing. A shot
+	// and a dump are both observations; a bench run is its own.
+	if len(runner.Shots()) == 0 && !runner.dumped && benchFrames == 0 {
+		return fmt.Errorf("script observed nothing; add a {\"op\":\"shot\"} or {\"op\":\"dump\"} step")
 	}
 	for _, s := range runner.Shots() {
 		fmt.Println("wrote", s)

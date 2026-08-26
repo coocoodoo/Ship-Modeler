@@ -36,14 +36,14 @@ const (
 	MarkerClose
 )
 
-// SketchTri is one triangle of a filled region, in world space.
-type SketchTri struct {
+// OverlayTri is one triangle of a filled region, in world space.
+type OverlayTri struct {
 	A, B, C geom.Vec3
 	Color   color.RGBA
 }
 
-// SketchLine is one stroke: an entity edge, a preview, or a dashed guide.
-type SketchLine struct {
+// OverlayLine is one stroke: an entity edge, a preview, or a dashed guide.
+type OverlayLine struct {
 	A, B    geom.Vec3
 	Color   color.RGBA
 	WidthPx float64
@@ -52,31 +52,35 @@ type SketchLine struct {
 	Dashed bool
 }
 
-// SketchMarker is one glyph at a point.
-type SketchMarker struct {
+// OverlayMarker is one glyph at a point.
+type OverlayMarker struct {
 	P      geom.Vec3
 	Kind   MarkerKind
 	Color  color.RGBA
 	SizePx float64
 }
 
-// SketchDraw is everything the sketch overlay paints for one frame.
-type SketchDraw struct {
+// Overlay is a batch of world-space decoration drawn on top of the scene:
+// sketch fills and strokes, gizmo arrows, snap glyphs. It carries no meaning of
+// its own, only how things look.
+type Overlay struct {
+	// Frame is the plane sketch coordinates lift onto. Overlays that build
+	// world points directly, like gizmos, leave it zero and never call Lift.
 	Frame geom.Frame
 	// Fills come first, then Lines, then Markers, so a glyph is never buried
 	// under a stroke.
-	Fills   []SketchTri
-	Lines   []SketchLine
-	Markers []SketchMarker
+	Fills   []OverlayTri
+	Lines   []OverlayLine
+	Markers []OverlayMarker
 }
 
 // Empty reports whether there is nothing to draw.
-func (s *SketchDraw) Empty() bool {
+func (s *Overlay) Empty() bool {
 	return len(s.Fills) == 0 && len(s.Lines) == 0 && len(s.Markers) == 0
 }
 
 // Lift places a sketch-space point on the plane, raised clear of it.
-func (s *SketchDraw) Lift(p geom.Vec2i) geom.Vec3 {
+func (s *Overlay) Lift(p geom.Vec2i) geom.Vec3 {
 	return s.Frame.LiftSub(p, SketchLiftUnits)
 }
 
@@ -86,9 +90,9 @@ const (
 	gapLengthPx  = 4.0
 )
 
-// drawSketchPass paints the sketch overlay over the scene.
-func (r *Renderer) drawSketchPass(s *Scene, vp Viewport) {
-	if len(s.Sketches) == 0 {
+// drawOverlayPass paints the sketch overlay over the scene.
+func (r *Renderer) drawOverlayPass(s *Scene, vp Viewport) {
+	if len(s.Sketches) == 0 && s.Gizmo == nil {
 		return
 	}
 	c := r.ribbonCtx(s.Camera, vp)
@@ -101,7 +105,10 @@ func (r *Renderer) drawSketchPass(s *Scene, vp Viewport) {
 	rl.DisableDepthTest()
 	rl.DisableBackfaceCulling()
 
-	for _, sk := range s.Sketches {
+	// Gizmos draw last of all, so a handle is never buried under the geometry
+	// it operates on.
+	batches := append(append([]*Overlay(nil), s.Sketches...), s.Gizmo)
+	for _, sk := range batches {
 		if sk == nil || sk.Empty() {
 			continue
 		}
@@ -130,7 +137,7 @@ func (r *Renderer) drawSketchPass(s *Scene, vp Viewport) {
 }
 
 // drawDashed splits a line into on-off runs of constant screen length.
-func (r *Renderer) drawDashed(c ribbonContext, l SketchLine) {
+func (r *Renderer) drawDashed(c ribbonContext, l OverlayLine) {
 	dir := l.B.Sub(l.A)
 	length := dir.Len()
 	if length <= 0 {
@@ -153,7 +160,7 @@ func (r *Renderer) drawDashed(c ribbonContext, l SketchLine) {
 
 // drawMarker paints one snap or endpoint glyph, screen-sized so it reads the
 // same at every zoom.
-func (r *Renderer) drawMarker(c ribbonContext, m SketchMarker) {
+func (r *Renderer) drawMarker(c ribbonContext, m OverlayMarker) {
 	size := m.SizePx
 	if size <= 0 {
 		size = 6

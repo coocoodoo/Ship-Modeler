@@ -2,7 +2,95 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M2 COMPLETE**, plus a follow-up fix for sketch visibility (below). Next up: **M3** (extrude to a new body: the arrow gizmo, draft, symmetric).
+**Current state:** **M3 COMPLETE** — sketches extrude into solids with draft, symmetric and through-all. Next up: **M4** (booleans via Manifold; the acceptance matrix gets written first).
+
+---
+
+## 2026-08-26 — M3: extrude to a new body
+
+**Done:**
+- `internal/geom/extrude` — `Build(regions, Params, bodyID)`: caps triangulated
+  from polygon-with-holes, side quads under draft via the M3 miter offset, per-face
+  stable IDs, weld, `mesh.Validate` gate. Normal / Reverse / Symmetric; symmetric
+  with draft builds three rings (two frusta widest at the sketch plane).
+- `internal/tools/extrude.go` — the tool's pure state: signed drag depth with the
+  sign folded into the direction on read, grid/fine/free snap, flip, draft clamp
+  reporting, result availability, Through-All, and the arrow's screen hit test.
+- `internal/model/extrude.go` — the command. Builds and validates the whole solid
+  before touching the document, so a refusal leaves it byte-identical. Reuses the
+  body id across redo so face identities stay stable.
+- `internal/app/extrudemode.go` — arrow drag, live preview at 55% alpha, camera
+  tilt off the axis, commit/cancel, and the scene measurement behind Through-All.
+- `internal/scene/gizmo.go` — the arrow: shaft, cone as a triangle fan, base dot.
+- `internal/app/shell.go` — the options card (depth + flip, direction chips, draft
+  slider + field with the clamp warning, result chips, Through-All), an Extrude
+  button on the sketch toolbar, and the main toolbar's Sketch and Extrude buttons
+  finally wired to the actions their shortcuts already ran.
+- Script ops `extrude`, `extrude.begin`, `extrude.commit`, `extrude.cancel`, plus
+  `shift`/`ctrl`/`alt` modifiers on `click` and `hover`.
+
+**Verified:**
+- `go build ./...`, `go vet ./...` and `gofmt -l` all clean.
+- `go test ./...` green across 12 packages; `internal/apptest` 28.6s.
+- Volumes checked against the closed-form frustum `V = h/3(A1 + A2 + sqrt(A1 A2))`,
+  not against recorded numbers: cube **216.0000 exactly**; 12° draft over 6 u
+  **137.2856** vs 137.2856 analytic; symmetric 10° **180.2560** vs 180.2560;
+  two disjoint squares **72.0000 exactly**; through-all volume equals 4x its own
+  reported depth.
+- Draft clamp: 40° on a 2 u square clamps to **9.43°**, volume **8.0314**, which is
+  the frustum formula for a taper stopping one subunit short of collapse.
+- Shots produced and read: `m3_straight`, `m3_draft`, `m3_symmetric`, `m3_gizmo`,
+  `m3_through`, `m3_touching`. All six are in `docs/shots/`.
+- Through-all verified from the Right view: the bar spans the hull and pokes one
+  unit past each end, which is the margin.
+
+**Decisions/deviations:** DECISIONS.md V-17 (symmetric draft = two frusta),
+V-18 (through-all reach measured both ways, +1 u margin), V-19 (camera tilt tested
+against the axis, not against named views), V-20 (goldens fail as stale when they
+drift inside tolerance), V-21 (a dump counts as an observation), V-22 (the new ops).
+**Every golden in the repo was regenerated** — see the stale-baseline note below.
+
+**Two things the session turned up that were not on the checklist:**
+
+1. *Every golden in the repo was silently out of date.* Enabling the toolbar's
+   Sketch and Extrude buttons changed about 0.04% of each frame — comfortably
+   inside the 99.7% tolerance TESTING §5 sets — so all sixteen goldens kept
+   passing while none of them matched the app any more. SPEC-RENDER §10 calls
+   these "same-machine baselines", so the honest expectation is an exact match and
+   the tolerance is a cushion for driver updates. `checkGolden` now fails a shot
+   that passes tolerance but has more than 200 changed pixels, with the diff image
+   and the instruction to regenerate. It caught this the first time it ran.
+
+2. *Extruding two regions that touch produced mesh jargon.* A circle inside a
+   rectangle makes a ring and a disc; picking both and extruding gave
+   "face 0 loop 0 repeats vertex 3". Each region becomes its own shell, and two
+   shells sharing a wall — or even a single corner — weld into edges belonging to
+   four faces, which is not a manifold and not something extruding harder can fix.
+   `extrude.Build` now detects any shared boundary point up front and refuses with
+   "Regions 0 and 1 touch — extrude them one at a time, or combine them once
+   booleans arrive". The card's Extrude button greys out with that as its reason.
+   Written test-first; the corner case corrected a wrong assumption of mine that a
+   single shared point would be fine.
+
+**Open issues:**
+- Adjacent regions can only be extruded one at a time. Merging them properly is a
+  2D union, which is M4's business.
+- `Result` = Add / Subtract / Intersect are visible and disabled, as specified,
+  until the boolean kernel lands.
+- Ctrl-fine and Alt-free snapping on the arrow drag are covered by unit tests but
+  not by an end-to-end script: the runner has no press-move-release drag op yet.
+  Worth adding when M6 needs it for transform gizmos.
+
+**Next:** M4 — write the boolean acceptance matrix first (TESTING §3, ~25 named
+cases including the flush butt-join family), then build and vendor Manifold.
+
+**Try it (user):**
+1. Run `modeler.exe`, click the **Top** plane in the tree, press `S`.
+2. Press `R` and drag out a rectangle.
+3. Press `E` — the camera swings to a three-quarter view and an arrow appears.
+4. Drag the arrow to set the depth; hold `Ctrl` for quarter units.
+5. Push the **Draft** slider to about 12° and watch the crate taper live.
+6. Press `Enter`. The body lands in the tree and the sketch hides itself.
 
 ---
 

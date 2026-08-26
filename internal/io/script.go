@@ -33,6 +33,7 @@ type Op struct {
 	Depth   float64  `json:"depth,omitempty"`
 	Draft   float64  `json:"draft,omitempty"`
 	Dir     string   `json:"dir,omitempty"`
+	Through bool     `json:"through,omitempty"`
 	Result  string   `json:"result,omitempty"`
 	Kind    string   `json:"kind,omitempty"`
 	Target  string   `json:"target,omitempty"`
@@ -49,6 +50,12 @@ type Op struct {
 	Res int     `json:"res,omitempty"`
 	Hex string  `json:"hex,omitempty"`
 	UV  *[2]int `json:"uv,omitempty"`
+
+	// Modifier keys held for the next pointer op. They matter as much as the
+	// position does: Shift adds to a selection, Ctrl snaps fine, Alt is free.
+	Shift bool `json:"shift,omitempty"`
+	Ctrl  bool `json:"ctrl,omitempty"`
+	Alt   bool `json:"alt,omitempty"`
 
 	// Visibility, camera and capture ops.
 	Visible *bool  `json:"visible,omitempty"`
@@ -129,7 +136,8 @@ func LoadScript(path string) (*Script, error) {
 var knownOps = map[string]bool{
 	"sketch.begin": true, "sketch.line": true, "sketch.rect": true,
 	"sketch.circle": true, "sketch.finish": true, "sketch.tool": true,
-	"extrude": true, "boolean": true,
+	"extrude": true, "extrude.begin": true, "extrude.commit": true,
+	"extrude.cancel": true, "boolean": true,
 	"select": true, "move": true, "rotate": true,
 	"paint.res": true, "paint.color": true, "paint.pixel": true,
 	"body.visible": true, "plane.visible": true, "sketch.visible": true,

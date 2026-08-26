@@ -190,6 +190,12 @@ func (a *App) handleSketchKeys(in InputFrame) {
 	case in.KeyPressed(rl.KeyC):
 		sess.SetTool(sketch.ToolCircle)
 	}
+	if in.KeyPressed(rl.KeyE) {
+		// E from a sketch with a region selected goes straight into extrude,
+		// which is the golden path of SPEC-UX §8.7.
+		a.BeginExtrude()
+		return
+	}
 	if in.KeyPressed(rl.KeyDelete) {
 		a.deleteSketchSelection()
 	}
@@ -303,9 +309,9 @@ func toggleInt(s []int, v int) []int {
 // document, its tree row keeps an eye toggle, and it has to keep showing in the
 // viewport or that toggle controls nothing. The one being edited is built last
 // so it lands on top of the rest.
-func (a *App) buildSketchDraws() []*render.SketchDraw {
+func (a *App) buildSketchDraws() []*render.Overlay {
 	active := a.ActiveSketch()
-	var out []*render.SketchDraw
+	var out []*render.Overlay
 
 	for _, s := range a.Doc().Sketches {
 		if !s.Visible || s == active {

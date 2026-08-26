@@ -170,12 +170,12 @@ Specs: UX §8, GEOM §3–4.
 
 ### M3 — Extrude to new body (L)
 Specs: UX §9, GEOM §5.
-- [ ] Region selection (click fill, Shift multi); toolbar Extrude / `E`
-- [ ] Preview solid (translucent) + **arrow gizmo**: LMB-drag along normal, grid-snapped depth, Ctrl = fine (¼ u); floating drag-number field synced both ways; flip by dragging through zero or ⇄ button (R4, R5)
-- [ ] Options card: Direction (Normal/Reverse/**Symmetric**), **Draft** −45°..45° slider+field with live preview & clamp warning, Result (New only until M4 — others visible, disabled, tooltip "coming with M4"), Through-All toggle
-- [ ] Solid construction (GEOM §5): caps (polygon+holes, triangulated), planar side quads under draft via miter offset; per-face stable IDs; weld; validator must pass
-- [ ] Body appears in tree ("Body N", auto color); shaded + crease/silhouette edges; sketch auto-hides with toast (UX §9.5)
-- [ ] Undo/redo across the whole flow; volume unit tests vs analytic (box, n-gon prism, with draft, symmetric)
+- [x] Region selection (click fill, Shift multi); toolbar Extrude / `E`
+- [x] Preview solid (translucent) + **arrow gizmo**: LMB-drag along normal, grid-snapped depth, Ctrl = fine (¼ u); floating drag-number field synced both ways; flip by dragging through zero or ⇄ button (R4, R5)
+- [x] Options card: Direction (Normal/Reverse/**Symmetric**), **Draft** −45°..45° slider+field with live preview & clamp warning, Result (New only until M4 — others visible, disabled, tooltip "coming with M4"), Through-All toggle
+- [x] Solid construction (GEOM §5): caps (polygon+holes, triangulated), planar side quads under draft via miter offset; per-face stable IDs; weld; validator must pass
+- [x] Body appears in tree ("Body N", auto color); shaded + crease/silhouette edges; sketch auto-hides with toast (UX §9.5)
+- [x] Undo/redo across the whole flow; volume unit tests vs analytic (box, n-gon prism, with draft, symmetric)
 **Accept:** draw square → E → drag out a drafted crate; goldens for straight/drafted/symmetric.
 
 ### M4 — Booleans via Manifold (L; highest-leverage integration — test-first)

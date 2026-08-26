@@ -83,6 +83,11 @@ func Build(regions []sketch2d.Region, p Params, bodyID uint32) (Result, error) {
 			return Result{}, fmt.Errorf("region %d has no area", i)
 		}
 	}
+	if a, b, touch := touchingPair(regions); touch {
+		return Result{}, fmt.Errorf(
+			"regions %d and %d touch — extrude them one at a time, "+
+				"or combine them once booleans arrive", a, b)
+	}
 
 	out := Result{Mesh: &mesh.Mesh{}, AchievedDraft: p.Draft}
 	seq := uint32(0)
@@ -101,6 +106,37 @@ func Build(regions []sketch2d.Region, p Params, bodyID uint32) (Result, error) {
 		return Result{}, fmt.Errorf("extrude produced an invalid solid: %w", err)
 	}
 	return out, nil
+}
+
+// touchingPair finds two selected regions that share any boundary point, and
+// reports their indices.
+//
+// Each region becomes its own closed shell, and the shells are then welded into
+// one mesh. Two regions that touch anywhere — a shared wall where a disc fills a
+// ring, or a single corner where two squares meet — weld into edges belonging to
+// four faces, which is not a manifold solid and cannot be made into one by
+// extruding harder. Catching it here means the refusal can name the regions and
+// say what to do, instead of the validator reporting a vertex number.
+//
+// The regions come from one arrangement, so a shared boundary is shared exactly:
+// integer equality is the right test, and no tolerance belongs anywhere near it.
+func touchingPair(regions []sketch2d.Region) (int, int, bool) {
+	if len(regions) < 2 {
+		return 0, 0, false
+	}
+	// owner maps a boundary point to the first region that claimed it.
+	owner := make(map[geom.Vec2i]int)
+	for i := range regions {
+		for _, l := range allLoops(regions[i]) {
+			for _, p := range l.Pts {
+				if prev, seen := owner[p]; seen && prev != i {
+					return prev, i, true
+				}
+				owner[p] = i
+			}
+		}
+	}
+	return 0, 0, false
 }
 
 // ring is one profile at one height along the extrusion.

@@ -56,11 +56,11 @@ type SketchView struct {
 }
 
 // BuildSketchDraw assembles the overlay.
-func BuildSketchDraw(v SketchView) *render.SketchDraw {
+func BuildSketchDraw(v SketchView) *render.Overlay {
 	if v.Sketch == nil {
 		return nil
 	}
-	d := &render.SketchDraw{Frame: v.Sketch.Frame()}
+	d := &render.Overlay{Frame: v.Sketch.Frame()}
 
 	if !v.Editing {
 		appendEntityStrokes(d, v)
@@ -78,7 +78,7 @@ func BuildSketchDraw(v SketchView) *render.SketchDraw {
 
 // appendRegionFills paints each closed region translucent, brighter under the
 // cursor and brighter still when selected (SPEC-UX §8.6).
-func appendRegionFills(d *render.SketchDraw, arr sketch2d.Arrangement, v SketchView) {
+func appendRegionFills(d *render.Overlay, arr sketch2d.Arrangement, v SketchView) {
 	for i, r := range arr.Regions {
 		fill := ui.WithAlpha(ui.ColorAccent, RegionFillAlpha)
 		switch {
@@ -88,7 +88,7 @@ func appendRegionFills(d *render.SketchDraw, arr sketch2d.Arrangement, v SketchV
 			fill = ui.WithAlpha(ui.ColorAccent, RegionHoverAlpha)
 		}
 		for _, t := range sketch2d.Triangulate(r) {
-			d.Fills = append(d.Fills, render.SketchTri{
+			d.Fills = append(d.Fills, render.OverlayTri{
 				A: d.Lift(t.A), B: d.Lift(t.B), C: d.Lift(t.C), Color: fill,
 			})
 		}
@@ -103,18 +103,18 @@ func appendRegionFills(d *render.SketchDraw, arr sketch2d.Arrangement, v SketchV
 	}
 }
 
-func appendLoopOutline(d *render.SketchDraw, l sketch2d.Loop, col color.RGBA) {
+func appendLoopOutline(d *render.Overlay, l sketch2d.Loop, col color.RGBA) {
 	for i := range l.Pts {
 		a := l.Pts[i]
 		b := l.Pts[(i+1)%len(l.Pts)]
-		d.Lines = append(d.Lines, render.SketchLine{
+		d.Lines = append(d.Lines, render.OverlayLine{
 			A: d.Lift(a), B: d.Lift(b), Color: col, WidthPx: SelectedWidthPx,
 		})
 	}
 }
 
 // appendEntityStrokes draws what the user actually placed.
-func appendEntityStrokes(d *render.SketchDraw, v SketchView) {
+func appendEntityStrokes(d *render.Overlay, v SketchView) {
 	selected := map[int]bool{}
 	if v.Session != nil {
 		for _, i := range v.Session.Selected {
@@ -138,7 +138,7 @@ func appendEntityStrokes(d *render.SketchDraw, v SketchView) {
 			n--
 		}
 		for j := 0; j < n; j++ {
-			d.Lines = append(d.Lines, render.SketchLine{
+			d.Lines = append(d.Lines, render.OverlayLine{
 				A: d.Lift(pts[j]), B: d.Lift(pts[(j+1)%len(pts)]),
 				Color: col, WidthPx: width,
 			})
@@ -147,7 +147,7 @@ func appendEntityStrokes(d *render.SketchDraw, v SketchView) {
 		// even before the region engine judges them.
 		if !e.Closed() && v.Editing {
 			for _, p := range pts {
-				d.Markers = append(d.Markers, render.SketchMarker{
+				d.Markers = append(d.Markers, render.OverlayMarker{
 					P: d.Lift(p), Kind: render.MarkerVertex,
 					Color: ui.Fade(col, 0.8), SizePx: VertexDotSizePx,
 				})
@@ -158,7 +158,7 @@ func appendEntityStrokes(d *render.SketchDraw, v SketchView) {
 
 // appendPreview draws the rubber band and, when a chain can close, the ring on
 // its start point.
-func appendPreview(d *render.SketchDraw, v SketchView) {
+func appendPreview(d *render.Overlay, v SketchView) {
 	if v.Session == nil || !v.HasSnap {
 		return
 	}
@@ -170,7 +170,7 @@ func appendPreview(d *render.SketchDraw, v SketchView) {
 			n--
 		}
 		for j := 0; j < n; j++ {
-			d.Lines = append(d.Lines, render.SketchLine{
+			d.Lines = append(d.Lines, render.OverlayLine{
 				A: d.Lift(pts[j]), B: d.Lift(pts[(j+1)%len(pts)]),
 				Color: ui.Fade(ui.ColorAccent, 0.85), WidthPx: PreviewWidthPx,
 			})
@@ -179,7 +179,7 @@ func appendPreview(d *render.SketchDraw, v SketchView) {
 
 	// The inference guide runs from the anchor point through the snapped one.
 	if v.Snap.HasGuide() {
-		d.Lines = append(d.Lines, render.SketchLine{
+		d.Lines = append(d.Lines, render.OverlayLine{
 			A: d.Lift(v.Snap.From), B: d.Lift(v.Snap.Point),
 			Color: ui.Fade(ui.ColorAccent, 0.55), WidthPx: GuideWidthPx, Dashed: true,
 		})
@@ -190,7 +190,7 @@ func appendPreview(d *render.SketchDraw, v SketchView) {
 		if p.ClosesChain {
 			col = ui.ColorSuccess
 		}
-		d.Markers = append(d.Markers, render.SketchMarker{
+		d.Markers = append(d.Markers, render.OverlayMarker{
 			P: d.Lift(start), Kind: render.MarkerClose, Color: col, SizePx: CloseRingSizePx,
 		})
 	}
@@ -198,9 +198,9 @@ func appendPreview(d *render.SketchDraw, v SketchView) {
 
 // appendOpenEnds rings every loose endpoint in error red, which is how R3 shows
 // a profile is not closed yet.
-func appendOpenEnds(d *render.SketchDraw, arr sketch2d.Arrangement) {
+func appendOpenEnds(d *render.Overlay, arr sketch2d.Arrangement) {
 	for _, p := range arr.OpenEnds {
-		d.Markers = append(d.Markers, render.SketchMarker{
+		d.Markers = append(d.Markers, render.OverlayMarker{
 			P: d.Lift(p), Kind: render.MarkerRing,
 			Color: ui.ColorError, SizePx: OpenEndSizePx,
 		})
@@ -208,7 +208,7 @@ func appendOpenEnds(d *render.SketchDraw, arr sketch2d.Arrangement) {
 }
 
 // appendSnapGlyph marks what the cursor latched onto (SPEC-UX §8.4).
-func appendSnapGlyph(d *render.SketchDraw, v SketchView) {
+func appendSnapGlyph(d *render.Overlay, v SketchView) {
 	if !v.HasSnap || v.Session == nil || v.Session.Tool == sketch.ToolSelect {
 		return
 	}
@@ -224,7 +224,7 @@ func appendSnapGlyph(d *render.SketchDraw, v SketchView) {
 	default:
 		return // Alt held: nothing latched, so nothing to advertise
 	}
-	d.Markers = append(d.Markers, render.SketchMarker{
+	d.Markers = append(d.Markers, render.OverlayMarker{
 		P: d.Lift(v.Snap.Point), Kind: kind, Color: col, SizePx: SnapGlyphSizePx,
 	})
 }

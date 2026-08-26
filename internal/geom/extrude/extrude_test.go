@@ -2,6 +2,7 @@ package extrude
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"modeler/internal/geom"
@@ -290,6 +291,74 @@ func TestExtrudeRejectsBadInput(t *testing.T) {
 	empty := sketch2d.Region{Outer: loopOf(pt(0, 0), pt(1, 0))}
 	if _, err := Build([]sketch2d.Region{empty}, Params{Frame: f, Depth: u(1)}, 1); err == nil {
 		t.Error("a two-point loop was accepted")
+	}
+}
+
+// TestTouchingRegionsAreRefusedInPlainWords covers the case a sketch produces
+// naturally and a solid modeller cannot: a circle inside a rectangle makes two
+// regions that share the circle, and extruding both would put two shells wall
+// to wall along a whole surface. That is not a 2-manifold solid, so the answer
+// has to be no — but it has to be a no that says which regions and what to do,
+// not one that leaks the validator's opinion of vertex 23.
+func TestTouchingRegionsAreRefusedInPlainWords(t *testing.T) {
+	circle := ngonLoop(1.5, 16)
+	ring := sketch2d.Region{
+		Outer: rectLoop(-4, -4, 4, 4),
+		Holes: []sketch2d.Loop{reversed(circle)},
+	}
+	disc := sketch2d.Region{Outer: circle}
+	p := Params{Frame: frontFrame(), Depth: u(2)}
+
+	// Each on its own is perfectly buildable.
+	if _, err := Build([]sketch2d.Region{ring}, p, 1); err != nil {
+		t.Fatalf("the ring alone failed: %v", err)
+	}
+	if _, err := Build([]sketch2d.Region{disc}, p, 1); err != nil {
+		t.Fatalf("the disc alone failed: %v", err)
+	}
+
+	_, err := Build([]sketch2d.Region{ring, disc}, p, 1)
+	if err == nil {
+		t.Fatal("a ring and the disc filling it were extruded together")
+	}
+	msg := err.Error()
+	for _, want := range []string{"touch", "one at a time"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("the refusal %q does not mention %q", msg, want)
+		}
+	}
+	if strings.Contains(msg, "vertex") || strings.Contains(msg, "invalid mesh") {
+		t.Errorf("the refusal leaks mesh internals: %q", msg)
+	}
+}
+
+// TestSeparateRegionsAreStillFine keeps the adjacency check from over-reaching:
+// two regions that merely sit near each other are the ordinary multi-region
+// case and must still build.
+func TestSeparateRegionsAreStillFine(t *testing.T) {
+	a := sketch2d.Region{Outer: rectLoop(0, 0, 4, 4)}
+	b := sketch2d.Region{Outer: rectLoop(6, 0, 10, 4)}
+	got, err := Build([]sketch2d.Region{a, b}, Params{Frame: frontFrame(), Depth: u(3)}, 1)
+	if err != nil {
+		t.Fatalf("two disjoint squares failed: %v", err)
+	}
+	closeTo(t, mesh.Volume(got.Mesh), 2*16*3, "volume of two disjoint prisms")
+}
+
+// TestRegionsTouchingAtOneCornerAreAlsoRefused: a single shared point is enough
+// to break the solid. Two squares meeting corner to corner weld into a mesh
+// whose shared column of edges belongs to four faces, which is not a manifold
+// and not something an extrude can fix. Refusing is the whole of the answer
+// until booleans arrive.
+func TestRegionsTouchingAtOneCornerAreAlsoRefused(t *testing.T) {
+	a := sketch2d.Region{Outer: rectLoop(0, 0, 4, 4)}
+	b := sketch2d.Region{Outer: rectLoop(4, 4, 8, 8)}
+	_, err := Build([]sketch2d.Region{a, b}, Params{Frame: frontFrame(), Depth: u(2)}, 1)
+	if err == nil {
+		t.Fatal("two squares meeting at a corner were extruded together")
+	}
+	if !strings.Contains(err.Error(), "touch") {
+		t.Errorf("the refusal %q does not say they touch", err)
 	}
 }
 

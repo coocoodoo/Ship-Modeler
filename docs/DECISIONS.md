@@ -230,3 +230,57 @@ tool, and the `dump` op grew a `sketch active=...` line reporting the entity,
 region and open-end counts. The specified `sketch.begin`, `sketch.line`,
 `sketch.rect`, `sketch.circle` and `sketch.finish` all landed as written.
 
+
+### 2026-08-26 — M3
+
+**V-17 · Symmetric with draft is two frusta meeting at the sketch plane.**
+SPEC-UX §9.3 says the draft "applies outward from the plane both ways (widest at
+the sketch plane)" and SPEC-GEOMETRY §5 describes an extrusion as two rings. The
+two only reconcile with three rings: the profile at the sketch plane, and a
+tapered ring at each end. A symmetric drafted solid therefore has a mid-belt of
+vertices and twice the side faces of a one-sided one, which is exactly what
+"widest at the sketch plane" has to mean for a shape that runs both ways.
+Evidence: `TestExtrudeSymmetricIsWidestAtTheSketchPlane`,
+`TestSymmetricStraddlesThePlane` (volume against 2x the frustum formula).
+
+**V-18 · Through-All measures the scene's reach in both directions.**
+SPEC-UX §9.3 defines the toggle as "past everything (scene bbox + margin)"
+without saying past everything in which direction. The depth is the furthest any
+existing geometry reaches from the sketch origin along the axis, either way,
+plus a 1 u margin, snapped to the grid — so flipping a through-all extrude
+cannot silently stop short. Symmetric doubles it, because it splits the run
+either side of the plane. The margin exists so the M4 subtract never has to
+resolve a cut that lands exactly flush with a face. Evidence:
+`TestThroughAllTakesOverTheDepth`, `TestThroughAllClearsTheWholeScene`.
+
+**V-19 · The extrude camera tilt is decided by the axis, not by the view.**
+SPEC-UX §9.1 asks the camera to pull back "if it was normal-on". Testing that
+against named views only covers the planes someone thought to list; the tool
+tests `|dot(forward, axis)| > 0.98` instead, which is the actual condition — an
+arrow pointing at the camera is invisible whichever plane produced it — and
+swings to a three-quarter view built in that axis's own frame.
+
+**V-20 · A golden that drifts inside tolerance fails as stale.**
+SPEC-RENDER §10 calls goldens "same-machine baselines" with a tolerance for
+driver updates, and TESTING §5 fixes that tolerance at |Δ|≤3 for ≥99.7% of
+pixels. Passing it is not the same as being unchanged: a control added to a
+toolbar covers about 0.04% of the frame, so every golden in the repo can go out
+of date while every golden test still passes — which is what had happened by the
+time this check was added. The gate itself is unchanged; a shot that passes it
+but has more than 200 changed pixels now fails separately, with the diff image
+and the instruction to regenerate. This strengthens §10's stated intent rather
+than departing from it.
+
+**V-21 · A script must observe something, and a dump counts.**
+The headless runner rejected any script that produced no shots. State probes
+that only `dump` are a legitimate and common kind of flow test, so the rule is
+now that a script must either capture or dump. Silence is still an error.
+Evidence: `TestAScriptThatObservesNothingIsRejected`.
+
+**V-22 · Ops added for M3 flows.** `extrude` runs and commits in one step;
+`extrude.begin`, `extrude.commit` and `extrude.cancel` split it so a shot can
+catch the tool mid-interaction. `extrude` and `extrude.begin` take `depth`,
+`draft`, `dir`, `through`, `regions` and `result`. With no sketch open and none
+named, they start from the sketch selected in the tree, which is the second
+entry point of SPEC-UX §9.1. The `dump` op grew an `extrude ...` line and `vol=`
+on every body line.

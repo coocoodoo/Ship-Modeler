@@ -49,9 +49,15 @@ func (a *App) BuildScene() render.Scene {
 	// on a sketch row means something.
 	s.Sketches = a.buildSketchDraws()
 
+	// The pending extrude solid rides along as a translucent body.
+	if d, ok := a.extrudePreviewDraw(); ok {
+		s.Bodies = append(s.Bodies, d)
+	}
+	s.Gizmo = a.buildExtrudeGizmo(a.layout.RenderViewport())
+
 	// Sketch mode dims the rest of the model and puts the grid on the sketch
 	// plane, so the profile being drawn is what the eye lands on (SPEC-UX §8.1).
-	if a.InSketch() {
+	if a.InSketch() || a.InExtrude() {
 		s.DimFactor = SketchDimFactor
 		if sk := a.ActiveSketch(); sk != nil {
 			s.Grid = scene.SketchGridFor(sk)
@@ -315,6 +321,9 @@ func (a *App) handleKeys(in InputFrame, vp render.Viewport) {
 
 	if in.KeyPressed(rl.KeyS) {
 		a.beginSketchFromSelection()
+	}
+	if in.KeyPressed(rl.KeyE) {
+		a.BeginExtrude()
 	}
 	if in.KeyPressed(rl.KeyH) {
 		a.hideSelection()

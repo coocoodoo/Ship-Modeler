@@ -74,8 +74,9 @@ type App struct {
 	// body changed.
 	gpu map[uint32]*render.BodyGPU
 
-	tree   treeState
-	sketch sketchState
+	tree    treeState
+	sketch  sketchState
+	extrude extrudeState
 
 	// cubeDrag, orbiting and panning track camera navigation drags.
 	cubeDrag          bool
@@ -271,7 +272,9 @@ func (a *App) update(in InputFrame) {
 	if !a.chromeOwnsPointer(in) {
 		a.handleCubeInput(in, vp)
 		a.handleCameraInput(in, vp)
-		if a.InSketch() {
+		if a.InExtrude() {
+			a.updateExtrude(in, vp)
+		} else if a.InSketch() {
 			a.updateSketch(in, vp)
 		} else {
 			a.handleViewportClick(in, vp)
@@ -284,10 +287,14 @@ func (a *App) update(in InputFrame) {
 	// Keyboard shortcuts never depend on where the pointer is: pressing L while
 	// the cursor rests over the tree panel must still pick the Line tool.
 	if !a.UI.WantKeyboard() {
-		if a.InSketch() {
+		switch {
+		case a.InExtrude():
+			a.handleGlobalKeys(in, vp)
+			a.handleExtrudeKeys(in)
+		case a.InSketch():
 			a.handleGlobalKeys(in, vp)
 			a.handleSketchKeys(in)
-		} else {
+		default:
 			a.handleKeys(in, vp)
 		}
 	}
@@ -342,6 +349,9 @@ func (a *App) HintText() string {
 	}
 	if a.sketch.awaitingPlane {
 		return "Click a plane to sketch on it · Esc to cancel"
+	}
+	if a.InExtrude() {
+		return a.extrudeHint()
 	}
 	if a.InSketch() {
 		return a.sketchHint()

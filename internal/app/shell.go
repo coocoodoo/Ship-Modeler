@@ -1,14 +1,17 @@
 package app
 
 import (
+	"fmt"
 	"image/color"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"modeler/internal/geom"
+	"modeler/internal/geom/extrude"
 	"modeler/internal/io"
 	"modeler/internal/model"
 	"modeler/internal/sketch"
+	"modeler/internal/tools"
 	"modeler/internal/ui"
 )
 
@@ -58,7 +61,10 @@ func (a *App) buildShell(l Layout) {
 		a.buildTree(l.Tree)
 	}
 	a.buildTreeHandle(l.Handle)
-	if a.InSketch() {
+	switch {
+	case a.InExtrude():
+		a.buildExtrudeCard(l.Viewport)
+	case a.InSketch():
 		a.buildSketchCard(l.Viewport)
 	}
 	a.UI.HintBar(l.HintBar, a.HintText(), Version)
@@ -81,17 +87,38 @@ type toolbarTool struct {
 	shortcut string
 	icon     ui.IconFunc
 	// milestone names the release that turns this tool on, which is what its
-	// disabled tooltip says.
+	// disabled tooltip says. Empty means the tool has shipped.
 	milestone string
+	// start is what clicking the button does, and is the same entry point the
+	// shortcut key uses. Nil for a tool that has not shipped.
+	start func(*App)
 }
 
 func toolbarTools() []toolbarTool {
 	return []toolbarTool{
-		{ModeSketch, "Sketch", "S", ui.DrawSketchToolIcon, "M2"},
-		{ModeExtrude, "Extrude", "E", ui.DrawExtrudeIcon, "M3"},
-		{ModeBoolean, "Boolean", "B", ui.DrawBooleanIcon, "M4"},
-		{ModeIdle, "Move", "M", ui.DrawMoveIcon, "M6"},
-		{ModePaint, "Paint", "P", ui.DrawPaintIcon, "M7"},
+		{mode: ModeSketch, label: "Sketch", shortcut: "S", icon: ui.DrawSketchToolIcon,
+			start: (*App).beginSketchFromSelection},
+		{mode: ModeExtrude, label: "Extrude", shortcut: "E", icon: ui.DrawExtrudeIcon,
+			start: func(a *App) { a.BeginExtrude() }},
+		{mode: ModeBoolean, label: "Boolean", shortcut: "B", icon: ui.DrawBooleanIcon,
+			milestone: "M4"},
+		{mode: ModeIdle, label: "Move", shortcut: "M", icon: ui.DrawMoveIcon,
+			milestone: "M6"},
+		{mode: ModePaint, label: "Paint", shortcut: "P", icon: ui.DrawPaintIcon,
+			milestone: "M7"},
+	}
+}
+
+// active reports whether this tool is the one currently running, which is what
+// gives the button its accent underline (SPEC-UX §4).
+func (t toolbarTool) active(a *App) bool {
+	switch t.mode {
+	case ModeSketch:
+		return a.InSketch()
+	case ModeExtrude:
+		return a.InExtrude()
+	default:
+		return false
 	}
 }
 
@@ -109,15 +136,19 @@ func (a *App) buildToolbar(r rl.Rectangle) {
 		box, rest = ui.SplitLeft(rest, w)
 		box.Height = btnH
 
+		var why string
+		if tool.start == nil {
+			why = tool.label + " arrives with milestone " + tool.milestone
+		}
 		clicked := a.UI.IconButton(ui.MakeID("tool."+tool.label), box, tool.icon, ui.IconOpts{
 			Label:       tool.label,
-			Active:      false,
-			Disabled:    true,
+			Active:      tool.active(a),
+			Disabled:    tool.start == nil,
 			Shortcut:    tool.shortcut,
-			DisabledWhy: tool.label + " arrives with milestone " + tool.milestone,
+			DisabledWhy: why,
 		})
-		if clicked {
-			a.Mode = tool.mode
+		if clicked && tool.start != nil {
+			tool.start(a)
 		}
 		var gap rl.Rectangle
 		gap, rest = ui.SplitLeft(rest, a.px(2))
@@ -523,6 +554,28 @@ func (a *App) buildSketchToolbar(r rl.Rectangle) {
 		_ = gap
 	}
 
+	// Extrude sits after a separator: it is not a drawing tool, it is what you
+	// do with what you have drawn (SPEC-UX §9.1).
+	sepX := rest.X + a.px(ui.Spacing)
+	a.UI.HairlineV(sepX, r.Y+a.px(8), r.Height-a.px(16), ui.ColorStroke)
+	rest.X = sepX + a.px(ui.Spacing)
+	rest.Width -= a.px(ui.Spacing * 2)
+
+	closed := len(a.ActiveSketch().Arrangement().Regions) > 0
+	exW := a.px(ui.IconSize+ui.Spacing) + a.UI.TextWidth("Extrude", ui.FontSizeUI) + a.px(ui.Spacing)
+	var exBox rl.Rectangle
+	exBox, rest = ui.SplitLeft(rest, exW)
+	exBox.Height = btnH
+	if a.UI.IconButton(ui.MakeID("sketchtool.extrude"), exBox, ui.DrawExtrudeIcon, ui.IconOpts{
+		Label:       "Extrude",
+		Disabled:    !closed,
+		Shortcut:    "E",
+		Tooltip:     "Pull the selected region into a solid",
+		DisabledWhy: "Close the red endpoints first — extrude needs a closed region",
+	}) {
+		a.BeginExtrude()
+	}
+
 	// Finish and cancel sit on the right, mirroring the card's footer.
 	btnW := a.px(96)
 	var doneBox, cancelBox rl.Rectangle
@@ -632,4 +685,163 @@ func (a *App) selectedCircle(s *model.Sketch, sess *sketch.Session) (int, bool) 
 		return 0, false
 	}
 	return i, true
+}
+
+// buildExtrudeCard is the options panel of SPEC-UX §9.3: depth, direction,
+// draft, result and through-all, with a footer that confirms or cancels.
+func (a *App) buildExtrudeCard(viewport rl.Rectangle) {
+	t := a.extrude.tool
+	if t == nil {
+		return
+	}
+	w := a.px(248)
+	h := a.px(298)
+	box := ui.Rect(
+		viewport.X+viewport.Width-w-a.px(ui.Spacing*2),
+		viewport.Y+a.px(ui.ViewCubeSize+ui.ViewCubeMargin*2+34),
+		w, h)
+
+	// The confirm button is only live when a solid actually built. A preview
+	// that failed is the most reliable answer there is to "will this work",
+	// and it comes with the sentence explaining why not.
+	valid, why := t.Valid()
+	if valid && a.extrude.previewErr != "" {
+		valid, why = false, a.extrude.previewErr
+	}
+	card := a.UI.FloatingCard(ui.MakeID("extrude.card"), box, "Extrude", ui.FloatingCardOpts{
+		Footer:          true,
+		ConfirmLabel:    "Extrude",
+		CancelLabel:     "Cancel",
+		ConfirmDisabled: !valid,
+		ConfirmWhy:      why,
+	})
+	body := card.Body
+	line := a.UI.Fonts.LineHeight(ui.FontSizeUI) + a.px(2)
+	row := func(h float32) rl.Rectangle {
+		var r rl.Rectangle
+		r, body = ui.SplitTop(body, h)
+		return r
+	}
+
+	// Depth: a drag-number field kept in sync with the arrow both ways.
+	r := row(a.px(24))
+	labelBox, fieldBox := ui.SplitLeft(r, a.px(64))
+	a.UI.Text(labelBox, "Depth", ui.FontSizeSmall, ui.ColorTextDim)
+	flipBox, fieldBox := ui.SplitRight(fieldBox, a.px(28))
+	// Through-All owns the depth while it is on, so the field shows what the
+	// scene measured rather than pretending the number is still yours to set.
+	shown := t.DepthUnits
+	if t.ThroughAll {
+		shown = t.EffectiveDepth()
+	}
+	if v, res := a.UI.DragNumber(ui.MakeID("extrude.depth"), fieldBox, shown, ui.NumberOpts{
+		Unit: "u", Step: 1, FineStep: 0.25, Decimals: 2,
+		Min: -tools.MaxDepthUnits, Max: tools.MaxDepthUnits,
+		Disabled:    t.ThroughAll,
+		Tooltip:     "Drag to scrub, click to type",
+		DisabledWhy: "Through all sets the depth from the scene",
+	}); res.Changed {
+		t.SetDepth(v)
+		a.rebuildExtrudePreview()
+	}
+	if a.UI.IconButton(ui.MakeID("extrude.flip"), flipBox, ui.DrawFlipIcon, ui.IconOpts{
+		Tooltip: "Flip the direction",
+	}) {
+		t.Flip()
+		a.rebuildExtrudePreview()
+	}
+
+	body.Y += a.px(4)
+	body.Height -= a.px(4)
+
+	// Direction chips.
+	a.UI.Text(row(line), "Direction", ui.FontSizeSmall, ui.ColorTextDim)
+	dirs := []extrude.Direction{extrude.Normal, extrude.Reverse, extrude.Symmetric}
+	dirLabels := []string{"Normal", "Reverse", "Symmetric"}
+	sel := 0
+	for i, d := range dirs {
+		if d == t.Dir {
+			sel = i
+		}
+	}
+	if pick, changed := a.UI.ChipGroup(ui.MakeID("extrude.dir"), row(a.px(24)),
+		dirLabels, sel, ui.ChipGroupOpts{}); changed {
+		t.Dir = dirs[pick]
+		a.rebuildExtrudePreview()
+	}
+
+	body.Y += a.px(4)
+	body.Height -= a.px(4)
+
+	// Draft, with the clamp warning of SPEC-UX §9.3.
+	r = row(line)
+	a.UI.Text(r, "Draft", ui.FontSizeSmall, ui.ColorTextDim)
+	if t.Clamped {
+		wb, _ := ui.SplitRight(r, a.px(120))
+		a.UI.Text(wb, fmt.Sprintf("clamped to %.1f°", t.AchievedDraft),
+			ui.FontSizeSmall, ui.ColorWarn)
+	}
+	r = row(a.px(24))
+	sliderBox, draftBox := ui.SplitRight(r, a.px(64))
+	if v, changed := a.UI.Slider(ui.MakeID("extrude.draftslider"), draftBox, t.Draft,
+		-extrude.MaxDraftDegrees, extrude.MaxDraftDegrees, ui.ButtonOpts{}); changed {
+		t.SetDraft(v)
+		a.rebuildExtrudePreview()
+	}
+	if v, res := a.UI.DragNumber(ui.MakeID("extrude.draft"), sliderBox, t.Draft, ui.NumberOpts{
+		Unit: "°", Step: 1, FineStep: 0.5, Decimals: 1,
+		Min: -extrude.MaxDraftDegrees, Max: extrude.MaxDraftDegrees,
+		Warn:        t.Clamped,
+		WarnTooltip: "Clamped — the profile is too tight for more draft",
+	}); res.Changed {
+		t.SetDraft(v)
+		a.rebuildExtrudePreview()
+	}
+
+	body.Y += a.px(4)
+	body.Height -= a.px(4)
+
+	// Result: only New works until the boolean kernel lands, and the others say
+	// so rather than silently doing nothing.
+	a.UI.Text(row(line), "Result", ui.FontSizeSmall, ui.ColorTextDim)
+	results := []tools.Result{tools.ResultNew, tools.ResultAdd, tools.ResultSubtract, tools.ResultIntersect}
+	resLabels := make([]string, len(results))
+	disabled := make([]bool, len(results))
+	reasons := make([]string, len(results))
+	resSel := 0
+	for i, res := range results {
+		resLabels[i] = res.String()
+		disabled[i] = !res.Available()
+		reasons[i] = res.UnavailableReason()
+		if res == t.Result {
+			resSel = i
+		}
+	}
+	if pick, changed := a.UI.ChipGroup(ui.MakeID("extrude.result"), row(a.px(24)),
+		resLabels, resSel, ui.ChipGroupOpts{
+			PerChipDisabled: disabled, PerChipWhy: reasons,
+		}); changed {
+		t.Result = results[pick]
+	}
+
+	// Through all: the depth stops being something you drag and becomes
+	// whatever clears the scene.
+	if a.UI.Toggle(ui.MakeID("extrude.through"), row(a.px(22)), "Through all",
+		t.ThroughAll, ui.ButtonOpts{
+			Tooltip: "Run past everything in the scene instead of a set depth",
+		}) {
+		t.ThroughAll = !t.ThroughAll
+		a.rebuildExtrudePreview()
+	}
+
+	if a.extrude.previewErr != "" {
+		a.UI.Text(row(line), a.extrude.previewErr, ui.FontSizeSmall, ui.ColorError)
+	}
+
+	if card.Confirmed {
+		a.CommitExtrude()
+	}
+	if card.Cancelled {
+		a.CancelExtrude()
+	}
 }

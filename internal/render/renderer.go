@@ -112,7 +112,7 @@ func (r *Renderer) DrawViewport(s *Scene, vp Viewport) {
 	r.drawShadedPass(s)
 	r.drawEdgePass(s, vp)
 	r.drawTranslucentPass(s, vp)
-	r.drawSketchPass(s, vp)
+	r.drawOverlayPass(s, vp)
 	r.end3D()
 }
 

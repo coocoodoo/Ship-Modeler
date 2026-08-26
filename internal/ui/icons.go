@@ -309,3 +309,13 @@ func DrawCircleToolIcon(cx, cy, size float64, col color.RGBA) {
 	closedPoly(w, col, pts...)
 	rl.DrawCircleV(v2(cx, cy), float32(h*0.16), col)
 }
+
+// DrawFlipIcon is the two-way arrow that reverses an extrude (SPEC-UX §9.2).
+func DrawFlipIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	line(v2(cx-h*0.8, cy-h*0.35), v2(cx+h*0.8, cy-h*0.35), w, col)
+	poly(w, col, v2(cx+h*0.4, cy-h*0.75), v2(cx+h*0.85, cy-h*0.35), v2(cx+h*0.4, cy+h*0.05))
+	line(v2(cx-h*0.8, cy+h*0.35), v2(cx+h*0.8, cy+h*0.35), w, col)
+	poly(w, col, v2(cx-h*0.4, cy-h*0.05), v2(cx-h*0.85, cy+h*0.35), v2(cx-h*0.4, cy+h*0.75))
+}

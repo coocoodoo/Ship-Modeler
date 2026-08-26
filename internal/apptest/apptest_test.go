@@ -129,6 +129,22 @@ func checkGolden(t *testing.T, caseName, outDir string) {
 			t.Errorf("%s differs from its baseline: %s", base, res)
 			continue
 		}
+		// Passing the tolerance is not the same as being unchanged. These are
+		// same-machine baselines (SPEC-RENDER §10), so the honest expectation is
+		// that they match exactly; the tolerance is a cushion for a driver
+		// update, not room for a UI change to slip through unnoticed. A control
+		// added to a toolbar covers well under the outlier budget and would
+		// otherwise leave every golden quietly out of date.
+		if res.Differs() {
+			diff := filepath.Join(outDir, "diff_"+base)
+			if err := WriteDiff(diff, gotImg, wantImg); err == nil {
+				t.Logf("wrote diff image %s", diff)
+			}
+			t.Errorf("%s is stale: the render changed but stayed inside tolerance (%s). "+
+				"Review the diff, then regenerate with GOLDEN_UPDATE=1 and note it in PROGRESS.",
+				base, res)
+			continue
+		}
 		t.Logf("%s matches: %s", base, res)
 	}
 }
@@ -276,6 +292,36 @@ func TestScriptErrorsExitNonZero(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "sideways") {
 		t.Errorf("error does not name the offending value:\n%s", out)
+	}
+}
+
+// TestAScriptThatObservesNothingIsRejected: a run that neither captures nor
+// dumps proves nothing, and a script that quietly proves nothing is worse than
+// one that fails. A dump alone is enough — plenty of flow tests only read
+// state — but silence is not.
+func TestAScriptThatObservesNothingIsRejected(t *testing.T) {
+	dir := t.TempDir()
+	silent := filepath.Join(dir, "silent.json")
+	if err := os.WriteFile(silent, []byte(`[{"op":"camera.view","view":"top"}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(exePath, "-headless", "-script", silent, "-out", dir)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("a script with no shot and no dump exited 0:\n%s", out)
+	}
+	if !strings.Contains(string(out), "observed nothing") {
+		t.Errorf("error does not explain the problem:\n%s", out)
+	}
+
+	// The same script with a dump is fine.
+	probe := filepath.Join(dir, "probe.json")
+	if err := os.WriteFile(probe, []byte(`[{"op":"camera.view","view":"top"},{"op":"dump"}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd = exec.Command(exePath, "-headless", "-script", probe, "-out", dir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("a dump-only probe was rejected: %v\n%s", err, out)
 	}
 }
 
