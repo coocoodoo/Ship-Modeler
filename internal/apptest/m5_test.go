@@ -302,3 +302,63 @@ func TestFaceSketchDefaultsToAdd(t *testing.T) {
 		t.Errorf("the body grew by %v, want the 2x2x2 that was drawn", grew)
 	}
 }
+
+// TestSketchingLooksAtTheFaceNotThroughIt is a regression, reported by the
+// user: starting a sketch pointed the camera the opposite way.
+//
+// LookAlong takes the direction the eye sits in, so looking at a face means
+// passing its outward normal. M5 passed the negation, which put the camera
+// inside the body staring at the back of the surface you had just asked to
+// draw on — the geometry was right and the view was inside out.
+//
+// The check is the camera's forward direction against the face's normal. They
+// must oppose: the eye is outside, looking back down the normal.
+func TestSketchingLooksAtTheFaceNotThroughIt(t *testing.T) {
+	stdout, _ := runScript(t, "m5_faceview")
+	cams := parseCameraDumps(t, stdout)
+	if len(cams) != 3 {
+		t.Fatalf("expected 3 dumps, got %d:\n%s", len(cams), stdout)
+	}
+
+	cases := []struct {
+		what   string
+		normal [3]float64
+		cam    [3]float64
+	}{
+		{"a face pointing +Y", [3]float64{0, 1, 0}, cams[0]},
+		{"a face pointing +X", [3]float64{1, 0, 0}, cams[1]},
+		{"the Front plane", [3]float64{0, 0, 1}, cams[2]},
+	}
+	for _, c := range cases {
+		dot := c.normal[0]*c.cam[0] + c.normal[1]*c.cam[1] + c.normal[2]*c.cam[2]
+		if dot > -0.99 {
+			t.Errorf("sketching on %s looks %v, which is %.2f against its normal %v — "+
+				"want the camera outside looking back down it",
+				c.what, c.cam, dot, c.normal)
+		}
+	}
+}
+
+// parseCameraDumps pulls the camera's forward direction out of each dump.
+func parseCameraDumps(t *testing.T, stdout string) [][3]float64 {
+	t.Helper()
+	line := regexp.MustCompile(
+		`^camera forward=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+) ortho=\d$`)
+	var out [][3]float64
+	for _, raw := range strings.Split(stdout, "\n") {
+		m := line.FindStringSubmatch(strings.TrimRight(raw, "\r"))
+		if m == nil {
+			continue
+		}
+		var v [3]float64
+		for i := 0; i < 3; i++ {
+			f, err := strconv.ParseFloat(m[i+1], 64)
+			if err != nil {
+				t.Fatalf("unparsable camera line %q", raw)
+			}
+			v[i] = f
+		}
+		out = append(out, v)
+	}
+	return out
+}

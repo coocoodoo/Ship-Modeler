@@ -483,3 +483,26 @@ func (a *App) extrudeHint() string {
 	}
 	return "Drag the arrow to set the depth · Enter to confirm · Esc to cancel"
 }
+
+// canExtrude reports whether the Extrude button would do anything right now,
+// and what to do about it if not (SPEC-UX §15).
+//
+// The answer is exactly the set of things BeginExtrude accepts: a sketch being
+// edited with a closed region in it, or one selected in the tree or the
+// viewport with the same.
+func (a *App) canExtrude() (bool, string) {
+	const why = "Select a sketch with a closed profile — or press S to draw one"
+	s := a.ActiveSketch()
+	if s == nil {
+		if ref, ok := a.Sel.Primary(); ok && ref.Kind == model.SelSketch {
+			s = a.Doc().SketchByID(ref.Sketch)
+		}
+	}
+	if s == nil {
+		return false, why
+	}
+	if len(s.Arrangement().Regions) == 0 {
+		return false, "Close the red endpoints first — extrude needs a closed region"
+	}
+	return true, ""
+}

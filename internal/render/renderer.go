@@ -220,25 +220,33 @@ func (r *Renderer) drawPlanes(s *Scene, vp Viewport) {
 	for i := range s.Planes {
 		p := &s.Planes[i]
 		quad := planeQuad(p.Frame, p.HalfSize)
-		fill := p.Color
-		if p.Hovered {
-			fill = ui.WithAlpha(fill, uint8(min255(int(fill.A)*2)))
-		}
-		drawPolyFan(quad[:], fill)
 
+		// A selected plane is tinted in the accent, not merely outlined in it.
+		// These quads are enormous, and a one-and-a-half pixel border on
+		// something that fills the viewport is not a highlight anybody sees.
+		fill := p.Color
 		border := ui.WithAlpha(p.Color, 0x4D)
+		width := 1.5
 		switch {
 		case p.Selected:
-			border = ui.ColorAccent
+			fill = ui.WithAlpha(ui.ColorAccent, PlaneSelectedAlpha)
+			border, width = ui.ColorAccent, 3
 		case p.Hovered:
+			fill = ui.WithAlpha(fill, uint8(min255(int(fill.A)*2)))
 			border = ui.WithAlpha(p.Color, 0xAA)
 		}
+		drawPolyFan(quad[:], fill)
 		for k := 0; k < 4; k++ {
-			r.drawRibbon(c, quad[k], quad[(k+1)%4], 1.5, border, 1)
+			r.drawRibbon(c, quad[k], quad[(k+1)%4], width, border, 1)
 		}
 	}
 	rl.DrawRenderBatchActive()
 }
+
+// PlaneSelectedAlpha is how strongly a selected plane is tinted. Stronger than
+// its resting tint so the selection reads across the whole quad, weak enough
+// that the model behind it still does.
+const PlaneSelectedAlpha = 0x3A
 
 // drawEdgePass draws the crease and boundary overlay for every opaque body
 // (SPEC-RENDER §5).

@@ -30,6 +30,9 @@ const (
 	RegionHoverAlpha = 0x4D
 	// IdleSketchAlpha fades a sketch that is not being edited.
 	IdleSketchAlpha = 0.55
+	// IdleRegionFillAlpha tints a closed profile on a sketch nobody is editing,
+	// which is how you tell at a glance which sketches can be extruded.
+	IdleRegionFillAlpha = 0x1F
 )
 
 // SketchView is everything the app knows about the sketch being drawn, handed
@@ -57,6 +60,9 @@ type SketchView struct {
 	// dim solid lines you can snap to but never select (SPEC-UX §10). Empty for
 	// a sketch on a default plane, or one whose face has since been cut away.
 	Reference [][]geom.Vec2i
+	// Selected is true when this sketch is the current selection. An idle
+	// sketch you have picked has to look picked, the same as anything else.
+	Selected bool
 }
 
 // BuildSketchDraw assembles the overlay.
@@ -67,6 +73,11 @@ func BuildSketchDraw(v SketchView) *render.Overlay {
 	d := &render.Overlay{Frame: v.Sketch.Frame()}
 
 	if !v.Editing {
+		// An idle sketch still shows which of its profiles are closed. That is
+		// the one thing a person needs to know about a sketch they are not
+		// drawing on — a closed profile is one they can extrude — and leaving
+		// it out made a finished sketch look like a handful of loose lines.
+		appendRegionFills(d, v.Sketch.Arrangement(), v)
 		appendEntityStrokes(d, v)
 		return d
 	}
@@ -108,6 +119,11 @@ func appendRegionFills(d *render.Overlay, arr sketch2d.Arrangement, v SketchView
 	for i, r := range arr.Regions {
 		fill := ui.WithAlpha(ui.ColorAccent, RegionFillAlpha)
 		switch {
+		case !v.Editing && v.Selected:
+			fill = ui.WithAlpha(ui.ColorAccent, 0x4D)
+		case !v.Editing:
+			// Quieter than the active sketch's, but unmistakably a filled area.
+			fill = ui.WithAlpha(ui.ColorAccent, IdleRegionFillAlpha)
 		case v.SelectedRegions[i]:
 			fill = ui.WithAlpha(ui.ColorAccent, 0x66)
 		case i == v.HoverRegion:
@@ -120,7 +136,7 @@ func appendRegionFills(d *render.Overlay, arr sketch2d.Arrangement, v SketchView
 		}
 		// A selected or hovered region also gets its outline drawn, so the
 		// boundary reads even where fills overlap.
-		if v.SelectedRegions[i] || i == v.HoverRegion {
+		if (!v.Editing && v.Selected) || v.SelectedRegions[i] || i == v.HoverRegion {
 			appendLoopOutline(d, r.Outer, ui.ColorAccent)
 			for _, h := range r.Holes {
 				appendLoopOutline(d, h, ui.ColorAccent)
@@ -150,7 +166,12 @@ func appendEntityStrokes(d *render.Overlay, v SketchView) {
 	for i := range v.Sketch.Entities {
 		e := &v.Sketch.Entities[i]
 		col, width := ui.ColorText, float64(EntityWidthPx)
-		if !v.Editing {
+		switch {
+		case !v.Editing && v.Selected:
+			// A selected sketch reads as selected, in the same accent
+			// everything else selected uses.
+			col, width = ui.ColorAccent, SelectedWidthPx
+		case !v.Editing:
 			// An idle sketch recedes so the model and the active sketch read
 			// first, but it is unmistakably still there.
 			col = ui.Fade(ui.ColorTextDim, IdleSketchAlpha)

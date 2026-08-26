@@ -101,6 +101,10 @@ type toolbarTool struct {
 	// start is what clicking the button does, and is the same entry point the
 	// shortcut key uses. Nil for a tool that has not shipped.
 	start func(*App)
+	// ready reports whether the tool can run right now, and why not if it
+	// cannot. A button that is always live tells you nothing; one that greys
+	// out with a reason tells you what to do next (SPEC-UX §15).
+	ready func(*App) (bool, string)
 }
 
 func toolbarTools() []toolbarTool {
@@ -108,9 +112,9 @@ func toolbarTools() []toolbarTool {
 		{mode: ModeSketch, label: "Sketch", shortcut: "S", icon: ui.DrawSketchToolIcon,
 			start: (*App).beginSketchFromSelection},
 		{mode: ModeExtrude, label: "Extrude", shortcut: "E", icon: ui.DrawExtrudeIcon,
-			start: func(a *App) { a.BeginExtrude() }},
+			start: func(a *App) { a.BeginExtrude() }, ready: (*App).canExtrude},
 		{mode: ModeBoolean, label: "Boolean", shortcut: "B", icon: ui.DrawBooleanIcon,
-			start: func(a *App) { a.BeginBoolean() }},
+			start: func(a *App) { a.BeginBoolean() }, ready: (*App).canBoolean},
 		{mode: ModeIdle, label: "Move", shortcut: "M", icon: ui.DrawMoveIcon,
 			milestone: "M6"},
 		{mode: ModePaint, label: "Paint", shortcut: "P", icon: ui.DrawPaintIcon,
@@ -147,18 +151,21 @@ func (a *App) buildToolbar(r rl.Rectangle) {
 		box, rest = ui.SplitLeft(rest, w)
 		box.Height = btnH
 
-		var why string
-		if tool.start == nil {
+		enabled, why := tool.start != nil, ""
+		switch {
+		case tool.start == nil:
 			why = tool.label + " arrives with milestone " + tool.milestone
+		case tool.ready != nil:
+			enabled, why = tool.ready(a)
 		}
 		clicked := a.UI.IconButton(ui.MakeID("tool."+tool.label), box, tool.icon, ui.IconOpts{
 			Label:       tool.label,
 			Active:      tool.active(a),
-			Disabled:    tool.start == nil,
+			Disabled:    !enabled,
 			Shortcut:    tool.shortcut,
 			DisabledWhy: why,
 		})
-		if clicked && tool.start != nil {
+		if clicked && enabled {
 			tool.start(a)
 		}
 		var gap rl.Rectangle

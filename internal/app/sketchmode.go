@@ -84,8 +84,11 @@ func (a *App) enterSketch(s *model.Sketch) {
 	to := a.targetCamera()
 	if s.OnFace {
 		// A face has no entry in the named-view table; the way to look at it
-		// straight on is to look down its own normal (SPEC-UX §10).
-		to.LookAlong(frame.N.Neg())
+		// straight on is to put the eye on the outward side and look back down
+		// the normal. LookAlong takes the direction the eye sits in, so it is
+		// the normal itself — negating it puts the camera inside the body,
+		// looking at the back of the face you asked to sketch on.
+		to.LookAlong(frame.N)
 	} else {
 		to.Azimuth, to.Elevation = render.PlaneView(s.Plane)
 	}
@@ -390,7 +393,11 @@ func (a *App) buildSketchDraws() []*render.Overlay {
 		if !s.Visible || s == active {
 			continue
 		}
-		if d := scene.BuildSketchDraw(scene.SketchView{Sketch: s}); d != nil && !d.Empty() {
+		view := scene.SketchView{
+			Sketch:   s,
+			Selected: a.Sel.Contains(model.SketchRef(s.ID)) || a.hoverSketch == s,
+		}
+		if d := scene.BuildSketchDraw(view); d != nil && !d.Empty() {
 			out = append(out, d)
 		}
 	}

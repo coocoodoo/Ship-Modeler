@@ -6,6 +6,44 @@
 
 ---
 
+## 2026-08-26 — Fixes: sketch and plane highlighting, sketch camera
+
+**Reported by the user, four things at once.** All four were real.
+
+**A selected sketch did not highlight, and a closed one showed no tint.**
+`BuildSketchDraw` had one branch for the sketch being edited and one for
+everything else, and the second drew strokes and nothing more. So a finished
+sketch showed no region fill — the one thing worth knowing about a sketch you
+are not drawing on, since a filled region is one you can extrude — and being
+selected changed nothing about how it looked. Idle sketches now tint their
+closed regions quietly, and a selected one draws in the accent with its
+boundary, like everything else selected.
+
+**A selected plane did not highlight.** It did, technically: the 1.5-pixel
+border turned accent. On a quad that fills the viewport that is not a highlight
+anybody sees. A selected plane is now tinted across its whole face and bordered
+at three pixels.
+
+**Sketching faced the wrong way.** `Camera.LookAlong` takes the direction the
+eye sits in, so looking at a face means passing its outward normal. M5 passed
+the negation, which put the camera inside the body staring at the back of the
+surface you had just asked to draw on. The geometry was right the whole time and
+the view was inside out. `TestSketchingLooksAtTheFaceNotThroughIt` asserts the
+camera's forward opposes the normal, and fails with the old sign.
+
+**"Add an extrude button top left."** It was already there, in both toolbars.
+The real problem is that it never greyed out: in Idle it looked identical
+whether or not anything could be extruded, so it taught you nothing and you had
+to click it to find out. Toolbar buttons now ask the tool whether it can run and
+grey out with the reason when it cannot — Extrude wants a sketch with a closed
+profile, Boolean wants two bodies (SPEC-UX §15).
+
+**Verified:** shots read for all four states. Full suite green; goldens
+regenerated, since plane tint, sketch tint, toolbar greying and the face-sketch
+camera all changed what is on screen.
+
+---
+
 ## 2026-08-26 — Fix: closed sketches could not be clicked
 
 **Reported by the user:** closed sketches can't be selected to extrude them.

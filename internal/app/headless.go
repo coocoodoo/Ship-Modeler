@@ -868,6 +868,12 @@ func (r *ScriptRunner) dump() {
 		strings.Join(planes, ","), len(doc.Bodies), len(doc.Sketches),
 		a.Bus.UndoDepth(), a.Bus.RedoDepth(), boolBit(doc.DirtySinceSave))
 
+	// The camera's forward direction, which is the only way to assert that a
+	// view faces what it was asked to face rather than the back of it.
+	f := a.targetCamera().Forward()
+	fmt.Printf("camera forward=%.4f,%.4f,%.4f ortho=%d\n",
+		f.X, f.Y, f.Z, boolBit(!a.Camera.Perspective))
+
 	for _, b := range doc.Bodies {
 		fmt.Printf("body id=%d name=%q visible=%d tris=%d vol=%.4f color=%02X%02X%02X\n",
 			b.ID, b.Name, boolBit(b.Visible), b.TriangleCount(), bodyVolume(b),

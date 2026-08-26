@@ -236,3 +236,12 @@ func (a *App) booleanPickSummary() string {
 	}
 	return out
 }
+
+// canBoolean reports whether the Boolean button would do anything, which needs
+// two bodies to combine.
+func (a *App) canBoolean() (bool, string) {
+	if len(a.Doc().Bodies) < 2 {
+		return false, "A boolean needs two bodies — there is only one to work with"
+	}
+	return true, ""
+}

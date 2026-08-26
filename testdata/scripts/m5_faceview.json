@@ -1,0 +1,13 @@
+[
+  {"op":"sketch.face","body":"Hull","axis":"+y"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"sketch.finish"},
+  {"op":"sketch.face","body":"Hull","axis":"+x"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"sketch.finish"},
+  {"op":"sketch.begin","plane":"Front"},
+  {"op":"settle"},
+  {"op":"dump"}
+]
