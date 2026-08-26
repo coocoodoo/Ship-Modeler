@@ -93,9 +93,10 @@ func (a *App) BuildScene() render.Scene {
 
 	// Sketch mode dims the rest of the model and puts the grid on the sketch
 	// plane, so the profile being drawn is what the eye lands on (SPEC-UX §8.1).
-	// A push/pull drag gets the same treatment for as long as it lasts: it is
-	// the same question — how far has this come — asked with a different tool.
-	if a.InSketch() || a.previewOwnsView() {
+	// A push/pull drag deliberately does not: it is a direct edit of a body in
+	// place, and you are judging the new material against the model it is
+	// joining. Dimming that model is dimming the thing you are comparing to.
+	if a.InSketch() || a.InExtrude() {
 		s.DimFactor = SketchDimFactor
 		if sk := a.ActiveSketch(); sk != nil {
 			s.Grid = scene.SketchGridFor(sk)
@@ -226,12 +227,13 @@ func (a *App) FrameSelection(vp render.Viewport) {
 	a.Anim.Start(a.Camera, to)
 }
 
-// previewOwnsView reports that a translucent preview is the subject of the
-// view: an open extrude, or a push/pull drag that has moved.
+// previewOwnsView reports that a translucent preview is being dragged: an open
+// extrude, or a push/pull drag that has moved.
 //
-// Both put a see-through solid in front of the model and ask one question about
-// it. Everything else — planes included — gets out of the way until the answer
-// is given.
+// It decides one thing only — whether the default planes are in the way. A
+// translucent plane blending against a translucent preview in the same pass
+// muddles both, and a quad spanning the viewport crosses whatever is being
+// pulled. The model itself stays exactly as it was.
 func (a *App) previewOwnsView() bool {
 	if a.InExtrude() {
 		return true

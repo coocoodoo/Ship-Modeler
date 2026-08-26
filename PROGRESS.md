@@ -30,13 +30,18 @@ thing that matters is how far it has come. They are hidden for the duration of
 the tool and back the instant it closes; their eye toggles are untouched. The
 sketch grid stays, because that is what makes the depth readable.
 
-**And then the same for push/pull, with a second screenshot showing why.** A
-push/pull drag had none of this: the model stayed at full strength, the planes
-stayed put, and a translucent plane blending against a translucent preview in
-the same pass produced exactly the muddle the user called an eye sore. Both
-tools now go through one predicate, `previewOwnsView` — an open extrude, or a
-push/pull drag that has moved — and both get the same treatment. Blue material
-going on, red coming off, against a dimmed model and nothing else.
+**And then the planes for push/pull too, with a second screenshot showing why.**
+A translucent plane blending against a translucent preview in the same pass
+muddles both, and a quad spanning the viewport crosses whatever is being pulled.
+Both tools now go through one predicate, `previewOwnsView`.
+
+**That change first went too far and the user sent it back.** Along with hiding
+the planes it dimmed the model during a push/pull drag, on the reasoning that
+extrude already did and the two tools ask the same question. They do not. An
+extrude builds a new solid and the model is background; a push/pull is a direct
+edit of a body in place, and what you are judging is the new material *against
+the model it is joining*. Dimming that model dims the thing being compared to.
+`previewOwnsView` now decides one thing only: whether the planes are in the way.
 
 **Verified:** rendered an extrude in progress on the user's scene — the prism
 is now unmistakably the brightest thing in the frame. Sketch mode re-checked:
