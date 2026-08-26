@@ -173,7 +173,7 @@ func (r *Renderer) drawShadedPass(s *Scene) {
 		if b.GPU == nil || !b.GPU.uploaded || b.Alpha < 0.999 {
 			continue
 		}
-		r.drawBody(b, s.DimFactor)
+		r.drawBody(b, s.dimFor(b))
 	}
 }
 
@@ -190,7 +190,7 @@ func (r *Renderer) drawTranslucentPass(s *Scene, vp Viewport) {
 		if b.GPU == nil || !b.GPU.uploaded || b.Alpha >= 0.999 {
 			continue
 		}
-		r.drawBody(b, s.DimFactor)
+		r.drawBody(b, s.dimFor(b))
 	}
 	rl.EnableBackfaceCulling()
 }
@@ -213,6 +213,10 @@ func (r *Renderer) drawBody(b *BodyDraw, dim float64) {
 // drawPlanes renders the default planes as two-sided translucent quads with a
 // screen-constant border (SPEC-UX §5).
 func (r *Renderer) drawPlanes(s *Scene, vp Viewport) {
+	// The planes are part of "everything else": while a mode is dimming the
+	// scene to make one thing stand out, three full-strength quads across the
+	// viewport are exactly what it is trying to get out of the way.
+	dim := s.DimFactor
 	if len(s.Planes) == 0 {
 		return
 	}
@@ -234,6 +238,10 @@ func (r *Renderer) drawPlanes(s *Scene, vp Viewport) {
 		case p.Hovered:
 			fill = ui.WithAlpha(fill, uint8(min255(int(fill.A)*2)))
 			border = ui.WithAlpha(p.Color, 0xAA)
+		}
+		if dim > 0 && dim < 1 {
+			fill = fadeAlpha(fill, dim)
+			border = fadeAlpha(border, dim)
 		}
 		drawPolyFan(quad[:], fill)
 		for k := 0; k < 4; k++ {
@@ -266,8 +274,8 @@ func (r *Renderer) drawEdgePass(s *Scene, vp Viewport) {
 		if b.Selected {
 			col, width = ui.ColorAccent, EdgeSelectedWidth
 		}
-		if s.DimFactor > 0 && s.DimFactor < 1 {
-			col = fadeAlpha(col, s.DimFactor)
+		if d := s.dimFor(b); d > 0 && d < 1 {
+			col = fadeAlpha(col, d)
 		}
 		for _, e := range b.GPU.Edges {
 			a := b.Transform.TransformPoint(e.A)

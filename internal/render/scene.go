@@ -26,6 +26,20 @@ type BodyDraw struct {
 	SelectedFaces map[mesh.FaceUID]bool
 	Selected      bool // whole-body selection: accent silhouette
 	EdgeColor     color.RGBA
+
+	// NoDim exempts this body from the scene's DimFactor. A mode that dims the
+	// scene is dimming it to make one thing stand out, and that thing is
+	// usually a body in this list — dimming it along with everything else
+	// defeats the whole point.
+	NoDim bool
+}
+
+// dimFor is how far a body fades, honouring its exemption.
+func (s *Scene) dimFor(b *BodyDraw) float64 {
+	if b.NoDim {
+		return 1
+	}
+	return s.DimFactor
 }
 
 // PlaneDraw is one default plane, drawn as a bounded translucent quad with a

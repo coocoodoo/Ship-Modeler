@@ -6,6 +6,30 @@
 
 ---
 
+## 2026-08-26 — Fix: the extrude preview was dimmed with everything else
+
+**Reported by the user, with a screenshot.** Mid-extrude, the pending solid was
+as dark as the model behind it and barely readable.
+
+Sketch and extrude modes fade the scene to 30% so the thing being worked on
+stands out (SPEC-UX §8.1). The preview solid is a `BodyDraw` in the same list as
+every other body, so it was faded along with them — the scene was being dimmed
+to highlight something that was also being dimmed. And the three default planes
+were not faded at all, so full-strength quads across the viewport were the
+brightest thing in a shot that was supposed to be about the extrusion.
+
+**Fixed:** `BodyDraw` grew a `NoDim` flag, set on the extrude and push/pull
+previews, and the planes now honour the scene's dim factor. What a mode is
+about is the one thing at full strength; everything else, planes included,
+recedes.
+
+**Verified:** rendered an extrude in progress on the user's scene — the prism
+is now unmistakably the brightest thing in the frame. Sketch mode re-checked:
+the sketch still reads first, and the plane quads no longer compete with it.
+Full suite green, goldens regenerated.
+
+---
+
 ## 2026-08-26 — Fixes: sketch and plane highlighting, sketch camera
 
 **Reported by the user, four things at once.** All four were real.

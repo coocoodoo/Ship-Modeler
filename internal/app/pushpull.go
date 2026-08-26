@@ -205,6 +205,7 @@ func (a *App) pushPullPreviewDraw() (render.BodyDraw, bool) {
 		Color:     col,
 		Alpha:     PreviewAlpha,
 		Transform: geom.Identity(),
+		NoDim:     true,
 	}, true
 }
 

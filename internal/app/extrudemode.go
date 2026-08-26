@@ -466,6 +466,9 @@ func (a *App) extrudePreviewDraw() (render.BodyDraw, bool) {
 		Color:     model.AutoBodyColor(int(a.Doc().Seq.Body)),
 		Alpha:     PreviewAlpha,
 		Transform: geom.Identity(),
+		// The scene is dimmed so this stands out. Dimming it too would leave
+		// nothing to look at.
+		NoDim: true,
 	}, true
 }
 
