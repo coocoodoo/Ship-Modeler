@@ -2,7 +2,46 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M2 COMPLETE.** You can pick a plane, draw lines, rectangles and circles on it with snapping, and watch closed profiles fill while loose ends glow red. Next up: **M3** (extrude to a new body: the arrow gizmo, draft, symmetric).
+**Current state:** **M2 COMPLETE**, plus a follow-up fix for sketch visibility (below). Next up: **M3** (extrude to a new body: the arrow gizmo, draft, symmetric).
+
+---
+
+## 2026-08-26 — Fix: finished sketches were invisible
+
+**Reported by the user:** sketches disappear once you finish them.
+
+**Confirmed, and it was mine.** The viewport only ever built a draw list inside
+an `if a.InSketch()` guard, so the moment the session ended the sketch stopped
+being drawn. It was still in the document — entities, regions, tree row all
+intact — just never rendered. The same gap from the other end: `Sketch.Visible`
+was written by the tree's eye toggle and reported in dumps, but nothing in the
+viewport read it, so that toggle controlled nothing at all. I had marked M2's
+"tree section, rename/hide/delete" checkbox complete; the hide half was not
+honestly done.
+
+**Why the tests missed it:** every M2 golden was shot *while in sketch mode*.
+The script called `sketch.finish` but only dumped afterwards, never took a
+picture. The dump assertions all passed because the document was correct — the
+defect was purely in what got drawn.
+
+**Fixed:** `render.Scene` now carries a list of sketch overlays rather than one,
+and `BuildScene` builds one for every visible sketch, with the active sketch
+last so it lands on top. An idle sketch draws as quiet dimmed strokes: no region
+fills, no red rings, no snap glyphs, because those all answer "what am I about
+to do", which only the active sketch is being asked.
+
+**A second bug, in the test I wrote to catch the first.** My regression test
+asserted `!res.WithinTolerance()` to mean "the picture changed" — but
+`WithinTolerance` asks the opposite question, "does this match its baseline",
+and allows a 0.3% outlier budget for driver variation. The sketch's thin strokes
+cover 0.158% of the frame, so the test reported no change while the feature was
+working. There is now an explicit `Differs()` that counts changed pixels, used
+by both this test and the tree-collapse one.
+
+**Verified:** new `sketch.visible` op; `TestFinishedSketchStaysVisible` renders
+the sketch after finishing and again with it hidden and requires the two to
+differ, so the bug cannot come back from either side. New goldens
+`m2_after_finish.png` and `m2_sketch_hidden.png`. 217 tests pass.
 
 ---
 

@@ -28,13 +28,21 @@ const (
 	SketchGridHalf   = 40.0
 	RegionFillAlpha  = 0x33
 	RegionHoverAlpha = 0x4D
+	// IdleSketchAlpha fades a sketch that is not being edited.
+	IdleSketchAlpha = 0.55
 )
 
 // SketchView is everything the app knows about the sketch being drawn, handed
 // to the scene layer in one struct so the draw list is built from a single
 // consistent snapshot.
 type SketchView struct {
-	Sketch  *model.Sketch
+	Sketch *model.Sketch
+	// Editing is true for the sketch the user is currently drawing on. An
+	// idle sketch still draws — leaving it invisible the moment you finish
+	// would make the tree's eye toggle a lie — but it draws as quiet strokes
+	// only: no region fills, no red rings, no snap glyphs. Those all answer
+	// "what am I about to do", which is a question only the active sketch has.
+	Editing bool
 	Session *sketch.Session
 	// Snap is the resolved cursor, when the pointer is over the viewport.
 	Snap    sketch.Snap
@@ -53,8 +61,13 @@ func BuildSketchDraw(v SketchView) *render.SketchDraw {
 		return nil
 	}
 	d := &render.SketchDraw{Frame: v.Sketch.Frame()}
-	arr := v.Sketch.Arrangement()
 
+	if !v.Editing {
+		appendEntityStrokes(d, v)
+		return d
+	}
+
+	arr := v.Sketch.Arrangement()
 	appendRegionFills(d, arr, v)
 	appendEntityStrokes(d, v)
 	appendPreview(d, v)
@@ -111,6 +124,11 @@ func appendEntityStrokes(d *render.SketchDraw, v SketchView) {
 	for i := range v.Sketch.Entities {
 		e := &v.Sketch.Entities[i]
 		col, width := ui.ColorText, float64(EntityWidthPx)
+		if !v.Editing {
+			// An idle sketch recedes so the model and the active sketch read
+			// first, but it is unmistakably still there.
+			col = ui.Fade(ui.ColorTextDim, IdleSketchAlpha)
+		}
 		if selected[i] {
 			col, width = ui.ColorAccent, SelectedWidthPx
 		}
@@ -127,7 +145,7 @@ func appendEntityStrokes(d *render.SketchDraw, v SketchView) {
 		}
 		// Endpoints of open entities get a dot, so a line's ends are visible
 		// even before the region engine judges them.
-		if !e.Closed() {
+		if !e.Closed() && v.Editing {
 			for _, p := range pts {
 				d.Markers = append(d.Markers, render.SketchMarker{
 					P: d.Lift(p), Kind: render.MarkerVertex,

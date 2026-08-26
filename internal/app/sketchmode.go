@@ -297,21 +297,38 @@ func toggleInt(s []int, v int) []int {
 	return append(s, v)
 }
 
-// buildSketchDraw assembles the overlay for this frame.
-func (a *App) buildSketchDraw() *render.SketchDraw {
-	s := a.ActiveSketch()
-	if s == nil {
-		return nil
+// buildSketchDraws assembles an overlay for every visible sketch.
+//
+// A sketch does not stop existing when you finish drawing it: it stays in the
+// document, its tree row keeps an eye toggle, and it has to keep showing in the
+// viewport or that toggle controls nothing. The one being edited is built last
+// so it lands on top of the rest.
+func (a *App) buildSketchDraws() []*render.SketchDraw {
+	active := a.ActiveSketch()
+	var out []*render.SketchDraw
+
+	for _, s := range a.Doc().Sketches {
+		if !s.Visible || s == active {
+			continue
+		}
+		if d := scene.BuildSketchDraw(scene.SketchView{Sketch: s}); d != nil && !d.Empty() {
+			out = append(out, d)
+		}
 	}
-	return scene.BuildSketchDraw(scene.SketchView{
-		Sketch:          s,
-		Session:         a.sketch.session,
-		Snap:            a.sketch.snap,
-		HasSnap:         a.sketch.hasSnap,
-		Cursor:          a.sketch.snap.Point,
-		HoverRegion:     a.sketch.hoverRegion,
-		SelectedRegions: a.sketch.selectedRegions,
-	})
+
+	if active != nil {
+		out = append(out, scene.BuildSketchDraw(scene.SketchView{
+			Sketch:          active,
+			Editing:         true,
+			Session:         a.sketch.session,
+			Snap:            a.sketch.snap,
+			HasSnap:         a.sketch.hasSnap,
+			Cursor:          a.sketch.snap.Point,
+			HoverRegion:     a.sketch.hoverRegion,
+			SelectedRegions: a.sketch.selectedRegions,
+		}))
+	}
+	return out
 }
 
 // sketchHint is what the hint bar says in sketch mode.

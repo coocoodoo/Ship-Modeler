@@ -137,6 +137,15 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return op.Errorf("could not change the visibility of the %s plane", op.Plane)
 		}
 
+	case "sketch.visible":
+		sk := a.Doc().SketchByName(op.Sketch)
+		if sk == nil {
+			return op.Errorf("no sketch named %q", op.Sketch)
+		}
+		if !a.Run(&model.SetSketchVisible{ID: sk.ID, Visible: *op.Visible}) {
+			return op.Errorf("could not change the visibility of %q", op.Sketch)
+		}
+
 	case "select":
 		if err := r.selectOp(op); err != nil {
 			return err

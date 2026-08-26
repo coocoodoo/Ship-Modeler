@@ -226,8 +226,8 @@ func TestTreeCollapses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.WithinTolerance() {
-		t.Error("collapsing the tree panel changed nothing on screen")
+	if !res.Differs() {
+		t.Errorf("collapsing the tree panel changed nothing on screen: %s", res)
 	}
 }
 

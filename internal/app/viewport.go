@@ -45,6 +45,10 @@ func (a *App) BuildScene() render.Scene {
 
 	s.Planes = a.buildPlaneDraws()
 
+	// Every visible sketch draws, in or out of sketch mode, so the eye toggle
+	// on a sketch row means something.
+	s.Sketches = a.buildSketchDraws()
+
 	// Sketch mode dims the rest of the model and puts the grid on the sketch
 	// plane, so the profile being drawn is what the eye lands on (SPEC-UX §8.1).
 	if a.InSketch() {
@@ -52,7 +56,6 @@ func (a *App) BuildScene() render.Scene {
 		if sk := a.ActiveSketch(); sk != nil {
 			s.Grid = scene.SketchGridFor(sk)
 		}
-		s.Sketch = a.buildSketchDraw()
 		for i := range s.Bodies {
 			s.Bodies[i].Pickable = false
 		}

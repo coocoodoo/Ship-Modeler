@@ -132,7 +132,7 @@ var knownOps = map[string]bool{
 	"extrude": true, "boolean": true,
 	"select": true, "move": true, "rotate": true,
 	"paint.res": true, "paint.color": true, "paint.pixel": true,
-	"body.visible": true, "plane.visible": true,
+	"body.visible": true, "plane.visible": true, "sketch.visible": true,
 	"deselect": true, "delete": true, "undo": true, "redo": true,
 	"hover": true, "click": true, "ui.tree": true,
 	"camera.view": true, "camera.frame": true, "camera.orbit": true,
@@ -183,6 +183,10 @@ func (o Op) validate() error {
 	case "plane.visible":
 		if o.Plane == "" || o.Visible == nil {
 			return o.Errorf("needs plane and visible")
+		}
+	case "sketch.visible":
+		if o.Sketch == "" || o.Visible == nil {
+			return o.Errorf("needs sketch and visible")
 		}
 	case "ui.tree":
 		if o.Visible == nil {

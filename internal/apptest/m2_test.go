@@ -1,6 +1,7 @@
 package apptest
 
 import (
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -71,10 +72,11 @@ func TestGoldenSketchTools(t *testing.T) {
 func TestRectAndCircleGiveTwoRegions(t *testing.T) {
 	stdout, _ := runScript(t, "m2_sketch")
 	dumps := parseSketchDumps(t, stdout)
-	if len(dumps) != 3 {
-		t.Fatalf("expected 3 dumps, got %d:\n%s", len(dumps), stdout)
+	if len(dumps) != 4 {
+		t.Fatalf("expected 4 dumps, got %d:\n%s", len(dumps), stdout)
 	}
 
+	// Dumps: on entering, after drawing, after finishing, after hiding.
 	empty, drawn, afterFinish := dumps[0], dumps[1], dumps[2]
 
 	if !empty.present {
@@ -195,4 +197,45 @@ func TestSketchAppearsInTheTree(t *testing.T) {
 			t.Errorf("dump %d reports %d sketches, want 1", i, d.sketches)
 		}
 	}
+}
+
+// TestFinishedSketchStaysVisible is the regression test for a real defect: the
+// viewport only ever drew the sketch being edited, so finishing one made it
+// vanish and the eye toggle on its tree row controlled nothing.
+//
+// It is checked from both sides. The render after finishing must differ from
+// the render with the sketch hidden — that difference is the sketch itself.
+func TestFinishedSketchStaysVisible(t *testing.T) {
+	_, outDir := runScript(t, "m2_sketch")
+
+	shown, err := LoadPNG(filepath.Join(outDir, "m2_after_finish.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hidden, err := LoadPNG(filepath.Join(outDir, "m2_sketch_hidden.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Compare(shown, hidden)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Differs() {
+		t.Errorf("hiding the sketch changed nothing on screen, so a finished "+
+			"sketch is not being drawn at all: %s", res)
+	}
+
+	// The document keeps the sketch either way: hiding is not deleting.
+	docs := parseDumps(t, mustStdout(t, "m2_sketch"))
+	last := docs[len(docs)-1]
+	if last.sketches != 1 {
+		t.Errorf("after hiding, the document reports %d sketches, want 1", last.sketches)
+	}
+}
+
+// mustStdout re-runs a script for its output alone.
+func mustStdout(t *testing.T, name string) string {
+	t.Helper()
+	out, _ := runScript(t, name)
+	return out
 }

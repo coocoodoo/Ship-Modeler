@@ -88,8 +88,7 @@ const (
 
 // drawSketchPass paints the sketch overlay over the scene.
 func (r *Renderer) drawSketchPass(s *Scene, vp Viewport) {
-	sk := s.Sketch
-	if sk == nil || sk.Empty() {
+	if len(s.Sketches) == 0 {
 		return
 	}
 	c := r.ribbonCtx(s.Camera, vp)
@@ -101,24 +100,31 @@ func (r *Renderer) drawSketchPass(s *Scene, vp Viewport) {
 	// impossible. Logged in DECISIONS.
 	rl.DisableDepthTest()
 	rl.DisableBackfaceCulling()
-	for _, t := range sk.Fills {
-		tri3(t.A, t.B, t.C, t.Color)
-	}
-	rl.DrawRenderBatchActive()
 
-	for _, l := range sk.Lines {
-		if l.Dashed {
-			r.drawDashed(c, l)
+	for _, sk := range s.Sketches {
+		if sk == nil || sk.Empty() {
 			continue
 		}
-		r.drawRibbon(c, l.A, l.B, l.WidthPx, l.Color, EyeShrinkEdgeFactor)
-	}
-	rl.DrawRenderBatchActive()
+		for _, t := range sk.Fills {
+			tri3(t.A, t.B, t.C, t.Color)
+		}
+		rl.DrawRenderBatchActive()
 
-	for _, m := range sk.Markers {
-		r.drawMarker(c, m)
+		for _, l := range sk.Lines {
+			if l.Dashed {
+				r.drawDashed(c, l)
+				continue
+			}
+			r.drawRibbon(c, l.A, l.B, l.WidthPx, l.Color, EyeShrinkEdgeFactor)
+		}
+		rl.DrawRenderBatchActive()
+
+		for _, m := range sk.Markers {
+			r.drawMarker(c, m)
+		}
+		rl.DrawRenderBatchActive()
 	}
-	rl.DrawRenderBatchActive()
+
 	rl.EnableBackfaceCulling()
 	rl.EnableDepthTest()
 }

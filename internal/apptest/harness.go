@@ -48,6 +48,18 @@ func (r CompareResult) WithinTolerance() bool {
 	return within >= MinPixelsWithinTolerance && r.MeanDelta <= MaxMeanDelta
 }
 
+// Differs reports whether two renders genuinely differ, which is the opposite
+// question to WithinTolerance.
+//
+// WithinTolerance asks "does this match its baseline", and allows a small
+// outlier budget for driver variation. Asking it backwards is a trap: a thin
+// stroke can cover well under that budget and still be exactly the thing under
+// test. This counts changed pixels directly instead.
+func (r CompareResult) Differs() bool {
+	const minChangedPixels = 200
+	return r.Outliers >= minChangedPixels
+}
+
 func (r CompareResult) String() string {
 	if r.Pixels == 0 {
 		return "no pixels compared"
