@@ -41,6 +41,7 @@ type m3Dump struct {
 	sketchVisible map[string]bool
 	extrude       extrudeDump
 	toasts        []string
+	hint          string
 	undo, redo    int
 }
 
@@ -107,6 +108,10 @@ func parseM3Dumps(t *testing.T, stdout string) []m3Dump {
 				clamped: m[4] == "1", dir: m[5], through: m[6] == "1",
 				regions: atoi(t, m[7]), result: m[8], targets: atoi(t, m[9]),
 				present: true,
+			}
+		case strings.HasPrefix(line, "hint "):
+			if m := regexp.MustCompile(`^hint "(.*)"$`).FindStringSubmatch(line); m != nil {
+				cur.hint = m[1]
 			}
 		case strings.HasPrefix(line, "toast "):
 			if m := m3ToastLine.FindStringSubmatch(line); m != nil {

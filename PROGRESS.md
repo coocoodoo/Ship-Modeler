@@ -6,6 +6,42 @@
 
 ---
 
+## 2026-08-26 — Fix: closed sketches could not be clicked
+
+**Reported by the user:** closed sketches can't be selected to extrude them.
+
+**Confirmed, and it had been true since M2.** A finished sketch draws as an
+overlay, not as geometry, so it was never in the ID buffer the pick pass reads.
+Clicking one selected whatever was behind it — which, on the plane it was drawn
+on, is that plane. Clicking the sketch's outline hit nothing at all. Nothing
+failed loudly; a closed profile simply looked unpickable.
+
+The tree path always worked — select the sketch row, press E — which is why
+`TestExtrudeStartsFromASketchPickedInTheTree` passed all through M3 and why this
+went unnoticed for four milestones. Every automated route into extrude went
+through the tree or through the `extrude` op directly. Nothing clicked a sketch
+in the viewport, because until now nothing needed to.
+
+**Fixed:** a click that lands on nothing, or on a plane, now tests the visible
+sketches first, in the sketch's own plane rather than by rendering ids — the
+same point-in-region code the sketch-mode hover already uses, and exact. A body
+in front still wins; the nearest of two overlapping sketches wins. Open profiles
+are pickable by their strokes, closed ones anywhere inside.
+
+**The hint bar disagreed with the click, and that took longer to find than the
+bug.** With the click fixed, hovering a sketch still read "Top plane". The hint
+was reaching `TreeHover` first — which is fed from the viewport hover — so the
+fix belonged in `viewportHoverRef`, not in a special case inside `HintText`.
+Putting it there means the tree row highlights too, which is what hovering
+anything else already does.
+
+**Verified:** `TestClickingASketchSelectsIt` covers the whole path — hover names
+the sketch, click selects it, E opens the extrude with its region picked, and
+the committed solid is 108 (a 6x6 square pulled 3). Full suite green, no golden
+drift.
+
+---
+
 ## 2026-08-26 — M6: selection, direct edit, transform
 
 **Done:**

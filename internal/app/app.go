@@ -82,6 +82,10 @@ type App struct {
 	transform transformState
 	box       boxSelectState
 
+	// hoverSketch is the visible sketch under the pointer, which the ID buffer
+	// cannot report because an overlay is not geometry.
+	hoverSketch *model.Sketch
+
 	// cubeDrag, orbiting and panning track camera navigation drags.
 	cubeDrag          bool
 	orbiting, panning bool
@@ -439,6 +443,9 @@ func (a *App) describeRef(r model.Ref) string {
 		return a.bodyName(r.Body)
 	case model.SelSketch:
 		if s := a.Doc().SketchByID(r.Sketch); s != nil {
+			if len(s.Arrangement().Regions) > 0 {
+				return s.Name + " · click to select it, then E to extrude"
+			}
 			return s.Name
 		}
 	}

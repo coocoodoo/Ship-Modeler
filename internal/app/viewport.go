@@ -125,6 +125,14 @@ func (a *App) buildPlaneDraws() []render.PlaneDraw {
 // viewportHoverRef maps the pick result into a document reference, so the tree
 // can highlight the row for whatever the cursor is over in 3D.
 func (a *App) viewportHoverRef() model.Ref {
+	// A sketch under the pointer wins over the plane it was drawn on, for the
+	// same reason a click does: the sketch is what is in front, and the hint
+	// bar has to describe what a click will actually select.
+	if a.hoverSketch != nil {
+		if !a.Hover.Hit || a.Hover.Kind == render.PickPlane {
+			return model.SketchRef(a.hoverSketch.ID)
+		}
+	}
 	if !a.Hover.Hit {
 		return model.Ref{}
 	}
@@ -302,6 +310,17 @@ func (a *App) handleViewportClick(in InputFrame, vp render.Viewport) {
 	hit := a.Renderer.Pick(&s, vp, in.MouseX, in.MouseY)
 	a.Hover = hit
 
+	// A visible sketch is an overlay, not geometry, so it is not in the ID
+	// buffer. It still has to be clickable: selecting a sketch is how you
+	// extrude one without going to the tree, and a closed profile that cannot
+	// be clicked looks broken. A body in front of it still wins.
+	if !hit.Hit || hit.Kind == render.PickPlane {
+		if sk := a.sketchAt(in.MouseX, in.MouseY, vp); sk != nil {
+			a.selectRef(model.SketchRef(sk.ID))
+			return
+		}
+	}
+
 	if !hit.Hit {
 		// Empty space starts a rectangle. It only becomes a box select if the
 		// pointer actually travels; a press and release in the same place is
@@ -474,8 +493,10 @@ func (a *App) updateHover(in InputFrame, vp render.Viewport) {
 	if a.UI.WantMouse() || a.Cube.Contains(in.MouseX, in.MouseY) ||
 		a.orbiting || a.panning || a.cubeDrag {
 		a.Hover = render.PickResult{}
+		a.hoverSketch = nil
 		return
 	}
+	a.hoverSketch = a.sketchAt(in.MouseX, in.MouseY, vp)
 	a.pickCooldown -= in.DeltaMillis
 	if !vp.Contains(int(in.MouseX), int(in.MouseY)) {
 		a.Hover = render.PickResult{}

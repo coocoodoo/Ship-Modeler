@@ -239,3 +239,52 @@ func TestDuplicateOffsetsACopy(t *testing.T) {
 		t.Errorf("the duplicate was silent; toasts were %q", after.toasts)
 	}
 }
+
+// TestClickingASketchSelectsIt is a regression, reported by the user: a closed
+// sketch could not be selected to extrude it.
+//
+// A finished sketch is drawn as an overlay, not as geometry, so it was never in
+// the ID buffer the pick pass reads. Clicking one selected whatever was behind
+// it — which, on the plane it was drawn on, is that plane. The sketch was
+// perfectly selectable from the tree, so nothing failed loudly; it just looked
+// as though closed profiles could not be picked.
+func TestClickingASketchSelectsIt(t *testing.T) {
+	stdout, _ := runScript(t, "m6_sketchclick")
+	dumps := parseM3Dumps(t, stdout)
+	sels, _ := parseM6Dumps(t, stdout)
+	if len(dumps) != 4 {
+		t.Fatalf("expected 4 dumps, got %d:\n%s", len(dumps), stdout)
+	}
+	hovered, clicked, open, done := dumps[0], dumps[1], dumps[2], dumps[3]
+
+	// Hovering names the sketch, not the plane under it, so the hint bar
+	// describes what a click will actually do.
+	if !strings.Contains(hovered.hint, "Sketch 1") {
+		t.Errorf("hovering a sketch says %q, want it to name the sketch", hovered.hint)
+	}
+	if strings.Contains(hovered.hint, "plane") {
+		t.Errorf("hovering a sketch says %q, which is the plane behind it", hovered.hint)
+	}
+	if sels[0].count != 0 {
+		t.Errorf("hovering selected something: %q", sels[0].desc)
+	}
+
+	// Clicking selects the sketch itself.
+	if sels[1].desc != "Sketch 1" {
+		t.Errorf("clicking a sketch selected %q, want Sketch 1", sels[1].desc)
+	}
+	_ = clicked
+
+	// And from there E extrudes it, with its region already picked.
+	if !open.extrude.present {
+		t.Fatal("the extrude tool did not open on the selected sketch")
+	}
+	if open.extrude.regions != 1 {
+		t.Errorf("the extrude took %d regions, want the sketch's 1", open.extrude.regions)
+	}
+	if !done.hasBody("Body 4") {
+		t.Error("the extrude produced no body")
+	} else if done.body(t, "Body 4").vol != 108 {
+		t.Errorf("volume = %v, want 36 square units pulled 3", done.body(t, "Body 4").vol)
+	}
+}

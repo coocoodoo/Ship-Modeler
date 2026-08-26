@@ -143,11 +143,19 @@ func (a *App) snapConfig(in InputFrame, vp render.Viewport) sketch.Config {
 // in sketch coordinates.
 func (a *App) cursorInSketchPlane(in InputFrame, vp render.Viewport) (geom.Vec2i, bool) {
 	s := a.ActiveSketch()
-	if s == nil || !vp.Contains(int(in.MouseX), int(in.MouseY)) {
+	if s == nil {
+		return geom.Vec2i{}, false
+	}
+	return a.cursorInPlaneOf(s, in.MouseX, in.MouseY, vp)
+}
+
+// cursorInPlaneOf maps a window position into one sketch's own coordinates.
+func (a *App) cursorInPlaneOf(s *model.Sketch, mouseX, mouseY float64, vp render.Viewport) (geom.Vec2i, bool) {
+	if s == nil || !vp.Contains(int(mouseX), int(mouseY)) {
 		return geom.Vec2i{}, false
 	}
 	frame := s.Frame()
-	origin, dir := a.Camera.Ray(vp.Local(in.MouseX, in.MouseY), float64(vp.W), float64(vp.H))
+	origin, dir := a.Camera.Ray(vp.Local(mouseX, mouseY), float64(vp.W), float64(vp.H))
 
 	denom := dir.Dot(frame.N)
 	if denom > -geom.NormalEps && denom < geom.NormalEps {
@@ -159,6 +167,57 @@ func (a *App) cursorInSketchPlane(in InputFrame, vp render.Viewport) (geom.Vec2i
 	}
 	local := frame.ToLocal(origin.Add(dir.Mul(t)))
 	return geom.Vec2iFromUnits(local), true
+}
+
+// sketchAt finds the visible sketch under a window position, if any.
+//
+// A finished sketch is drawn but is not in the pick pass — it is an overlay,
+// not geometry — so clicking one used to select whatever was behind it, which
+// on the plane it was drawn on is that plane. Since selecting a sketch is how
+// you get to extrude it without going to the tree, that made a closed profile
+// look unselectable.
+//
+// The test is done in the sketch's own plane rather than by rendering ids:
+// exact, cheap, and the same point-in-region code the sketch-mode hover uses.
+// The nearest sketch to the camera wins, so two overlapping sketches resolve
+// the way they look.
+func (a *App) sketchAt(mouseX, mouseY float64, vp render.Viewport) *model.Sketch {
+	var best *model.Sketch
+	var bestDist float64
+	eye := a.Camera.Eye()
+
+	for _, s := range a.Doc().Sketches {
+		if !s.Visible || len(s.Entities) == 0 {
+			continue
+		}
+		p, ok := a.cursorInPlaneOf(s, mouseX, mouseY, vp)
+		if !ok {
+			continue
+		}
+		arr := s.Arrangement()
+		if scene.RegionAt(arr, p) < 0 && !a.nearSketchStroke(s, p, vp) {
+			continue
+		}
+		d := s.Frame().ToWorld(geom.Vec2{
+			X: float64(p.X) / geom.Unit, Y: float64(p.Y) / geom.Unit,
+		}).Sub(eye).LenSq()
+		if best == nil || d < bestDist {
+			best, bestDist = s, d
+		}
+	}
+	return best
+}
+
+// nearSketchStroke reports whether a point is within grabbing distance of one
+// of a sketch's lines, so an open profile — which has no region to click
+// inside — is still selectable.
+func (a *App) nearSketchStroke(s *model.Sketch, p geom.Vec2i, vp render.Viewport) bool {
+	// The same forgiveness the Select tool gives inside sketch mode.
+	radius := int64(SketchStrokePickPx * a.subunitsPerPixel(vp))
+	if radius < geom.SubunitsPerUnit/16 {
+		radius = geom.SubunitsPerUnit / 16
+	}
+	return sketch.EntityAt(p, s.Entities, radius) >= 0
 }
 
 // updateSketch runs one frame of sketch-mode input.
@@ -245,9 +304,13 @@ func (a *App) handleSketchClick(in InputFrame, s *model.Sketch, sess *sketch.Ses
 	}
 }
 
+// SketchStrokePickPx is how close the pointer must come to a sketch line to
+// count as being on it.
+const SketchStrokePickPx = 3
+
 // handleSketchSelectClick picks entities and regions (SPEC-UX §8.5, §8.6).
 func (a *App) handleSketchSelectClick(in InputFrame, s *model.Sketch, sess *sketch.Session, p geom.Vec2i) {
-	radius := int64(3 * a.subunitsPerPixel(a.layout.RenderViewport()))
+	radius := int64(SketchStrokePickPx * a.subunitsPerPixel(a.layout.RenderViewport()))
 	if radius < geom.SubunitsPerUnit/16 {
 		radius = geom.SubunitsPerUnit / 16
 	}
