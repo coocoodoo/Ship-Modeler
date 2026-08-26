@@ -45,7 +45,7 @@
 
 **Try it (user):**
 ```bash
-c:\goin\go.exe run ./cmd/modeler
+c:\go\bin\go.exe run ./cmd/modeler
 ```
 1. **Click an eye** next to Top, Front or Right — the plane vanishes, the row dims, and **Ctrl+Z** brings it back.
 2. **Click a body row** — it gets an accent silhouette in the viewport; **hover** a row instead and watch that body outline in accent too.
