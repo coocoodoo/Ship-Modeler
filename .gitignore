@@ -1,0 +1,22 @@
+# Build outputs
+modeler.exe
+*.exe
+*.test
+*.out
+
+# Go
+/vendor/
+
+# Runtime / debug artifacts
+/debug/
+/dist/
+
+# Test scratch (goldens under testdata/golden ARE committed)
+/testdata/tmp/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Keep docs/shots (visual diary) — do not ignore
