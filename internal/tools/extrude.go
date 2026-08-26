@@ -9,6 +9,7 @@ import (
 	"math"
 
 	"modeler/internal/geom"
+	"modeler/internal/geom/csg"
 	"modeler/internal/geom/extrude"
 )
 
@@ -58,17 +59,37 @@ func (r Result) String() string {
 	}
 }
 
-// Available reports whether a result mode can be used yet. Add, Subtract and
-// Intersect all need the boolean kernel, which arrives with M4; until then they
-// are shown but disabled, with a tooltip that says so (SPEC-UX §9.3).
-func (r Result) Available() bool { return r == ResultNew }
+// Op is the boolean this result runs, and whether it runs one at all.
+func (r Result) Op() (csg.Op, bool) {
+	switch r {
+	case ResultAdd:
+		return csg.Union, true
+	case ResultSubtract:
+		return csg.Subtract, true
+	case ResultIntersect:
+		return csg.Intersect, true
+	default:
+		return csg.Union, false
+	}
+}
 
-// UnavailableReason is what a disabled result chip's tooltip says.
-func (r Result) UnavailableReason() string {
-	if r.Available() {
+// NeedsTarget reports whether this result has to find a body to act on.
+func (r Result) NeedsTarget() bool { _, ok := r.Op(); return ok }
+
+// Available reports whether a result mode can be used given what the extrude
+// would actually touch. Add, Subtract and Intersect need something to combine
+// with; New never does (SPEC-UX §9.4).
+func (r Result) Available(targets int) bool {
+	return !r.NeedsTarget() || targets > 0
+}
+
+// UnavailableReason is what a disabled result chip's tooltip says. A disabled
+// control must always say how to enable it (SPEC-UX §15).
+func (r Result) UnavailableReason(targets int) string {
+	if r.Available(targets) {
 		return ""
 	}
-	return r.String() + " needs the boolean kernel, which arrives with milestone M4"
+	return "Nothing to " + r.String() + " with — the extrude does not reach another body"
 }
 
 // ExtrudeTool is the live state of one extrude interaction (SPEC-UX §9.3).

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"modeler/internal/geom"
+	"modeler/internal/geom/csg"
 	"modeler/internal/geom/extrude"
 )
 
@@ -279,26 +280,65 @@ func TestDepthAndDraftAreClamped(t *testing.T) {
 	}
 }
 
-// TestOnlyNewIsAvailableUntilM4 keeps the disabled result chips honest: they are
-// visible so the shape of the tool is clear, and each says what turns it on.
-func TestOnlyNewIsAvailableUntilM4(t *testing.T) {
-	if !ResultNew.Available() {
-		t.Error("New should be available")
+// TestResultsNeedSomethingToCombineWith is the chip-enabling rule of
+// SPEC-UX §9.4: New always works, and the other three are only offered when the
+// extrude actually reaches a body to combine with.
+func TestResultsNeedSomethingToCombineWith(t *testing.T) {
+	combining := []Result{ResultAdd, ResultSubtract, ResultIntersect}
+
+	// Nothing in reach: only New.
+	if !ResultNew.Available(0) {
+		t.Error("New should be available with nothing to combine with")
 	}
-	for _, r := range []Result{ResultAdd, ResultSubtract, ResultIntersect} {
-		if r.Available() {
-			t.Errorf("%v is available before the boolean kernel exists", r)
+	if ResultNew.UnavailableReason(0) != "" {
+		t.Error("an available result should have no disabled reason")
+	}
+	for _, r := range combining {
+		if r.Available(0) {
+			t.Errorf("%v is available with no body in reach", r)
 		}
-		why := r.UnavailableReason()
+		why := r.UnavailableReason(0)
 		if why == "" {
 			t.Errorf("%v gives no reason for being disabled", r)
 		}
-		if !contains(why, "M4") {
-			t.Errorf("%v's reason %q does not name the milestone that enables it", r, why)
+		if !contains(why, r.String()) {
+			t.Errorf("%v's reason %q does not name the chip it is about", r, why)
 		}
 	}
-	if ResultNew.UnavailableReason() != "" {
-		t.Error("an available result should have no disabled reason")
+
+	// A body in reach turns them all on.
+	for _, r := range append(combining, ResultNew) {
+		if !r.Available(1) {
+			t.Errorf("%v is still disabled with a body in reach", r)
+		}
+		if r.UnavailableReason(1) != "" {
+			t.Errorf("%v still gives a disabled reason when it is enabled", r)
+		}
+	}
+}
+
+// TestResultOps maps each chip onto the boolean it runs.
+func TestResultOps(t *testing.T) {
+	want := map[Result]struct {
+		op    csg.Op
+		needs bool
+	}{
+		ResultNew:       {csg.Union, false},
+		ResultAdd:       {csg.Union, true},
+		ResultSubtract:  {csg.Subtract, true},
+		ResultIntersect: {csg.Intersect, true},
+	}
+	for r, w := range want {
+		op, combining := r.Op()
+		if combining != w.needs {
+			t.Errorf("%v combining = %v, want %v", r, combining, w.needs)
+		}
+		if combining && op != w.op {
+			t.Errorf("%v runs %v, want %v", r, op, w.op)
+		}
+		if r.NeedsTarget() != w.needs {
+			t.Errorf("%v NeedsTarget = %v, want %v", r, r.NeedsTarget(), w.needs)
+		}
 	}
 }
 

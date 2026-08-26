@@ -1,0 +1,8 @@
+[
+  {"op":"dump"},
+  {"op":"boolean.begin","kind":"union","target":"Hull","tools":["Wing pod"],"visible":true},
+  {"op":"dump"},
+  {"op":"boolean.commit"},
+  {"op":"settle"},
+  {"op":"dump"}
+]

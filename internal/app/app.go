@@ -77,6 +77,7 @@ type App struct {
 	tree    treeState
 	sketch  sketchState
 	extrude extrudeState
+	boolean booleanState
 
 	// cubeDrag, orbiting and panning track camera navigation drags.
 	cubeDrag          bool
@@ -274,6 +275,8 @@ func (a *App) update(in InputFrame) {
 		a.handleCameraInput(in, vp)
 		if a.InExtrude() {
 			a.updateExtrude(in, vp)
+		} else if a.InBoolean() {
+			a.updateBoolean(in, vp)
 		} else if a.InSketch() {
 			a.updateSketch(in, vp)
 		} else {
@@ -291,6 +294,9 @@ func (a *App) update(in InputFrame) {
 		case a.InExtrude():
 			a.handleGlobalKeys(in, vp)
 			a.handleExtrudeKeys(in)
+		case a.InBoolean():
+			a.handleGlobalKeys(in, vp)
+			a.handleBooleanKeys(in)
 		case a.InSketch():
 			a.handleGlobalKeys(in, vp)
 			a.handleSketchKeys(in)
@@ -352,6 +358,9 @@ func (a *App) HintText() string {
 	}
 	if a.InExtrude() {
 		return a.extrudeHint()
+	}
+	if a.InBoolean() {
+		return a.booleanHint()
 	}
 	if a.InSketch() {
 		return a.sketchHint()

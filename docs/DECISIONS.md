@@ -83,6 +83,19 @@ These decisions were made deliberately at planning time (2026-08-26). The execut
 
 **Decision:** Build once in M4: pin a v3.x release tag (record the exact tag here when done), CMake flags `-G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DMANIFOLD_PAR=OFF -DMANIFOLD_TEST=OFF -DBUILD_SHARED_LIBS=OFF` (add `-DMANIFOLD_CROSS_SECTION=OFF` if the tag supports skipping it — we don't use cross sections). Copy `libmanifold*.a` + `include/manifold/*.h` + `LICENSE` into `third_party/manifold/`; commit them. cgo flags live only in `internal/geom/csg` (`CFLAGS: -I…`, `LDFLAGS: -L… -lmanifoldc -lmanifold -lstdc++ -static-libgcc -static-libstdc++`). The clone/build tree itself is NOT committed — only the vendored outputs, so later sessions never need CMake again.
 
+**Done, 2026-08-26.** Tag **v3.5.2**. CMake 4.3.1, gcc 15.2.0 (MinGW-W64 x86_64-ucrt-posix-seh), Ninja generator:
+
+```
+cmake -S <clone> -B <build> -G Ninja -DCMAKE_BUILD_TYPE=Release   -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++   -DMANIFOLD_PAR=OFF -DMANIFOLD_TEST=OFF -DMANIFOLD_PYBIND=OFF   -DMANIFOLD_CBIND=ON -DMANIFOLD_CROSS_SECTION=ON   -DMANIFOLD_USE_BUILTIN_CLIPPER2=ON -DBUILD_SHARED_LIBS=OFF
+```
+
+Two departures from the plan above, both forced by the tag:
+
+- **Cross sections stay ON.** `MANIFOLD_CBIND` is declared with `cmake_dependent_option` on `MANIFOLD_CROSS_SECTION`, so turning cross sections off takes the C bindings with it. The dependency it pulls in, Clipper2, is built from the in-tree copy (`MANIFOLD_USE_BUILTIN_CLIPPER2=ON`) and vendored alongside as `libClipper2.a`, with its licence.
+- **Ninja rather than MinGW Makefiles.** The generator has no bearing on the artifact and Ninja is several times faster; the compiler and flags are as specified.
+
+Vendored (2.8 MB total): `lib/libmanifoldc.a`, `lib/libmanifold.a`, `lib/libClipper2.a`, `include/manifold/{manifoldc.h,types.h}`, `LICENSE`, `LICENSE.clipper2`. The clone and build trees were left in scratch and are not committed.
+
 ---
 
 ## Deviations log
@@ -284,3 +297,70 @@ catch the tool mid-interaction. `extrude` and `extrude.begin` take `depth`,
 named, they start from the sketch selected in the tree, which is the second
 entry point of SPEC-UX §9.1. The `dump` op grew an `extrude ...` line and `vol=`
 on every body line.
+
+### 2026-08-26 — M4
+
+**V-23 · The float64 MeshGL, not the float32 one.** SPEC-GEOMETRY §6.3 specifies
+float32 vertices and argues carefully that the grid-snapped coordinates this
+document uses are exactly representable up to ±32,768 u. The argument is sound
+and no longer needed: the C API also carries `manifold_meshgl64_*`, which takes
+doubles, so the model's own float64 coordinates cross unchanged in both
+directions and the reasoning about representable ranges is moot.
+
+**V-24 · Manifold's merge table decides which vertices are one, not position.**
+SPEC-GEOMETRY §6.3 says to weld (`WeldDist`) after converting a result back.
+Welding by distance is wrong here: two solids touching along an edge have
+coincident vertices that Manifold has deliberately kept apart, and fusing them
+turns two legal shells into an edge belonging to four faces. The converter uses
+`mergeFromVert`/`mergeToVert` instead, which is Manifold's own verdict on the
+question, and does not weld again afterwards. The acceptance matrix's edge-touch
+and vertex-touch cases are what this is for.
+
+**V-25 · Output faces merge across source faces when they are coplanar.**
+SPEC-GEOMETRY §6.3 groups result triangles by `(originalID, plane-key)`, which
+keeps every source face separate. That leaves a flush butt-join as two half-walls
+with a seam down the middle rather than the one wall it visibly is, and a wall
+you can only drag half of is not the shape anybody drew. Grouping is by geometry
+— connected and coplanar — with one exception: two faces that both carry paint
+stay apart, because merging them would have to discard one picture. A merged
+face inherits the painted side's lineage.
+
+**V-26 · Straightening a split edge is a decision about the whole mesh.**
+A boolean leaves vertices in the middle of edges it split, and dropping them is
+what turns two stacked boxes back into one clean box. But a vertex can be
+mid-edge on one face and a genuine corner of the face next door — a T-junction,
+which booleans produce constantly — so a vertex goes only if every loop
+containing it agrees it is not a corner. And never when the loop doubles back on
+itself: the two sides of a zero-width spur are collinear too, and collapsing its
+tip invents an edge that runs straight past the vertices the neighbouring faces
+are still holding. The dot product tells a straight run from a reversal.
+
+**V-27 · Pinched vertices are split so each fan gets its own copy.**
+Manifold guarantees every *edge* has two faces, which permits a solid touching
+itself at a single point. Our mesh model assumes the neighbourhood of a vertex is
+a disc, and the validator sees the difference as an odd Euler characteristic. The
+converter now walks the fans of faces around each vertex and gives every fan
+after the first its own copy, in the same place. Nothing moves; the surface stops
+claiming to be joined where it is not.
+
+**V-28 · Zero-volume shells are dropped.** Coincident input surfaces can leave a
+pair of back-to-back faces: a closed, legal, empty shell. It costs nothing in
+volume and is two faces in the same place, which the validator reads as duplicate
+faces and a user would read as two things to click on. Connected pieces enclosing
+less than `WeldDist³` are removed. The test is enclosed volume rather than
+orientation, because a real cavity inside a solid also has negative volume and
+has to stay.
+
+**V-29 · A golden's text is checked for renderable glyphs.** The font atlas is a
+curated codepoint list (D-11) and anything outside it draws as an empty box. A
+boolean summary reached for a true minus sign (U+2212) and shipped a question
+mark to the user, invisible to every existing test. `TestEveryMessageIsRenderable`
+now runs every op script in the repository and checks every toast and hint line
+against the atlas.
+
+**V-30 · Ops added for M4 flows.** `boolean` runs and commits in one step;
+`boolean.begin`, `boolean.commit` and `boolean.cancel` split it so a shot can
+catch the tool mid-pick. They take `kind` (union/subtract/intersect), `target`,
+`tools` and `visible` (the keep-tools toggle). The extrude ops grew `result`
+(new/add/subtract/intersect), and the `dump` op grew a `boolean ...` line plus
+`result=` and `targets=` on the extrude line.

@@ -34,6 +34,28 @@ func buildGlyphRange() []rune {
 	return rs
 }
 
+// CanRender reports whether a rune is in the atlas. Text containing anything
+// else draws as a missing-glyph box, so every string the UI can show has to
+// pass this — see the apptest that checks the toasts and hints of every script.
+func CanRender(r rune) bool {
+	for _, c := range glyphRange {
+		if c == r {
+			return true
+		}
+	}
+	return false
+}
+
+// FirstUnrenderable returns the first rune of s the atlas cannot draw.
+func FirstUnrenderable(s string) (rune, bool) {
+	for _, r := range s {
+		if !CanRender(r) {
+			return r, true
+		}
+	}
+	return 0, false
+}
+
 // LoadFonts rasterises the embedded typeface for a display scale. Call
 // ReloadFonts when the scale changes; the caller owns unloading.
 func LoadFonts(scale float64) *Fonts {

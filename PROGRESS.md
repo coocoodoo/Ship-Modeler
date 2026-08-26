@@ -2,7 +2,93 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M3 COMPLETE** — sketches extrude into solids with draft, symmetric and through-all. Next up: **M4** (booleans via Manifold; the acceptance matrix gets written first).
+**Current state:** **M4 COMPLETE** — booleans work: Union, Subtract and Intersect, from the Boolean tool and from an extrude's Result chips. Next up: **M5** (sketch on faces, push/pull).
+
+---
+
+## 2026-08-26 — M4: booleans via Manifold
+
+**Done:**
+- `third_party/manifold/` — v3.5.2 built static with gcc 15.2 (MinGW-UCRT),
+  `MANIFOLD_PAR=OFF`, tests off, cross sections **on** because `MANIFOLD_CBIND`
+  depends on them. Exact tag and flags in DECISIONS D-12.
+- `internal/geom/csg/manifold.go` — the binding. Uses the **float64** MeshGL,
+  which the spec did not know existed and which retires its float32 caveat.
+- `internal/geom/csg/convert.go` — the converters: triangles in, polygons with
+  holes out, provenance carried on Manifold's reserved run ids.
+- `internal/model/boolean.go` — the Boolean command; `internal/model/extrude.go`
+  grew Result modes. Both build and validate everything before writing anything.
+- `internal/tools/boolean.go` + `internal/app/booleanmode.go` — the Boolean tool:
+  pick what survives, pick what to combine, Enter. Picked bodies tint.
+- `internal/app/csgdebug.go` — the §11.3 failure path: standard toast, document
+  untouched, OBJ repro under `debug/csg/` when `MODELER_CSG_DUMP` is set.
+
+**Verified:**
+- **The 25-case acceptance matrix was written first**, against an API that did
+  not exist, and all 25 pass — including the flush butt-join family, edge and
+  vertex touches, the one-subunit sliver, and the ten-op chain.
+- **200-op fuzz with an independent oracle** passes: every step validates and
+  agrees with Manifold's own volume, and every 20th step a 96³ voxel comparison
+  replays the op history as arithmetic and ray-casts the mesh. Deterministic
+  across three consecutive runs.
+- Paint survives a cut: fragments share the source `FacePaint` by identity and
+  sampled colours away from the hole are unchanged.
+- End to end: Boolean tool subtract 348 → 312 with the tool consumed; extrude
+  Result=Subtract through-all cuts 348 → 285 (a 3×3 column through 7 units);
+  Result=Add merges 348 → 364 without creating a body; undo restores all of it.
+- `gofmt -l`, `go vet ./...` clean; `go test ./...` green across 13 packages.
+- Shots read: `m4_picking`, `m4_applied`, `m4_cut`, `m4_union`, all in
+  `docs/shots/`.
+
+**Decisions/deviations:** D-12 filled in; V-23 (float64 MeshGL), V-24 (merge
+table, not distance, decides which vertices are one), V-25 (coplanar faces merge
+across sources except when both are painted), V-26 (straightening is a
+whole-mesh decision, and never collapses a spur), V-27 (pinched vertices split
+per fan), V-28 (zero-volume shells dropped), V-29 (glyph check over every
+message), V-30 (new ops). All goldens regenerated — the toolbar's Boolean button
+is live now, and the stale-baseline check from M3 caught it.
+
+**What the fuzz found that nothing else would have:**
+Four defects, all in the converter, none reachable by a single well-formed op.
+A boundary walk that started at whichever vertex Go's map iteration offered
+first, so the same boolean produced different face numbering run to run. A
+straightening pass that collapsed the tip of a zero-width spur and invented an
+edge running past vertices the neighbouring faces still held. A face pinched to a
+point, which Manifold permits and our document cannot represent. And a
+near-degenerate sliver from a free-rotated box, which has a normal in the
+arithmetic sense and noise in every other sense, seeding a patch of its own.
+Each was found by the chain reaching a state no isolated case would reach.
+
+**Two cgo lessons, both paid for in crashes:**
+A Go struct holding Go pointers cannot cross into C — the MeshGL options struct
+is exactly that, so everything is copied into C memory first. And Manifold
+constructs with placement new into a buffer you supply but destroys with
+`delete`, so that buffer must come from C++'s `operator new`; malloc memory dies
+inside the deleter on this toolchain. Manifold's own C tests sidestep this by
+never destroying anything, which a session running a boolean per click cannot do.
+
+**Open issues:**
+- Target picking for Add/Subtract/Intersect uses bounding-box overlap, not real
+  intersection. A box that overlaps but does not touch offers a chip that turns
+  out to do nothing; the alternative costs a full boolean on every slider move.
+- The async spinner for ops over 120 ms (SPEC-UX §9.5, §6.6) is not built. Every
+  operation measured so far is well under it, so there has been nothing to hang.
+- Paint is shared by pointer between fragments, which is what §3.4 asks for.
+  Repainting one fragment will need copy-on-write; that belongs with M7.
+
+**Next:** M5 — sketch on faces and push/pull. Face plane becomes the sketch
+plane with a persistent frame snapshot, and push/pull is an extrude of the face
+outline through the same command bus.
+
+**Try it (user):**
+1. Run `modeler.exe`. The scene starts with a hull, an engine pod and a wing pod.
+2. Click **Hull** in the tree, then press `B`.
+3. Click the hull in the viewport (it tints blue — this one survives), then the
+   wing pod (it tints red — this one gets used up).
+4. Pick **Subtract** in the card and press `Enter`.
+5. Press `Ctrl+Z` — the wing pod comes back exactly where it was.
+6. Or: press `S` on the Top plane, draw a rectangle over the hull, press `E`,
+   and pick **Subtract** in the Result chips to cut it out instead.
 
 ---
 

@@ -40,6 +40,11 @@ func (a *App) BuildScene() render.Scene {
 		if a.Hover.Hit && a.Hover.Kind == render.PickFace && a.Hover.BodyID == b.ID {
 			d.HoverFace = a.Hover.FaceUID
 		}
+		// A body picked for a boolean is tinted by the part it plays, so the
+		// viewport and the card always agree about what is about to happen.
+		if tint, ok := a.booleanTint(b.ID); ok {
+			d.Tint = tint
+		}
 		s.Bodies = append(s.Bodies, d)
 	}
 
@@ -324,6 +329,9 @@ func (a *App) handleKeys(in InputFrame, vp render.Viewport) {
 	}
 	if in.KeyPressed(rl.KeyE) {
 		a.BeginExtrude()
+	}
+	if in.KeyPressed(rl.KeyB) {
+		a.BeginBoolean()
 	}
 	if in.KeyPressed(rl.KeyH) {
 		a.hideSelection()

@@ -1,0 +1,7 @@
+[
+  {"op":"boolean","kind":"intersect","target":"Hull","tools":["Wing pod"]},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"undo"},
+  {"op":"dump"}
+]

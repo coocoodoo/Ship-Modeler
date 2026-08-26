@@ -30,6 +30,8 @@ type extrudeDump struct {
 	dir                    string
 	through                bool
 	regions                int
+	result                 string
+	targets                int
 	present                bool
 }
 
@@ -48,7 +50,8 @@ var (
 	m3SketchLine  = regexp.MustCompile(`^sketch id=\d+ name="([^"]*)" visible=(\d)$`)
 	m3ExtrudeLine = regexp.MustCompile(
 		`^extrude depth=(-?[\d.]+) draft=(-?[\d.]+) achieved=(-?[\d.]+) ` +
-			`clamped=(\d) dir="(\w+)" through=(\d) regions=(\d+)$`)
+			`clamped=(\d) dir="(\w+)" through=(\d) regions=(\d+) ` +
+			`result="(\w+)" targets=(\d+)$`)
 	m3DocLine   = regexp.MustCompile(`undo=(\d+) redo=(\d+)`)
 	m3ToastLine = regexp.MustCompile(`^toast "(.*)"$`)
 )
@@ -102,7 +105,8 @@ func parseM3Dumps(t *testing.T, stdout string) []m3Dump {
 			cur.extrude = extrudeDump{
 				depth: num(m[1]), draft: num(m[2]), achieved: num(m[3]),
 				clamped: m[4] == "1", dir: m[5], through: m[6] == "1",
-				regions: atoi(t, m[7]), present: true,
+				regions: atoi(t, m[7]), result: m[8], targets: atoi(t, m[9]),
+				present: true,
 			}
 		case strings.HasPrefix(line, "toast "):
 			if m := m3ToastLine.FindStringSubmatch(line); m != nil {

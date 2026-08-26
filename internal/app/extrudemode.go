@@ -8,6 +8,7 @@ import (
 
 	"modeler/internal/geom"
 	"modeler/internal/geom/extrude"
+	"modeler/internal/geom/mesh"
 	"modeler/internal/geom/sketch2d"
 	"modeler/internal/model"
 	"modeler/internal/render"
@@ -32,6 +33,13 @@ type extrudeState struct {
 	previewErr string
 	// hoverArrow is true when the pointer is over the gizmo.
 	hoverArrow bool
+	// targets are the bodies the pending solid would combine with, recomputed
+	// with the preview. Which of them a commit uses depends on the result mode
+	// (SPEC-UX §9.4).
+	targets []uint32
+	// previewMesh is the pending solid, kept so the targets can be worked out
+	// and so a debug dump has something to write.
+	previewMesh *mesh.Mesh
 	// returnCamera restores the view if the tool is cancelled.
 	returnCamera render.Camera
 }
@@ -169,11 +177,32 @@ func (a *App) CommitExtrude() bool {
 		Regions: t.Regions,
 		Params:  t.BuildParams(s.Frame()),
 	}
-	if !a.Run(cmd) {
+	// Add and Intersect with nothing to reach fall back to a new body rather
+	// than refusing, and say so (SPEC-UX §9.4).
+	result := t.Result
+	targets := a.extrudeTargets(result)
+	if result.NeedsTarget() && len(targets) == 0 {
+		result = tools.ResultNew
+		a.Toast(ui.Toast{Text: "Nothing to combine with — created a new body"})
+	}
+	if op, combining := result.Op(); combining {
+		cmd.Combine, cmd.Targets = &op, targets
+	}
+
+	if err := a.Bus.Run(cmd); err != nil {
+		// A boolean that fails gets the standard message of SPEC-UX §11.3: it
+		// promises nothing was lost and suggests something to try, which is more
+		// use than the solver's own words. Anything else — a profile that will
+		// not build, regions that touch — already says exactly what is wrong.
+		text := capitalize(err.Error())
+		if cmd.Combine != nil {
+			text = csgFailureToast(err)
+			a.dumpCSGRepro("extrude", a.extrude.previewMesh, targets)
+		}
+		a.Toast(ui.Toast{Text: text, Kind: ui.ToastError})
 		return false
 	}
 
-	name := cmd.Body().Name
 	if cmd.Clamped() {
 		a.Toast(ui.Toast{
 			Text: fmt.Sprintf("Draft clamped to %.1f° — the profile was too tight",
@@ -181,15 +210,33 @@ func (a *App) CommitExtrude() bool {
 			Kind: ui.ToastWarn,
 		})
 	}
+	for _, b := range cmd.Emptied() {
+		a.Toast(ui.Toast{Text: b.Name + " was cut away entirely — undo brings it back"})
+	}
 	a.Toast(ui.Toast{Text: s.Name + " hidden — find it in the tree"})
 
 	a.dropExtrudePreview()
 	a.extrude.tool = nil
 	a.sketch.session = nil
 	a.Mode = ModeIdle
-	a.Sel.Set(model.BodyRef(cmd.Body().ID))
-	_ = name
+	a.selectExtrudeResult(cmd)
 	return true
+}
+
+// selectExtrudeResult leaves the thing the extrude produced selected, whether
+// that is a new body or the one it merged into.
+func (a *App) selectExtrudeResult(cmd *model.Extrude) {
+	if b := cmd.Body(); b != nil {
+		a.Sel.Set(model.BodyRef(b.ID))
+		return
+	}
+	for _, b := range cmd.CombinedInto() {
+		if a.Doc().BodyByID(b.ID) != nil {
+			a.Sel.Set(model.BodyRef(b.ID))
+			return
+		}
+	}
+	a.Sel.Clear()
 }
 
 // selectedRegionList turns the sketch's region selection into sorted indices.
@@ -241,6 +288,7 @@ func (a *App) rebuildExtrudePreview() {
 	s := a.ActiveSketch()
 	a.dropExtrudePreview()
 	a.extrude.previewErr = ""
+	a.extrude.previewMesh, a.extrude.targets = nil, nil
 	if t == nil || s == nil {
 		return
 	}
@@ -262,10 +310,50 @@ func (a *App) rebuildExtrudePreview() {
 		return
 	}
 	t.AchievedDraft, t.Clamped = built.AchievedDraft, built.Clamped
+	a.extrude.previewMesh = built.Mesh
+	a.extrude.targets = a.bodiesReachedBy(built.Mesh)
 
 	g := render.BuildBodyGPU(built.Mesh)
 	g.Upload()
 	a.extrude.preview = g
+}
+
+// bodiesReachedBy lists the visible bodies the pending solid runs into, newest
+// last, which is the order SPEC-UX §9.4 calls topmost.
+//
+// The test is bounding boxes, not geometry. Running a real intersection every
+// time the draft slider moves would cost more than the extrude itself, and a
+// box that overlaps but does not touch costs only a chip being offered that
+// turns out to do nothing — whereas missing a real overlap would disable the
+// chip the user wanted.
+func (a *App) bodiesReachedBy(m *mesh.Mesh) []uint32 {
+	if m == nil {
+		return nil
+	}
+	box := m.AABB()
+	var out []uint32
+	for _, b := range a.Doc().Bodies {
+		if !b.Visible || b.Mesh == nil {
+			continue
+		}
+		if b.Mesh.AABB().Intersects(box) {
+			out = append(out, b.ID)
+		}
+	}
+	return out
+}
+
+// extrudeTargets narrows the reachable bodies to the ones a given result acts
+// on: everything it meets for Subtract, the topmost for Add and Intersect.
+func (a *App) extrudeTargets(r tools.Result) []uint32 {
+	all := a.extrude.targets
+	if len(all) == 0 || !r.NeedsTarget() {
+		return nil
+	}
+	if r == tools.ResultSubtract {
+		return append([]uint32(nil), all...)
+	}
+	return []uint32{all[len(all)-1]}
 }
 
 func (a *App) dropExtrudePreview() {

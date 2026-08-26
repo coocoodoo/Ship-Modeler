@@ -64,6 +64,8 @@ func (a *App) buildShell(l Layout) {
 	switch {
 	case a.InExtrude():
 		a.buildExtrudeCard(l.Viewport)
+	case a.InBoolean():
+		a.buildBooleanCard(l.Viewport)
 	case a.InSketch():
 		a.buildSketchCard(l.Viewport)
 	}
@@ -101,7 +103,7 @@ func toolbarTools() []toolbarTool {
 		{mode: ModeExtrude, label: "Extrude", shortcut: "E", icon: ui.DrawExtrudeIcon,
 			start: func(a *App) { a.BeginExtrude() }},
 		{mode: ModeBoolean, label: "Boolean", shortcut: "B", icon: ui.DrawBooleanIcon,
-			milestone: "M4"},
+			start: func(a *App) { a.BeginBoolean() }},
 		{mode: ModeIdle, label: "Move", shortcut: "M", icon: ui.DrawMoveIcon,
 			milestone: "M6"},
 		{mode: ModePaint, label: "Paint", shortcut: "P", icon: ui.DrawPaintIcon,
@@ -117,6 +119,8 @@ func (t toolbarTool) active(a *App) bool {
 		return a.InSketch()
 	case ModeExtrude:
 		return a.InExtrude()
+	case ModeBoolean:
+		return a.InBoolean()
 	default:
 		return false
 	}
@@ -809,10 +813,11 @@ func (a *App) buildExtrudeCard(viewport rl.Rectangle) {
 	disabled := make([]bool, len(results))
 	reasons := make([]string, len(results))
 	resSel := 0
+	reach := len(a.extrude.targets)
 	for i, res := range results {
 		resLabels[i] = res.String()
-		disabled[i] = !res.Available()
-		reasons[i] = res.UnavailableReason()
+		disabled[i] = !res.Available(reach)
+		reasons[i] = res.UnavailableReason(reach)
 		if res == t.Result {
 			resSel = i
 		}

@@ -1,0 +1,18 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"sketch.begin","plane":"Top"},
+  {"op":"sketch.rect","a":[0,0],"b":[5,5]},
+  {"op":"extrude","depth":3},
+  {"op":"dump"},
+  {"op":"boolean.begin","kind":"subtract","target":"Hull","tools":["Body 4"]},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m4_picking"},
+  {"op":"boolean.commit"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m4_applied"}
+]

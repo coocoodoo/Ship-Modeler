@@ -11,12 +11,14 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"modeler/internal/geom"
+	csggeom "modeler/internal/geom/csg"
 	extrudegeom "modeler/internal/geom/extrude"
 	"modeler/internal/geom/mesh"
 	"modeler/internal/io"
 	"modeler/internal/model"
 	"modeler/internal/render"
 	"modeler/internal/sketch"
+	"modeler/internal/tools"
 )
 
 // Headless mode is the executing agent's eyes (SPEC-RENDER §9): a hidden window
@@ -244,6 +246,30 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		if !a.CommitExtrude() {
 			return op.Errorf("the extrude was refused")
 		}
+
+	case "boolean":
+		if err := r.booleanOp(op, true); err != nil {
+			return err
+		}
+
+	case "boolean.begin":
+		if err := r.booleanOp(op, false); err != nil {
+			return err
+		}
+
+	case "boolean.commit":
+		if !a.InBoolean() {
+			return op.Errorf("the boolean tool is not open")
+		}
+		if !a.CommitBoolean() {
+			return op.Errorf("the boolean was refused")
+		}
+
+	case "boolean.cancel":
+		if !a.InBoolean() {
+			return op.Errorf("the boolean tool is not open")
+		}
+		a.CancelBoolean()
 
 	case "extrude.cancel":
 		if !a.InExtrude() {
@@ -514,8 +540,17 @@ func (r *ScriptRunner) extrudeOp(op io.Op, commit bool) error {
 		return op.Errorf("unknown direction %q", op.Dir)
 	}
 	t.ThroughAll = op.Through
-	if op.Result != "" && op.Result != "new" {
-		return op.Errorf("result %q needs the boolean kernel, which arrives with M4", op.Result)
+	switch op.Result {
+	case "", "new":
+		t.Result = tools.ResultNew
+	case "add":
+		t.Result = tools.ResultAdd
+	case "subtract":
+		t.Result = tools.ResultSubtract
+	case "intersect":
+		t.Result = tools.ResultIntersect
+	default:
+		return op.Errorf("unknown result %q", op.Result)
 	}
 	a.rebuildExtrudePreview()
 
@@ -524,6 +559,49 @@ func (r *ScriptRunner) extrudeOp(op io.Op, commit bool) error {
 	}
 	if !a.CommitExtrude() {
 		return op.Errorf("the extrude was refused")
+	}
+	return nil
+}
+
+// booleanOp runs a scripted boolean through the same tool and command the UI
+// uses, so a script and a session of clicking are the same code path.
+func (r *ScriptRunner) booleanOp(op io.Op, commit bool) error {
+	a := r.App
+	if !a.InBoolean() && !a.BeginBoolean() {
+		return op.Errorf("could not open the boolean tool")
+	}
+	t := a.boolean.tool
+	t.Clear()
+
+	switch op.Kind {
+	case "", "union", "add":
+		t.Op = csggeom.Union
+	case "subtract":
+		t.Op = csggeom.Subtract
+	case "intersect":
+		t.Op = csggeom.Intersect
+	default:
+		return op.Errorf("unknown boolean %q", op.Kind)
+	}
+	t.KeepTools = op.Visible != nil && *op.Visible
+
+	target := a.Doc().BodyByName(op.Target)
+	if target == nil {
+		return op.Errorf("no body named %q to keep", op.Target)
+	}
+	t.Pick(target.ID)
+	for _, name := range op.Tools {
+		b := a.Doc().BodyByName(name)
+		if b == nil {
+			return op.Errorf("no body named %q to combine", name)
+		}
+		t.Pick(b.ID)
+	}
+	if !commit {
+		return nil
+	}
+	if !a.CommitBoolean() {
+		return op.Errorf("the boolean was refused")
 	}
 	return nil
 }
@@ -594,9 +672,14 @@ func (r *ScriptRunner) dump() {
 	}
 	if t := a.extrude.tool; t != nil {
 		fmt.Printf("extrude depth=%.4f draft=%.2f achieved=%.2f clamped=%d dir=%q "+
-			"through=%d regions=%d\n",
+			"through=%d regions=%d result=%q targets=%d\n",
 			t.EffectiveDepth(), t.Draft, t.AchievedDraft, boolBit(t.Clamped),
-			t.Dir.String(), boolBit(t.ThroughAll), len(t.Regions))
+			t.Dir.String(), boolBit(t.ThroughAll), len(t.Regions),
+			t.Result.String(), len(a.extrudeTargets(t.Result)))
+	}
+	if t := a.boolean.tool; t != nil {
+		fmt.Printf("boolean op=%q target=%d tools=%d keep=%d\n",
+			t.Op.String(), t.Target, len(t.Tools), boolBit(t.KeepTools))
 	}
 	fmt.Printf("sel count=%d desc=%q\n", a.Sel.Len(), a.Sel.Describe(doc))
 	fmt.Printf("hint %q\n", a.HintText())

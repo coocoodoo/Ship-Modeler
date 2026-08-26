@@ -180,13 +180,13 @@ Specs: UX §9, GEOM §5.
 
 ### M4 — Booleans via Manifold (L; highest-leverage integration — test-first)
 Specs: GEOM §6, TESTING §3.
-- [ ] **Write the acceptance test matrix first** (TESTING §3: ~25 named cases incl. flush butt-joins, coincident faces, edge/vertex touches, slivers, chained fuzz with volume oracle)
-- [ ] Build Manifold once: install CMake if absent (winget Kitware.CMake), `git clone` at a pinned v3.x release tag, MinGW Makefiles, `MANIFOLD_PAR=OFF`, tests off; produce static `libmanifold.a`+`libmanifoldc.a`; vendor libs+headers+LICENSE into `third_party/manifold/`; record exact tag + flags in DECISIONS D-12
-- [ ] `geom/csg` cgo binding (~15 functions): MeshGL in/out, `manifold_boolean` (union/difference/intersect), status check, properties (volume), `manifold_reserve_ids` + `runOriginalID` per input face-run for provenance
-- [ ] Converters: Body mesh (polygon faces) → triangulated MeshGL with per-face runs; result MeshGL → Body: group triangles by (originalID, plane) → merge into polygon faces with holes → inherit FaceUID/paint → weld → `mesh.Validate` gate
-- [ ] On any error/empty result: op returns error, document untouched, red toast (UX §11.3), repro geometry dumped to `debug/csg/` under a dev flag
-- [ ] Wire into Extrude Result: **New / Add / Subtract / Intersect** with target rules of UX §9.4 (R8); Boolean tool for existing bodies with keep-tools option (R12)
-- [ ] Fallback ladder if Manifold won't build/bind after two honest attempts: implement in-house BSP CSG per GEOM **Appendix A** against the same matrix (that path is fully specced; budget XL)
+- [x] **Write the acceptance test matrix first** (TESTING §3: ~25 named cases incl. flush butt-joins, coincident faces, edge/vertex touches, slivers, chained fuzz with volume oracle)
+- [x] Build Manifold once: install CMake if absent (winget Kitware.CMake), `git clone` at a pinned v3.x release tag, MinGW Makefiles, `MANIFOLD_PAR=OFF`, tests off; produce static `libmanifold.a`+`libmanifoldc.a`; vendor libs+headers+LICENSE into `third_party/manifold/`; record exact tag + flags in DECISIONS D-12
+- [x] `geom/csg` cgo binding (~15 functions): MeshGL in/out, `manifold_boolean` (union/difference/intersect), status check, properties (volume), `manifold_reserve_ids` + `runOriginalID` per input face-run for provenance
+- [x] Converters: Body mesh (polygon faces) → triangulated MeshGL with per-face runs; result MeshGL → Body: group triangles by (originalID, plane) → merge into polygon faces with holes → inherit FaceUID/paint → weld → `mesh.Validate` gate
+- [x] On any error/empty result: op returns error, document untouched, red toast (UX §11.3), repro geometry dumped to `debug/csg/` under a dev flag
+- [x] Wire into Extrude Result: **New / Add / Subtract / Intersect** with target rules of UX §9.4 (R8); Boolean tool for existing bodies with keep-tools option (R12)
+- [ ] ~~Fallback ladder~~ (not needed — Manifold built and bound on the first attempt) if Manifold won't build/bind after two honest attempts: implement in-house BSP CSG per GEOM **Appendix A** against the same matrix (that path is fully specced; budget XL)
 **Accept:** full matrix green incl. the flush butt-join family; 200-op random fuzz keeps validity + volume within oracle tolerance; UX flows work.
 
 ### M5 — Sketch on faces & push/pull (M)
