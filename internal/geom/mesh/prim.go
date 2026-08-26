@@ -129,6 +129,18 @@ func Transform(m *Mesh, x geom.Mat4) {
 
 // Merge appends src's geometry into dst, renumbering vertex indices. The result
 // is a multi-shell mesh, which is legal (SPEC-GEOMETRY §6.5).
+// Merge concatenates two meshes into one.
+//
+// It is a concatenation, not a union: the shells arrive side by side and are
+// not joined, welded or checked against each other. If they overlap, or meet
+// face to face, the result is a mesh describing two solids in the same place —
+// which passes every check in Validate, because each shell is closed and
+// manifold on its own and they enclose no shared volume, and which Manifold
+// then cannot union onto at all. It answers by doing nothing.
+//
+// So: use this for shells that are genuinely apart, and csg.Boolean for shells
+// that are meant to become one solid. The test scene learned this the hard way
+// (PROGRESS, M5).
 func Merge(dst, src *Mesh) {
 	off := len(dst.Verts)
 	dst.Verts = append(dst.Verts, src.Verts...)

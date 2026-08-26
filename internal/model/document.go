@@ -79,9 +79,23 @@ type Sketch struct {
 	Name    string `json:"name"`
 	Visible bool   `json:"visible"`
 
-	// Plane is the default plane a sketch was drawn on. M5 extends this to a
-	// face reference with a frame snapshot (SPEC-GEOMETRY §3).
+	// Plane is the default plane a sketch was drawn on, meaningful only when
+	// the sketch is not anchored to a face.
 	Plane geom.PlaneKind `json:"plane"`
+
+	// OnFace anchors the sketch to a body's face instead (R9, SPEC-UX §10).
+	// Body and FaceID say which one, and FrameSnap is that face's plane as it
+	// was at the moment the sketch started.
+	//
+	// The snapshot is the point. A face is a transient thing — the next boolean
+	// can cut it in half, move it, or remove it — but a sketch drawn on it is
+	// work somebody did, and losing that work because the surface underneath it
+	// changed would be indefensible. The sketch keeps its plane; only the snap
+	// references go stale (SPEC-GEOMETRY §3).
+	OnFace    bool         `json:"onFace,omitempty"`
+	Body      uint32       `json:"body,omitempty"`
+	FaceID    mesh.FaceUID `json:"face,omitempty"`
+	FrameSnap geom.Frame   `json:"frame,omitempty"`
 
 	// Entities are what was drawn, in draw order.
 	Entities []Entity `json:"entities"`

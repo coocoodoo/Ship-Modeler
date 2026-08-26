@@ -74,10 +74,11 @@ type App struct {
 	// body changed.
 	gpu map[uint32]*render.BodyGPU
 
-	tree    treeState
-	sketch  sketchState
-	extrude extrudeState
-	boolean booleanState
+	tree     treeState
+	sketch   sketchState
+	extrude  extrudeState
+	boolean  booleanState
+	pushPull pushPullState
 
 	// cubeDrag, orbiting and panning track camera navigation drags.
 	cubeDrag          bool
@@ -280,8 +281,14 @@ func (a *App) update(in InputFrame) {
 		} else if a.InSketch() {
 			a.updateSketch(in, vp)
 		} else {
-			a.handleViewportClick(in, vp)
+			// The arrow gets first refusal on a click: a face armed for
+			// push/pull must not be re-picked out from under its own gizmo.
+			a.updatePushPull(in, vp)
+			if !a.grabbedArrow() {
+				a.handleViewportClick(in, vp)
+			}
 			a.updateHover(in, vp)
+			a.armPushPull()
 		}
 	} else {
 		a.Hover = render.PickResult{}
@@ -361,6 +368,9 @@ func (a *App) HintText() string {
 	}
 	if a.InBoolean() {
 		return a.booleanHint()
+	}
+	if a.InPushPull() {
+		return a.pushPullHint()
 	}
 	if a.InSketch() {
 		return a.sketchHint()

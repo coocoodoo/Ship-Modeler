@@ -191,9 +191,9 @@ Specs: GEOM §6, TESTING §3.
 
 ### M5 — Sketch on faces & push/pull (M)
 Specs: UX §10, §12.5.
-- [ ] Click flat face → "Sketch" → camera normal-on, face plane becomes sketch plane (persistent frame snapshot), face edges become snap references; "Project outline" button copies face boundary into sketch entities
-- [ ] Extrude from face sketch: defaults Result=Add with owning body; Subtract when cutting into the body per UX §9.4; through-all cut works
-- [ ] **Push/pull**: select face → normal arrow → drag out = Add, drag in = Subtract (auto), grid-snapped, full preview; implemented as extrude-of-face-outline through the command bus
+- [x] Click flat face → "Sketch" → camera normal-on, face plane becomes sketch plane (persistent frame snapshot), face edges become snap references; "Project outline" button copies face boundary into sketch entities
+- [x] Extrude from face sketch: defaults Result=Add with owning body; Subtract when cutting into the body per UX §9.4; through-all cut works
+- [x] **Push/pull**: select face → normal arrow → drag out = Add, drag in = Subtract (auto), grid-snapped, full preview; implemented as extrude-of-face-outline through the command bus
 **Accept:** build a stepped hull + cut windows entirely via face sketches and push/pull; goldens.
 
 ### M6 — Selection, direct edit, transform (L)

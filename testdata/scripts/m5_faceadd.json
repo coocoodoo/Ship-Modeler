@@ -1,0 +1,12 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"dump"},
+  {"op":"sketch.face","body":"Hull","axis":"+y"},
+  {"op":"sketch.rect","a":[-1,-1],"b":[1,1]},
+  {"op":"extrude.begin","depth":2},
+  {"op":"dump"},
+  {"op":"extrude.commit"},
+  {"op":"settle"},
+  {"op":"dump"}
+]

@@ -213,7 +213,20 @@ func (s *Sketch) RegionCount() int  { return len(s.Arrangement().Regions) }
 func (s *Sketch) OpenEndCount() int { return len(s.Arrangement().OpenEnds) }
 
 // Frame returns the sketch's plane frame in world space.
-func (s *Sketch) Frame() geom.Frame { return geom.PlaneFrame(s.Plane) }
+func (s *Sketch) Frame() geom.Frame {
+	if s.OnFace {
+		return s.FrameSnap
+	}
+	return geom.PlaneFrame(s.Plane)
+}
+
+// Where names the sketch's plane for toasts and the tree.
+func (s *Sketch) Where() string {
+	if s.OnFace {
+		return "a face"
+	}
+	return "the " + s.Plane.String() + " plane"
+}
 
 // Summary is the one-line description the sketch card shows.
 func (s *Sketch) Summary() string {

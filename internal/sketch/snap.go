@@ -82,6 +82,11 @@ type Config struct {
 	SubunitsPerPixel float64
 	// Suppressed is Alt held: no snapping at all, not even the grid.
 	Suppressed bool
+	// Reference is geometry to snap to that is not part of the sketch: the
+	// boundary of the face a face-sketch sits on (SPEC-UX §10). Its corners and
+	// edge midpoints are targets like any other, which is the whole reason for
+	// projecting a face's outline onto the plane you are drawing on.
+	Reference [][]geom.Vec2i
 }
 
 // DefaultConfig is the 1 u grid of SPEC-UX §8.4 at a given zoom.
@@ -107,10 +112,17 @@ func Resolve(cursor geom.Vec2i, ents []model.Entity, from *geom.Vec2i, cfg Confi
 	endpointR := int64(EndpointRadiusPx * cfg.SubunitsPerPixel)
 	midpointR := int64(MidpointRadiusPx * cfg.SubunitsPerPixel)
 
-	if p, ok := nearestEndpoint(cursor, ents, endpointR); ok {
+	// Drawn geometry and reference geometry compete on distance within a tier,
+	// not on which list they came from: the nearest corner is the one you meant
+	// whether you drew it or the face brought it.
+	ep, epOK := nearestEndpoint(cursor, ents, endpointR)
+	rp, rpOK := nearestPoint(cursor, referenceCorners(cfg.Reference), endpointR)
+	if p, ok := nearer(ep, epOK, rp, rpOK, cursor); ok {
 		return Snap{Point: p, Kind: SnapEndpoint}
 	}
-	if p, ok := nearestMidpoint(cursor, ents, midpointR); ok {
+	mp, mpOK := nearestMidpoint(cursor, ents, midpointR)
+	rm, rmOK := nearestPoint(cursor, referenceMidpoints(cfg.Reference), midpointR)
+	if p, ok := nearer(mp, mpOK, rm, rmOK, cursor); ok {
 		return Snap{Point: p, Kind: SnapMidpoint}
 	}
 
@@ -133,6 +145,68 @@ func Resolve(cursor geom.Vec2i, ents []model.Entity, from *geom.Vec2i, cfg Confi
 		Point: geom.Vec2i{X: snapTo(cursor.X, cfg.GridStep), Y: snapTo(cursor.Y, cfg.GridStep)},
 		Kind:  SnapGrid,
 	}
+}
+
+// nearer picks whichever of two candidates is closer to the cursor, with a
+// deterministic tie-break.
+func nearer(a geom.Vec2i, aOK bool, b geom.Vec2i, bOK bool, cursor geom.Vec2i) (geom.Vec2i, bool) {
+	switch {
+	case aOK && bOK:
+		da, db := a.Sub(cursor).LenSq(), b.Sub(cursor).LenSq()
+		if db < da || (db == da && lexLess(b, a)) {
+			return b, true
+		}
+		return a, true
+	case aOK:
+		return a, true
+	case bOK:
+		return b, true
+	}
+	return geom.Vec2i{}, false
+}
+
+// nearestPoint finds the closest of a plain list of candidates.
+func nearestPoint(cursor geom.Vec2i, pts []geom.Vec2i, radius int64) (geom.Vec2i, bool) {
+	if radius <= 0 {
+		return geom.Vec2i{}, false
+	}
+	r2 := radius * radius
+	best, bestD := geom.Vec2i{}, int64(0)
+	found := false
+	for _, p := range pts {
+		d := p.Sub(cursor).LenSq()
+		if d > r2 {
+			continue
+		}
+		if !found || d < bestD || (d == bestD && lexLess(p, best)) {
+			best, bestD, found = p, d, true
+		}
+	}
+	return best, found
+}
+
+// referenceCorners and referenceMidpoints expand the reference loops into the
+// two kinds of target a snap can land on.
+func referenceCorners(loops [][]geom.Vec2i) []geom.Vec2i {
+	var out []geom.Vec2i
+	for _, l := range loops {
+		out = append(out, l...)
+	}
+	return out
+}
+
+func referenceMidpoints(loops [][]geom.Vec2i) []geom.Vec2i {
+	var out []geom.Vec2i
+	for _, l := range loops {
+		for i := range l {
+			a, b := l[i], l[(i+1)%len(l)]
+			if a == b {
+				continue
+			}
+			out = append(out, geom.Vec2i{X: (a.X + b.X) / 2, Y: (a.Y + b.Y) / 2})
+		}
+	}
+	return out
 }
 
 func snapTo(v, step int64) int64 {

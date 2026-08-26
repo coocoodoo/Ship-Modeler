@@ -53,6 +53,10 @@ type SketchView struct {
 	HoverRegion int
 	// SelectedRegions are the regions picked for extrude.
 	SelectedRegions map[int]bool
+	// Reference is the anchored face's boundary in sketch coordinates, drawn as
+	// dim solid lines you can snap to but never select (SPEC-UX §10). Empty for
+	// a sketch on a default plane, or one whose face has since been cut away.
+	Reference [][]geom.Vec2i
 }
 
 // BuildSketchDraw assembles the overlay.
@@ -67,6 +71,7 @@ func BuildSketchDraw(v SketchView) *render.Overlay {
 		return d
 	}
 
+	appendReference(d, v)
 	arr := v.Sketch.Arrangement()
 	appendRegionFills(d, arr, v)
 	appendEntityStrokes(d, v)
@@ -74,6 +79,27 @@ func BuildSketchDraw(v SketchView) *render.Overlay {
 	appendOpenEnds(d, arr)
 	appendSnapGlyph(d, v)
 	return d
+}
+
+// appendReference draws the face the sketch sits on.
+//
+// It is drawn first and dimly on purpose: it is there to line things up
+// against, not to be part of the drawing. Nothing here is selectable — the
+// entities the user actually drew are the only things a click can find.
+func appendReference(d *render.Overlay, v SketchView) {
+	col := ui.WithAlpha(ui.ColorTextDim, 0x80)
+	for _, loop := range v.Reference {
+		for i := range loop {
+			a := loop[i]
+			b := loop[(i+1)%len(loop)]
+			if a == b {
+				continue
+			}
+			d.Lines = append(d.Lines, render.OverlayLine{
+				A: d.Lift(a), B: d.Lift(b), Color: col, WidthPx: 1,
+			})
+		}
+	}
 }
 
 // appendRegionFills paints each closed region translucent, brighter under the

@@ -364,3 +364,53 @@ catch the tool mid-pick. They take `kind` (union/subtract/intersect), `target`,
 `tools` and `visible` (the keep-tools toggle). The extrude ops grew `result`
 (new/add/subtract/intersect), and the `dump` op grew a `boolean ...` line plus
 `result=` and `targets=` on the extrude line.
+
+### 2026-08-26 — M5
+
+**V-31 · A sketch stores its plane, not a reference to one.** SPEC-GEOMETRY §3
+allows a sketch's plane to be "builtin plane enum OR face ref + Frame
+snapshot". Face sketches store all three: the body, the face identity, and the
+frame. The frame is what the sketch actually uses, so it keeps working when the
+face is gone; the identity is only for snap references and Project outline. This
+is not a hypothetical — extruding a face sketch replaces the very face it was
+drawn on, so by the second edit most face sketches are already orphaned, and
+they all still open, draw and extrude correctly.
+
+**V-32 · Clicking a face selects the face.** M1 and M2 selected the whole body
+on a viewport click, with a note that sub-element selection was M6's. SPEC-UX
+§10 needs a face to be selectable to sketch on it or push it, so faces are
+selectable now; edges and vertices stay with the unified selection model in M6.
+
+**V-33 · Two shells touching face to face pass validation, and should not.**
+The test scene's hull was two boxes joined with `mesh.Merge`, which concatenates
+rather than unions. Every check in SPEC-GEOMETRY §6.5 passes — each shell is
+closed, manifold, positively oriented, and the Euler count is right — and the
+volume agrees with Manifold's, because the shells enclose no shared volume. It
+is still not a solid: the shared plane carries two coincident surfaces. Manifold
+answers a union onto such a mesh by returning the target unchanged, silently,
+which is how this survived five milestones.
+
+The scene is fixed — the hull is unioned properly now, and `mesh.Merge` says in
+its doc comment what it is and is not for. A validator check for it was written
+and then removed: distinguishing "two solids pressed together" from a legal
+edge-to-edge or corner-to-corner touch needs to know whether two coplanar
+opposed faces overlap over an *area*, and the version that was precise enough to
+pass the M4 acceptance matrix still rejected two of its cases. A check that
+rejects correct geometry is worse than no check. The gap is recorded here
+instead, and `TestEveryBodyIsAlwaysAValidSolid` says out loud what it does not
+cover.
+
+**V-34 · Push/pull is its own command, not a synthesised extrude.** PLAN
+describes it as "extrude-of-face-outline through the command bus". It is exactly
+that geometrically — the face's loops become a region, the region becomes a
+prism, the prism unions or subtracts — but it is `model.PushPull` rather than a
+`model.Extrude` with a fabricated sketch. Push/pull has no sketch, and inventing
+one would put an entry in the tree that the user never made and cannot use.
+
+**V-35 · Ops added for M5 flows.** `sketch.face` starts a sketch on a face,
+`sketch.project` copies its outline in, and `pushpull` moves a face
+(`kind: "preview"` stops before the commit so a shot can catch the drag). All
+three, and `select` with `kind: "face"`, name a face either by index or by
+`axis` — `"+y"` picks the outermost face pointing that way, which keeps meaning
+the same thing after an edit has renumbered everything. The `dump` op grew
+`pushpull` and `facesketch` lines and a `valid=` field on every body.

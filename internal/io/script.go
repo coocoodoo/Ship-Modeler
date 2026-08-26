@@ -136,6 +136,7 @@ func LoadScript(path string) (*Script, error) {
 var knownOps = map[string]bool{
 	"sketch.begin": true, "sketch.line": true, "sketch.rect": true,
 	"sketch.circle": true, "sketch.finish": true, "sketch.tool": true,
+	"sketch.face": true, "sketch.project": true, "pushpull": true,
 	"extrude": true, "extrude.begin": true, "extrude.commit": true,
 	"extrude.cancel": true,
 	"boolean":        true, "boolean.begin": true,

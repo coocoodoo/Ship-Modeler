@@ -4,6 +4,7 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"modeler/internal/geom"
+	"modeler/internal/geom/mesh"
 	"modeler/internal/model"
 	"modeler/internal/render"
 	"modeler/internal/scene"
@@ -40,6 +41,9 @@ func (a *App) BuildScene() render.Scene {
 		if a.Hover.Hit && a.Hover.Kind == render.PickFace && a.Hover.BodyID == b.ID {
 			d.HoverFace = a.Hover.FaceUID
 		}
+		if faces := a.selectedFacesOf(b.ID); len(faces) > 0 {
+			d.SelectedFaces = faces
+		}
 		// A body picked for a boolean is tinted by the part it plays, so the
 		// viewport and the card always agree about what is about to happen.
 		if tint, ok := a.booleanTint(b.ID); ok {
@@ -54,11 +58,18 @@ func (a *App) BuildScene() render.Scene {
 	// on a sketch row means something.
 	s.Sketches = a.buildSketchDraws()
 
-	// The pending extrude solid rides along as a translucent body.
+	// The pending extrude solid rides along as a translucent body, and so does
+	// the material a push/pull drag would add or remove.
 	if d, ok := a.extrudePreviewDraw(); ok {
 		s.Bodies = append(s.Bodies, d)
 	}
-	s.Gizmo = a.buildExtrudeGizmo(a.layout.RenderViewport())
+	if d, ok := a.pushPullPreviewDraw(); ok {
+		s.Bodies = append(s.Bodies, d)
+	}
+	vpr := a.layout.RenderViewport()
+	if s.Gizmo = a.buildExtrudeGizmo(vpr); s.Gizmo == nil {
+		s.Gizmo = a.buildPushPullGizmo(vpr)
+	}
 
 	// Sketch mode dims the rest of the model and puts the grid on the sketch
 	// plane, so the profile being drawn is what the eye lands on (SPEC-UX §8.1).
@@ -188,6 +199,22 @@ func (a *App) FrameSelection(vp render.Viewport) {
 	a.Anim.Start(a.Camera, to)
 }
 
+// selectedFacesOf collects the selected faces belonging to one body, which is
+// what the overlay pass highlights.
+func (a *App) selectedFacesOf(bodyID uint32) map[mesh.FaceUID]bool {
+	var out map[mesh.FaceUID]bool
+	for _, ref := range a.Sel.Refs() {
+		if ref.Kind != model.SelFace || ref.Body != bodyID {
+			continue
+		}
+		if out == nil {
+			out = map[mesh.FaceUID]bool{}
+		}
+		out[ref.Face] = true
+	}
+	return out
+}
+
 // selectionBounds is the bounding box of the selected bodies and planes, or an
 // invalid box when nothing usable is selected.
 func (a *App) selectionBounds(s *render.Scene) geom.AABB {
@@ -283,9 +310,12 @@ func (a *App) handleViewportClick(in InputFrame, vp render.Viewport) {
 			return
 		}
 		a.selectRef(model.PlaneRef(hit.Plane))
-	case render.PickFace, render.PickEdge, render.PickVert:
-		// Sub-element selection arrives with the selection model in M6; until
-		// then a click in the viewport selects the whole body.
+	case render.PickFace:
+		// Clicking a face selects the face (SPEC-UX §10) — that is what makes
+		// it sketchable and push-pullable. Edges and vertices arrive with the
+		// full selection model in M6.
+		a.selectRef(model.FaceRef(hit.BodyID, hit.FaceUID))
+	case render.PickEdge, render.PickVert:
 		a.selectRef(model.BodyRef(hit.BodyID))
 	}
 }
@@ -354,6 +384,9 @@ func (a *App) beginSketchFromSelection() {
 			return
 		case model.SelSketch:
 			a.EditSketch(a.Doc().SketchByID(ref.Sketch))
+			return
+		case model.SelFace:
+			a.BeginSketchOnFace(ref.Body, ref.Face)
 			return
 		}
 	}

@@ -2,7 +2,96 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M4 COMPLETE** — booleans work: Union, Subtract and Intersect, from the Boolean tool and from an extrude's Result chips. Next up: **M5** (sketch on faces, push/pull).
+**Current state:** **M5 COMPLETE** — faces are sketchable and push/pullable; a stepped hull with windows can be built without touching a default plane. Next up: **M6** (unified selection, direct edit, transform).
+
+---
+
+## 2026-08-26 — M5: sketch on faces & push/pull
+
+**Done:**
+- `model.Sketch` grew a face anchor: body, face identity, and a **frame
+  snapshot**. The snapshot is what the sketch actually uses, so it survives the
+  face being cut away — which happens almost immediately, since extruding a face
+  sketch replaces the face it was drawn on.
+- `internal/app/facesketch.go` — starting a sketch on a face, the flatness
+  refusal, the face's outline as dim reference geometry, and **Project outline**.
+- Reference snapping: the anchored face's corners and edge midpoints compete
+  with the sketch's own on distance, not on which list they came from.
+- `model.PushPull` + `tools.PushPullTool` + `internal/app/pushpull.go` — the
+  hero tool. Select a flat face, drag its arrow: out adds, in cuts, decided by
+  the direction rather than by a mode. Live preview of the material, CSG on
+  release only.
+- Clicking a face now selects the face (V-32), which is what makes both of the
+  above reachable.
+- Extruding from a face sketch defaults to **Add** on the body it was drawn on.
+
+**Verified:**
+- **M5's acceptance, as arithmetic.** A stepped hull with two windows, built
+  without touching a default plane after the first: slab 12×8×3 = **288**; a
+  face pulled out 3 → **360**; a block grown from a face sketch → **504**; two
+  2×2 windows cut 2 deep → **488**. Every figure exact.
+- Push/pull both ways on the test hull: pulling the 5×4 top out 2.5 adds
+  **50**, pushing the 4×6 side in 2 removes **48**, and the previews before each
+  change nothing — CSG runs on release, as SPEC-UX §12.5 requires.
+- A face with a hole pushes as a ring: 10×10 minus 2×2, three units tall, hole
+  still open.
+- Pushing a face further than the body is deep empties it legally and undoes.
+- `gofmt -l`, `go vet ./...` clean; `go test ./...` green across 13 packages.
+- Shots read: `m5_stepped`, `m5_pulling`, `m5_pulled`, `m5_pushing`,
+  `m5_projected`.
+
+**The thing M5 found, which had been there since M0:**
+
+The test scene's hull was two boxes joined with `mesh.Merge`, which concatenates
+meshes rather than unioning them. It rendered correctly, picked correctly, and
+passed every check in the validation gate — each shell is closed, manifold,
+positively oriented, with the right Euler count — and its volume agreed with
+Manifold's, because the two shells enclose no shared volume. It was still not a
+solid: the plane where they meet carries two coincident surfaces, so the shells
+touch rather than join.
+
+Manifold's answer to a union onto such a mesh is to return the target unchanged.
+Not an error, not a warning: nothing. Every M4 boolean test passed because none
+of them unioned *onto* the hull — they subtracted from it, which happens to work.
+The first thing that did was M5's "extrude a face sketch and add it to its body",
+which reported success and changed nothing.
+
+The scene is fixed and `mesh.Merge` now says what it is and is not for. A
+validator check was written for the general case and then removed: telling "two
+solids pressed together" apart from a legal edge-to-edge touch means asking
+whether two coplanar opposed faces overlap over an *area*, and the version
+precise enough to pass M4's acceptance matrix still rejected two of its cases. A
+check that rejects correct geometry is worse than no check, so the gap is
+documented (DECISIONS V-33) rather than half-covered.
+
+**Decisions/deviations:** V-31 (a sketch stores its plane, not a reference),
+V-32 (clicking a face selects the face), V-33 (the validation gap above), V-34
+(push/pull is its own command), V-35 (the new ops). All goldens regenerated: the
+hull's silhouette changed when it became a real solid.
+
+**Open issues:**
+- The validator does not detect shells that touch face to face (V-33). Only
+  `mesh.Merge` can produce one, and it is now the only caller's job to know that.
+- Push/pull arms on the selected face every frame from Idle. Multi-face push
+  (drag several coplanar faces at once) is not built; nothing in the spec asks
+  for it yet.
+- Reference geometry is drawn and snapped to but not pickable, which is right —
+  though it means there is no way to select a face edge *as* an edge until M6.
+
+**Next:** M6 — unified selection (bodies / faces / edges / verts with the pick
+priority of SPEC-RENDER §6), direct vertex and edge editing, and the transform
+gizmo.
+
+**Try it (user):**
+1. Run `modeler.exe` and click the top of the hull's raised block.
+2. An arrow appears on the face. Drag it up — the block grows; drag it down
+   past where it started and it cuts in instead.
+3. Press `S` with that face selected: you are now sketching on it, looking
+   straight at it, with its outline drawn dim underneath.
+4. Click **Project outline** in the card to turn that outline into real lines.
+5. Draw a rectangle inside it and press `E` — the Result chips open on **Add**,
+   because a sketch on a face belongs to that body.
+6. Pick **Subtract** instead and it cuts a window rather than adding a block.
 
 ---
 

@@ -611,10 +611,14 @@ func (a *App) buildSketchCard(viewport rl.Rectangle) {
 		return
 	}
 
+	onFace, faceGone := a.faceSketchState(s)
 	w := a.px(232)
 	h := a.px(150)
 	if s.Consumed {
 		h += a.px(44)
+	}
+	if onFace {
+		h += a.px(34)
 	}
 	// Below the view cube, never covering it (SPEC-UX §2).
 	box := ui.Rect(
@@ -666,6 +670,26 @@ func (a *App) buildSketchCard(viewport rl.Rectangle) {
 		sess.CircleSegs = values[pick]
 		if i, ok := a.selectedCircle(s, sess); ok {
 			a.Run(&model.SetCircleSegs{Sketch: s.ID, Index: i, Segs: values[pick]})
+		}
+	}
+
+	// A face sketch can copy the shape it is sitting on into real entities,
+	// which is where an offset hull or a step in the armour starts
+	// (SPEC-UX §10).
+	if onFace {
+		body.Y += a.px(6)
+		body.Height -= a.px(6)
+		row, body = ui.SplitTop(body, a.px(24))
+		why := ""
+		if faceGone {
+			why = "The face this sketch was made on has been cut away"
+		}
+		if a.UI.Button(ui.MakeID("sketch.project"), row, "Project outline", ui.ButtonOpts{
+			Disabled:    faceGone,
+			Tooltip:     "Copy the face's boundary in as lines you can edit",
+			DisabledWhy: why,
+		}) {
+			a.ProjectFaceOutline()
 		}
 	}
 

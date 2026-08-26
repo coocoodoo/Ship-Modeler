@@ -65,10 +65,17 @@ func (c *AddBody) Events() []Event {
 	return []Event{{Kind: EvBodyAdded, BodyID: c.body.ID}}
 }
 
-// AddSketch inserts a new sketch on a default plane.
+// AddSketch inserts a new sketch, on a default plane or anchored to a face.
 type AddSketch struct {
 	Plane geom.PlaneKind
 	Label string
+
+	// OnFace, Body, Face and Frame anchor the sketch to a body's face
+	// (R9, SPEC-UX §10). Frame is the snapshot the sketch keeps for good.
+	OnFace bool
+	Body   uint32
+	Face   mesh.FaceUID
+	Frame  geom.Frame
 
 	sketch *Sketch
 }
@@ -90,7 +97,10 @@ func (c *AddSketch) Do(doc *Document) error {
 		if name == "" {
 			name = fmt.Sprintf("Sketch %d", id)
 		}
-		c.sketch = &Sketch{ID: id, Name: name, Visible: true, Plane: c.Plane}
+		c.sketch = &Sketch{
+			ID: id, Name: name, Visible: true, Plane: c.Plane,
+			OnFace: c.OnFace, Body: c.Body, FaceID: c.Face, FrameSnap: c.Frame,
+		}
 	}
 	doc.Sketches = append(doc.Sketches, c.sketch)
 	return nil

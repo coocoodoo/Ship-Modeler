@@ -201,6 +201,43 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		r.dumped = true
 		r.dump()
 
+	case "sketch.face":
+		f, err := r.faceByIndex(op)
+		if err != nil {
+			return err
+		}
+		if !a.BeginSketchOnFace(f.body.ID, f.uid) {
+			return op.Errorf("could not start a sketch on that face")
+		}
+
+	case "sketch.project":
+		if !a.InSketch() {
+			return op.Errorf("no sketch is being edited")
+		}
+		if !a.ProjectFaceOutline() {
+			return op.Errorf("the outline could not be projected")
+		}
+
+	case "pushpull":
+		f, err := r.faceByIndex(op)
+		if err != nil {
+			return err
+		}
+		a.Sel.Set(model.FaceRef(f.body.ID, f.uid))
+		a.armPushPull()
+		t := a.pushPull.tool
+		if t == nil {
+			return op.Errorf("that face cannot be pushed or pulled")
+		}
+		t.DistanceUnits = op.Depth
+		a.rebuildPushPullPreview()
+		if op.Kind == "preview" {
+			return nil
+		}
+		if !a.CommitPushPull() {
+			return op.Errorf("the push/pull was refused")
+		}
+
 	case "sketch.begin":
 		k, ok := geom.ParsePlaneKind(op.Plane)
 		if !ok {
@@ -387,6 +424,12 @@ func (r *ScriptRunner) selectOp(op io.Op) error {
 			return op.Errorf("unknown plane %q", op.Plane)
 		}
 		a.Sel.Set(model.PlaneRef(k))
+	case "face":
+		f, err := r.faceByIndex(op)
+		if err != nil {
+			return err
+		}
+		a.Sel.Set(model.FaceRef(f.body.ID, f.uid))
 	case "sketch":
 		sk := a.Doc().SketchByName(op.Sketch)
 		if sk == nil {
@@ -540,8 +583,11 @@ func (r *ScriptRunner) extrudeOp(op io.Op, commit bool) error {
 		return op.Errorf("unknown direction %q", op.Dir)
 	}
 	t.ThroughAll = op.Through
+	// An unspecified result leaves whatever the tool chose for itself, which is
+	// how a face sketch keeps its Add default (SPEC-UX §10).
 	switch op.Result {
-	case "", "new":
+	case "":
+	case "new":
 		t.Result = tools.ResultNew
 	case "add":
 		t.Result = tools.ResultAdd
@@ -561,6 +607,70 @@ func (r *ScriptRunner) extrudeOp(op io.Op, commit bool) error {
 		return op.Errorf("the extrude was refused")
 	}
 	return nil
+}
+
+// faceByIndex resolves a script's face reference.
+//
+// Identities are minted at run time, so a script cannot name one. It can name a
+// position — `face: 3` — but positions move every time a boolean rebuilds the
+// body, which makes a script that edits twice unwritable. So it can also name a
+// direction — `axis: "+y"` — which picks the outermost face pointing that way
+// and keeps meaning the same thing after the shape underneath it changes.
+func (r *ScriptRunner) faceByIndex(op io.Op) (faceRef, error) {
+	b := r.App.Doc().BodyByName(op.Body)
+	if b == nil || b.Mesh == nil {
+		return faceRef{}, op.Errorf("no body named %q", op.Body)
+	}
+	if op.Axis != "" {
+		return faceByAxis(b, op)
+	}
+	if op.Face < 0 || op.Face >= len(b.Mesh.Faces) {
+		return faceRef{}, op.Errorf("body %q has %d faces, not one at index %d",
+			op.Body, len(b.Mesh.Faces), op.Face)
+	}
+	return faceRef{body: b, face: op.Face, uid: b.Mesh.Faces[op.Face].ID}, nil
+}
+
+// faceByAxis picks the outermost face pointing along a named world axis.
+func faceByAxis(b *model.Body, op io.Op) (faceRef, error) {
+	dir, ok := parseAxis(op.Axis)
+	if !ok {
+		return faceRef{}, op.Errorf("unknown axis %q, want one of +x -x +y -y +z -z", op.Axis)
+	}
+	best, bestReach := -1, 0.0
+	for i := range b.Mesh.Faces {
+		if b.Mesh.FaceNormal(i).Dot(dir) < 0.999 {
+			continue
+		}
+		// Among parallel faces, the one furthest out along the axis is the one
+		// a person would have clicked.
+		reach := b.Mesh.FaceCentroid(i).Dot(dir)
+		if best < 0 || reach > bestReach {
+			best, bestReach = i, reach
+		}
+	}
+	if best < 0 {
+		return faceRef{}, op.Errorf("body %q has no face pointing %s", op.Body, op.Axis)
+	}
+	return faceRef{body: b, face: best, uid: b.Mesh.Faces[best].ID}, nil
+}
+
+func parseAxis(s string) (geom.Vec3, bool) {
+	switch s {
+	case "+x":
+		return geom.AxisX, true
+	case "-x":
+		return geom.AxisX.Neg(), true
+	case "+y":
+		return geom.AxisY, true
+	case "-y":
+		return geom.AxisY.Neg(), true
+	case "+z":
+		return geom.AxisZ, true
+	case "-z":
+		return geom.AxisZ.Neg(), true
+	}
+	return geom.Vec3{}, false
 }
 
 // booleanOp runs a scripted boolean through the same tool and command the UI
@@ -681,11 +791,28 @@ func (r *ScriptRunner) dump() {
 		fmt.Printf("boolean op=%q target=%d tools=%d keep=%d\n",
 			t.Op.String(), t.Target, len(t.Tools), boolBit(t.KeepTools))
 	}
+	if t := a.pushPull.tool; t != nil {
+		fmt.Printf("pushpull body=%d dist=%.4f adding=%d\n",
+			t.Body, t.DistanceUnits, boolBit(t.Adding()))
+	}
+	for _, sk := range doc.Sketches {
+		if sk.OnFace {
+			fmt.Printf("facesketch id=%d body=%d ref=%d\n",
+				sk.ID, sk.Body, boolBit(a.faceRefAlive(sk)))
+		}
+	}
 	fmt.Printf("sel count=%d desc=%q\n", a.Sel.Len(), a.Sel.Describe(doc))
 	fmt.Printf("hint %q\n", a.HintText())
 	for _, t := range a.UI.Toasts() {
 		fmt.Printf("toast %q\n", t.Text)
 	}
+}
+
+// bodyValid reports whether a body is a solid the rest of the program can
+// reason about. Every dump carries it so no script can quietly produce, or
+// start from, geometry that only looks right.
+func bodyValid(b *model.Body) bool {
+	return b.Mesh != nil && mesh.Validate(b.Mesh) == nil
 }
 
 // bodyVolume is a body's solid volume, or zero when it has no mesh.

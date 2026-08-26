@@ -80,9 +80,16 @@ func (a *App) enterSketch(s *model.Sketch) {
 	a.Sel.Clear()
 
 	// Look squarely at the plane, framing a comfortable working area.
+	frame := s.Frame()
 	to := a.targetCamera()
-	to.Azimuth, to.Elevation = render.PlaneView(s.Plane)
-	to.Target = s.Frame().O
+	if s.OnFace {
+		// A face has no entry in the named-view table; the way to look at it
+		// straight on is to look down its own normal (SPEC-UX §10).
+		to.LookAlong(frame.N.Neg())
+	} else {
+		to.Azimuth, to.Elevation = render.PlaneView(s.Plane)
+	}
+	to.Target = frame.O
 	to.OrthoScale = 24
 	a.Anim.Start(a.Camera, to)
 }
@@ -126,6 +133,9 @@ func (a *App) snapConfig(in InputFrame, vp render.Viewport) sketch.Config {
 		c.GridStep = geom.SubunitsFine
 	}
 	c.Suppressed = in.Alt
+	// The face a face-sketch sits on brings its own corners and edge midpoints
+	// to snap to (SPEC-UX §10).
+	c.Reference = a.faceOutline2D(a.ActiveSketch())
 	return c
 }
 
@@ -332,6 +342,7 @@ func (a *App) buildSketchDraws() []*render.Overlay {
 			Cursor:          a.sketch.snap.Point,
 			HoverRegion:     a.sketch.hoverRegion,
 			SelectedRegions: a.sketch.selectedRegions,
+			Reference:       a.faceOutline2D(active),
 		}))
 	}
 	return out

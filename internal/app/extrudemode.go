@@ -94,6 +94,12 @@ func (a *App) BeginExtrude() bool {
 	origin := regionCentroid(arr, regions, frame)
 	a.extrude.tool = tools.NewExtrudeTool(s.ID, regions, origin, frame.N)
 	a.extrude.tool.ThroughDepth = a.throughAllDepth(origin, frame.N)
+	// A sketch drawn on a face is nearly always meant to grow that body, not to
+	// start a new one beside it (SPEC-UX §10). Subtract is one chip away, which
+	// is the "cut a hole here" path.
+	if s.OnFace {
+		a.extrude.tool.Result = tools.ResultAdd
+	}
 	a.extrude.returnCamera = a.targetCamera()
 	a.Mode = ModeExtrude
 	a.rebuildExtrudePreview()
@@ -352,6 +358,15 @@ func (a *App) extrudeTargets(r tools.Result) []uint32 {
 	}
 	if r == tools.ResultSubtract {
 		return append([]uint32(nil), all...)
+	}
+	// A face sketch belongs to the body it was drawn on, so that body is the
+	// target whether or not it happens to be topmost (SPEC-UX §10).
+	if s := a.ActiveSketch(); s != nil && s.OnFace {
+		for _, id := range all {
+			if id == s.Body {
+				return []uint32{id}
+			}
+		}
 	}
 	return []uint32{all[len(all)-1]}
 }

@@ -1,0 +1,23 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"pushpull","body":"Hull","axis":"+y","depth":2.5,"kind":"preview"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m5_pulling"},
+  {"op":"pushpull","body":"Hull","axis":"+y","depth":2.5},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m5_pulled"},
+  {"op":"pushpull","body":"Hull","axis":"+x","depth":-2,"kind":"preview"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m5_pushing"},
+  {"op":"pushpull","body":"Hull","axis":"+x","depth":-2},
+  {"op":"settle"},
+  {"op":"dump"}
+]

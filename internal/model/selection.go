@@ -207,6 +207,12 @@ func (s *Selection) Describe(doc *Document) string {
 			}
 		case SelPlane:
 			return r.Plane.String() + " plane"
+		case SelFace:
+			// A face is only meaningful with the body it belongs to: "a face"
+			// on its own tells you nothing about what you clicked.
+			if b := doc.BodyByID(r.Body); b != nil {
+				return "a face of " + b.Name
+			}
 		}
 		return r.Kind.String()
 	default:
