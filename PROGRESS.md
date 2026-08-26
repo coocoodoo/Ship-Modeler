@@ -23,6 +23,13 @@ previews, and the planes now honour the scene's dim factor. What a mode is
 about is the one thing at full strength; everything else, planes included,
 recedes.
 
+**Then the user asked for the planes to go entirely while extruding, and they
+were right.** Dimming them was not enough — three translucent quads spanning the
+viewport still cross the solid being pulled out, and at that moment the only
+thing that matters is how far it has come. They are hidden for the duration of
+the tool and back the instant it closes; their eye toggles are untouched. The
+sketch grid stays, because that is what makes the depth readable.
+
 **Verified:** rendered an extrude in progress on the user's scene — the prism
 is now unmistakably the brightest thing in the frame. Sketch mode re-checked:
 the sketch still reads first, and the plane quads no longer compete with it.

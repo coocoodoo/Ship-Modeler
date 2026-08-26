@@ -52,7 +52,14 @@ func (a *App) BuildScene() render.Scene {
 		s.Bodies = append(s.Bodies, d)
 	}
 
-	s.Planes = a.buildPlaneDraws()
+	// The default planes step out of the way entirely while an extrude is being
+	// dragged. Dimming them was not enough: three translucent quads spanning the
+	// viewport still cross the solid you are pulling out, and the one thing that
+	// matters at that moment is how far it has come. They are back the instant
+	// the tool closes, and their eye toggles are untouched.
+	if !a.InExtrude() {
+		s.Planes = a.buildPlaneDraws()
+	}
 
 	// Every visible sketch draws, in or out of sketch mode, so the eye toggle
 	// on a sketch row means something.
