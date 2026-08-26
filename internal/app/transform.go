@@ -41,6 +41,15 @@ func (a *App) armTransform() {
 	if a.transform.tool != nil && a.transform.tool.Dragging() {
 		return
 	}
+	// A face armed for push/pull owns its own gizmo, and the two would sit on
+	// top of each other: the arrow starts at the face centroid and the move
+	// gizmo's centre handle is a disc around that same point. Only one of them
+	// is drawn, so leaving both armed means an invisible gizmo quietly eating
+	// every click meant for the arrow — which is what it did.
+	if a.InPushPull() {
+		a.transform.tool = nil
+		return
+	}
 	pivot, ok := a.Sel.Pivot(a.Doc())
 	if !ok {
 		a.transform.tool = nil

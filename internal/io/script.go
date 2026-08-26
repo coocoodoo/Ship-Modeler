@@ -150,7 +150,8 @@ var knownOps = map[string]bool{
 	"paint.res": true, "paint.color": true, "paint.pixel": true,
 	"body.visible": true, "plane.visible": true, "sketch.visible": true,
 	"deselect": true, "delete": true, "undo": true, "redo": true,
-	"hover": true, "click": true, "ui.tree": true,
+	"hover": true, "click": true, "drag": true, "drag.release": true,
+	"ui.tree":     true,
 	"camera.view": true, "camera.frame": true, "camera.orbit": true,
 	"camera.zoom": true, "camera.project": true,
 	"settle": true, "shot": true, "pick": true, "dump": true,
@@ -195,6 +196,10 @@ func (o Op) validate() error {
 	case "pick", "hover", "click":
 		if o.At == nil {
 			return o.Errorf("needs at [x,y]")
+		}
+	case "drag":
+		if o.From == nil || o.To == nil {
+			return o.Errorf("needs from [x,y] and to [x,y] in window pixels")
 		}
 	case "plane.visible":
 		if o.Plane == "" || o.Visible == nil {

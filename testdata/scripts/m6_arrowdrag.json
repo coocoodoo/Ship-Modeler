@@ -1,0 +1,16 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"select","kind":"face","body":"Hull","axis":"+y"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"drag","from":[773,230],"to":[773,120],"kind":"hold"},
+  {"op":"dump"},
+  {"op":"shot","name":"m6_arrowdrag"},
+  {"op":"drag.release"},
+  {"op":"settle"},
+  {"op":"dump"}
+]

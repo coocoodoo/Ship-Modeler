@@ -16,7 +16,7 @@ import (
 
 var (
 	m5PushPullLine = regexp.MustCompile(
-		`^pushpull body=(\d+) dist=(-?[\d.]+) adding=(\d)$`)
+		`^pushpull body=(\d+) dist=(-?[\d.]+) adding=(\d)( arrow=\S+)?$`)
 	m5FaceSketchLine = regexp.MustCompile(
 		`^facesketch id=(\d+) body=(\d+) ref=(\d)$`)
 )

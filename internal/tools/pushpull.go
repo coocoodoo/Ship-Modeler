@@ -43,6 +43,12 @@ func NewPushPullTool(body uint32, face mesh.FaceUID, origin, axis geom.Vec3) *Pu
 // Adding reports whether the current drag would add material rather than cut.
 func (t *PushPullTool) Adding() bool { return t.DistanceUnits > 0 }
 
+// Flipped reports that the drag has been pulled back past the face, which is
+// when the arrow turns round. It is deliberately not the negation of Adding:
+// a drag that has not moved yet is neither, and treating "not adding" as
+// "flipped" inverts the very first pixel of every outward pull.
+func (t *PushPullTool) Flipped() bool { return t.DistanceUnits < 0 }
+
 // Active reports whether the drag has moved far enough to mean anything.
 func (t *PushPullTool) Active() bool {
 	return math.Abs(t.DistanceUnits) >= 1.0/geom.Unit

@@ -6,6 +6,45 @@
 
 ---
 
+## 2026-08-26 — Fix: the face arrow was being eaten by an invisible gizmo
+
+**Reported by the user:** selecting a face and dragging its arrow did nothing —
+the arrow would not move and the planes would not hide.
+
+Both symptoms, one cause. Selecting a face armed *two* tools at the same point:
+the push/pull arrow and the move gizmo, whose screen-plane handle is a disc
+centred exactly where the arrow starts. M6 made the drawing exclusive — only the
+arrow appears — but not the input. The gizmo was still hit-tested, and being
+hit-tested first it swallowed the press. So the arrow never engaged, its
+distance stayed at zero, and the planes stayed because they hide on a drag that
+never began. Worse, the drag was not doing nothing: it was silently running the
+move gizmo, deforming the face's vertices instead of push/pulling it. Dragging
+the arrow up three units produced the toast "Move +0, +3, +0".
+
+A second bug sat directly behind it, which the first was hiding. The drag's
+sign was taken from `!Adding()`, and `Adding()` is "distance > 0" — false at the
+start of every drag, when the distance is still zero. So the first pixel of an
+outward pull would have been read as a push. `Flipped()` — "distance < 0" — is
+the honest question, and matches what the extrude arrow already did.
+
+**No drag in this program had ever been tested.** The script runner could click
+and it could hover, and every drag-driven tool — the extrude arrow, push/pull,
+the move and rotate gizmos, box select — was exercised by calling its internals
+directly and never through a press, a run of motion and a release. That is
+precisely the path this bug lived on. There is now a `drag` op that does the
+real thing, a `kind: "hold"` that stops mid-drag so a shot or a dump can catch
+it, and a `drag.release` to finish. The button stays down across ops, because
+every op ends by stepping a frame and that frame would otherwise look like a
+release.
+
+**Verified:** `TestDraggingTheFaceArrowActuallyPushPulls` drives a real drag and
+asserts all three of the reported symptoms — the arrow reads 3 units mid-drag,
+`planes drawn` goes 3 → 0 → 3, and the toast says "Pulled the face out" rather
+than "Move". Re-armed the old gizmo to confirm the test fails with all three
+messages. Full suite green.
+
+---
+
 ## 2026-08-26 — Fix: the extrude preview was dimmed with everything else
 
 **Reported by the user, with a screenshot.** Mid-extrude, the pending solid was

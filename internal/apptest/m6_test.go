@@ -17,7 +17,8 @@ import (
 var (
 	m6SelLine = regexp.MustCompile(`^sel count=(\d+) desc="([^"]*)"$`)
 	m6Gizmo   = regexp.MustCompile(
-		`^gizmo mode="(\w+)" pivot=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+) boxfilter="(\w+)"$`)
+		`^gizmo mode="(\w+)" pivot=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)$`)
+	m6BoxFilter = regexp.MustCompile(`^boxselect filter="(\w+)"$`)
 )
 
 type selDump struct {
@@ -64,10 +65,12 @@ func parseM6Dumps(t *testing.T, stdout string) ([]selDump, []gizmoDump) {
 			if m == nil {
 				t.Fatalf("unparsable gizmo line: %q", line)
 			}
-			*curGiz = gizmoDump{
-				mode:   m[1],
-				pivot:  [3]float64{num(m[2]), num(m[3]), num(m[4])},
-				filter: m[5], present: true,
+			curGiz.mode = m[1]
+			curGiz.pivot = [3]float64{num(m[2]), num(m[3]), num(m[4])}
+			curGiz.present = true
+		case curGiz != nil && strings.HasPrefix(line, "boxselect "):
+			if m := m6BoxFilter.FindStringSubmatch(line); m != nil {
+				curGiz.filter = m[1]
 			}
 		}
 	}
@@ -301,4 +304,88 @@ func TestClickingASketchSelectsIt(t *testing.T) {
 	} else if done.body(t, "Body 4").vol != 108 {
 		t.Errorf("volume = %v, want 36 square units pulled 3", done.body(t, "Body 4").vol)
 	}
+}
+
+// TestDraggingTheFaceArrowActuallyPushPulls is a regression, reported by the
+// user: selecting a face and dragging its arrow did nothing, and the planes
+// stayed put.
+//
+// Selecting a face armed two tools at the same point. The push/pull arrow was
+// the one drawn, but the move gizmo was armed too, and its screen-plane handle
+// is a disc centred exactly where the arrow starts. Being armed, it was
+// hit-tested; being hit-tested first, it swallowed the press. So the arrow
+// never got the input, its distance stayed at zero, and the drag silently
+// became a vertex move that deformed the face instead of push/pulling it. The
+// planes stayed because they hide on a drag that never began.
+//
+// Note what this needed to catch it: a real press, a run of motion, and a
+// release. There was no way to script one until this bug demanded it, which is
+// exactly why every drag in the program had gone untested.
+func TestDraggingTheFaceArrowActuallyPushPulls(t *testing.T) {
+	stdout, _ := runScript(t, "m6_arrowdrag")
+	dumps := parseM3Dumps(t, stdout)
+	pp, _ := parseM5Dumps(t, stdout)
+	planes := parsePlaneCounts(t, stdout)
+	if len(dumps) != 3 {
+		t.Fatalf("expected 3 dumps, got %d:\n%s", len(dumps), stdout)
+	}
+	armed, mid, done := dumps[0], dumps[1], dumps[2]
+
+	// Armed but not yet dragged: nothing has happened and the planes are there.
+	if pp[0].dist != 0 {
+		t.Errorf("the arrow starts at %v, want 0", pp[0].dist)
+	}
+	if planes[0] != 3 {
+		t.Errorf("%d planes before the drag, want 3", planes[0])
+	}
+
+	// Mid-drag: the arrow has moved with the pointer, and the planes are gone.
+	if pp[1].dist != 3 {
+		t.Errorf("mid-drag the arrow reads %v, want the 3 units it was dragged — "+
+			"a zero here means something else took the press", pp[1].dist)
+	}
+	if !pp[1].adding {
+		t.Error("dragging away from the face reads as a cut, not a pull")
+	}
+	if planes[1] != 0 {
+		t.Errorf("%d planes drawn mid-drag, want none", planes[1])
+	}
+	// CSG runs on release only, so the body has not changed yet.
+	if mid.body(t, "Hull").vol != armed.body(t, "Hull").vol {
+		t.Error("the body changed before the drag was released")
+	}
+
+	// Released: the boolean ran, and the planes came back.
+	grew := done.body(t, "Hull").vol - armed.body(t, "Hull").vol
+	if math.Abs(grew-60) > 1e-9 {
+		t.Errorf("the pull added %v, want the 5x4 face times 3", grew)
+	}
+	if planes[2] != 3 {
+		t.Errorf("%d planes after the drag, want them back", planes[2])
+	}
+	var told bool
+	for _, msg := range done.toasts {
+		if strings.Contains(msg, "Pulled the face out") {
+			told = true
+		}
+		if strings.Contains(msg, "Move ") {
+			t.Errorf("the drag was handled as a move, not a push/pull: %q", msg)
+		}
+	}
+	if !told {
+		t.Errorf("the push/pull was silent; toasts were %q", done.toasts)
+	}
+}
+
+// parsePlaneCounts pulls how many default planes each dump was drawing.
+func parsePlaneCounts(t *testing.T, stdout string) []int {
+	t.Helper()
+	line := regexp.MustCompile(`^planes drawn=(\d+)$`)
+	var out []int
+	for _, raw := range strings.Split(stdout, "\n") {
+		if m := line.FindStringSubmatch(strings.TrimRight(raw, "\r")); m != nil {
+			out = append(out, atoi(t, m[1]))
+		}
+	}
+	return out
 }

@@ -17,6 +17,7 @@ import (
 	"modeler/internal/io"
 	"modeler/internal/model"
 	"modeler/internal/render"
+	"modeler/internal/scene"
 	"modeler/internal/sketch"
 	"modeler/internal/tools"
 )
@@ -72,6 +73,10 @@ type ScriptRunner struct {
 	moved bool
 	// mods are the modifier keys the next pointer op holds down.
 	mods mods
+	// held keeps the left button down across ops, so a drag can be paused
+	// mid-way and inspected. Every op ends by stepping a frame, and without
+	// this that frame would look like a release and finish the drag.
+	held bool
 }
 
 // NewScriptRunner prepares a runner writing PNGs into outDir.
@@ -180,6 +185,19 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		r.mods = mods{shift: op.Shift, ctrl: op.Ctrl, alt: op.Alt}
 		r.click(op.At[0], op.At[1], op.Kind)
 		r.mods = mods{}
+
+	case "drag":
+		r.mods = mods{shift: op.Shift, ctrl: op.Ctrl, alt: op.Alt}
+		// kind "hold" stops with the button still down, so a shot or a dump can
+		// catch what a tool looks like mid-drag. Anything a tool only does
+		// between press and release is otherwise invisible to a script.
+		r.drag(op.From[0], op.From[1], op.To[0], op.To[1], op.Segs, op.Kind == "hold")
+		if op.Kind != "hold" {
+			r.mods = mods{}
+		}
+
+	case "drag.release":
+		r.dragRelease()
 
 	case "ui.tree":
 		a.tree.collapsed = op.Visible != nil && !*op.Visible
@@ -388,12 +406,66 @@ func (r *ScriptRunner) frame() InputFrame {
 	in.DeltaMillis = VirtualFrameMillis
 	in.MouseX, in.MouseY = r.mouse[0], r.mouse[1]
 	in.Shift, in.Ctrl, in.Alt = r.mods.shift, r.mods.ctrl, r.mods.alt
+	in.Down[MouseLeft] = r.held
 	if r.moved {
 		// A nominal delta so hover picking treats this as real motion.
 		in.MouseDX, in.MouseDY = 1, 0
 		r.moved = false
 	}
 	return in
+}
+
+// drag synthesizes a press, a run of motion and a release, which is the only
+// way to exercise a tool that only does anything between the two.
+//
+// The steps matter. A drag that jumped straight from press to release would
+// miss everything that happens per-frame — the hover that has to latch onto a
+// handle first, the live preview, the coalescing — and those are exactly the
+// places drags go wrong.
+func (r *ScriptRunner) drag(x0, y0, x1, y1 float64, steps int, hold bool) {
+	if steps <= 0 {
+		steps = 8
+	}
+	// Hover the start first: a handle has to know the pointer is on it before
+	// the button goes down, just as it would with a real mouse.
+	r.mouse = [2]float64{x0, y0}
+	r.moved = true
+	r.step()
+
+	down := r.frame()
+	down.Pressed[MouseLeft] = true
+	down.Down[MouseLeft] = true
+	r.runFrame(down)
+
+	prevX, prevY := x0, y0
+	for i := 1; i <= steps; i++ {
+		t := float64(i) / float64(steps)
+		x := x0 + (x1-x0)*t
+		y := y0 + (y1-y0)*t
+		r.mouse = [2]float64{x, y}
+		f := r.frame()
+		f.Down[MouseLeft] = true
+		f.MouseDX, f.MouseDY = x-prevX, y-prevY
+		r.runFrame(f)
+		prevX, prevY = x, y
+	}
+
+	if hold {
+		r.held = true
+		return
+	}
+	up := r.frame()
+	up.Released[MouseLeft] = true
+	r.runFrame(up)
+}
+
+// dragRelease finishes a held drag.
+func (r *ScriptRunner) dragRelease() {
+	r.held = false
+	up := r.frame()
+	up.Released[MouseLeft] = true
+	r.runFrame(up)
+	r.mods = mods{}
 }
 
 // mods is the modifier state a scripted pointer op runs under.
@@ -870,6 +942,10 @@ func (r *ScriptRunner) dump() {
 
 	// The camera's forward direction, which is the only way to assert that a
 	// view faces what it was asked to face rather than the back of it.
+	// How many default planes the scene is actually drawing, which is how a
+	// test says "they got out of the way" without comparing pixels.
+	fmt.Printf("planes drawn=%d\n", len(a.BuildScene().Planes))
+
 	f := a.targetCamera().Forward()
 	fmt.Printf("camera forward=%.4f,%.4f,%.4f ortho=%d\n",
 		f.X, f.Y, f.Z, boolBit(!a.Camera.Perspective))
@@ -900,13 +976,23 @@ func (r *ScriptRunner) dump() {
 			t.Op.String(), t.Target, len(t.Tools), boolBit(t.KeepTools))
 	}
 	if t := a.transform.tool; t != nil {
-		fmt.Printf("gizmo mode=%q pivot=%.4f,%.4f,%.4f boxfilter=%q\n",
-			t.Mode.String(), t.Pivot.X, t.Pivot.Y, t.Pivot.Z,
-			BoxFilterLabel(a.box.Filter))
+		fmt.Printf("gizmo mode=%q pivot=%.4f,%.4f,%.4f\n",
+			t.Mode.String(), t.Pivot.X, t.Pivot.Y, t.Pivot.Z)
 	}
+	// The box filter is app state in its own right, not part of the gizmo. It
+	// was reported on the gizmo's line until a face selection stopped arming
+	// one and took the filter with it.
+	fmt.Printf("boxselect filter=%q\n", BoxFilterLabel(a.box.Filter))
 	if t := a.pushPull.tool; t != nil {
-		fmt.Printf("pushpull body=%d dist=%.4f adding=%d\n",
-			t.Body, t.DistanceUnits, boolBit(t.Adding()))
+		// The arrow's screen ends are reported so a scripted drag can aim at the
+		// same pixels a person would. Without them a drag test has to guess,
+		// and a test that guesses at coordinates is a test that passes by
+		// accident.
+		vp := a.Viewport(r.Size.W, r.Size.H)
+		ax, ay, bx, by, _ := scene.ArrowScreenEnds(
+			a.Camera, vp, t.Origin, t.ArrowDirection(), a.arrowLength(vp))
+		fmt.Printf("pushpull body=%d dist=%.4f adding=%d arrow=%.0f,%.0f,%.0f,%.0f\n",
+			t.Body, t.DistanceUnits, boolBit(t.Adding()), ax, ay, bx, by)
 	}
 	for _, sk := range doc.Sketches {
 		if sk.OnFace {
