@@ -67,8 +67,20 @@ func (a *App) BuildScene() render.Scene {
 		s.Bodies = append(s.Bodies, d)
 	}
 	vpr := a.layout.RenderViewport()
-	if s.Gizmo = a.buildExtrudeGizmo(vpr); s.Gizmo == nil {
+	// Exactly one gizmo is live at a time, and they are checked in the order a
+	// tool takes over from the selection underneath it.
+	switch {
+	case a.InExtrude():
+		s.Gizmo = a.buildExtrudeGizmo(vpr)
+	case a.InPushPull():
 		s.Gizmo = a.buildPushPullGizmo(vpr)
+	default:
+		s.Gizmo = a.buildTransformGizmo(vpr)
+	}
+	// Selected edges and vertices draw as their own overlay: the body pass
+	// knows about faces and silhouettes, not about sub-elements.
+	if sel := a.buildSelectionOverlay(); sel != nil {
+		s.Sketches = append(s.Sketches, sel)
 	}
 
 	// Sketch mode dims the rest of the model and puts the grid on the sketch
@@ -291,6 +303,10 @@ func (a *App) handleViewportClick(in InputFrame, vp render.Viewport) {
 	a.Hover = hit
 
 	if !hit.Hit {
+		// Empty space starts a rectangle. It only becomes a box select if the
+		// pointer actually travels; a press and release in the same place is
+		// still a click, and still deselects (SPEC-UX §12.1).
+		a.beginBoxSelect(in.MouseX, in.MouseY)
 		if !in.Shift && !in.Ctrl {
 			a.Sel.Clear()
 		}
@@ -311,12 +327,18 @@ func (a *App) handleViewportClick(in InputFrame, vp render.Viewport) {
 		}
 		a.selectRef(model.PlaneRef(hit.Plane))
 	case render.PickFace:
-		// Clicking a face selects the face (SPEC-UX §10) — that is what makes
-		// it sketchable and push-pullable. Edges and vertices arrive with the
-		// full selection model in M6.
-		a.selectRef(model.FaceRef(hit.BodyID, hit.FaceUID))
-	case render.PickEdge, render.PickVert:
-		a.selectRef(model.BodyRef(hit.BodyID))
+		// A second click on an already-selected face takes the whole body,
+		// which is SPEC-UX §12.1's double-click without needing to time one.
+		ref := model.FaceRef(hit.BodyID, hit.FaceUID)
+		if a.Sel.Contains(ref) && a.Sel.Len() == 1 && !in.Shift && !in.Ctrl {
+			a.selectRef(model.BodyRef(hit.BodyID))
+			return
+		}
+		a.selectRef(ref)
+	case render.PickEdge:
+		a.selectRef(model.EdgeRef(hit.BodyID, hit.Edge))
+	case render.PickVert:
+		a.selectRef(model.VertRef(hit.BodyID, hit.Vert))
 	}
 }
 
@@ -396,6 +418,9 @@ func (a *App) beginSketchFromSelection() {
 // escape walks one level back up the interaction stack (SPEC-UX §1).
 func (a *App) escape() {
 	switch {
+	case a.CancelTransform():
+		// A live drag is the innermost thing there is: Escape puts the model
+		// back where it started and records nothing (SPEC-DATA §2).
 	case a.showShortcuts:
 		a.showShortcuts = false
 	case a.UI.ModalOpen():

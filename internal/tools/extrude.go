@@ -270,6 +270,21 @@ func clamp(v, lo, hi float64) float64 {
 	return v
 }
 
+// AxisDistancePxClamped measures the distance to a screen-space line *segment*,
+// with the projection clamped to its ends. Use it where the segment really is a
+// segment — a chord of a ring, say — rather than a ray a drag can run past.
+func AxisDistancePxClamped(px, py, ax, ay, bx, by float64) (dist, along float64) {
+	dx, dy := bx-ax, by-ay
+	den := dx*dx + dy*dy
+	if den == 0 {
+		return math.Hypot(px-ax, py-ay), 0
+	}
+	tt := ((px-ax)*dx + (py-ay)*dy) / den
+	tt = clamp(tt, 0, 1)
+	cx, cy := ax+tt*dx, ay+tt*dy
+	return math.Hypot(px-cx, py-cy), tt * math.Sqrt(den)
+}
+
 // AxisDistancePx measures how far a point is from a screen-space line segment,
 // and how far along it the projection falls. The gizmo uses it to decide
 // whether the pointer has grabbed the arrow, and to turn a drag into a depth.

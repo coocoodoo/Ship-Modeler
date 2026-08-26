@@ -42,9 +42,13 @@ type Op struct {
 	// Selection and transform ops.
 	Body    string      `json:"body,omitempty"`
 	Face    int         `json:"face,omitempty"`
+	Vert    int         `json:"vert,omitempty"`
+	Edge    int         `json:"edge,omitempty"`
 	Delta   *[3]float64 `json:"delta,omitempty"`
 	Axis    string      `json:"axis,omitempty"`
 	Degrees float64     `json:"degrees,omitempty"`
+	// Rect is a box-select rectangle in window pixels.
+	Rect *[4]float64 `json:"rect,omitempty"`
 
 	// Paint ops.
 	Res int     `json:"res,omitempty"`
@@ -142,6 +146,7 @@ var knownOps = map[string]bool{
 	"boolean":        true, "boolean.begin": true,
 	"boolean.commit": true, "boolean.cancel": true,
 	"select": true, "move": true, "rotate": true,
+	"duplicate": true, "box.select": true,
 	"paint.res": true, "paint.color": true, "paint.pixel": true,
 	"body.visible": true, "plane.visible": true, "sketch.visible": true,
 	"deselect": true, "delete": true, "undo": true, "redo": true,

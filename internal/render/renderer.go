@@ -29,6 +29,14 @@ type Renderer struct {
 
 	pickRT rl.RenderTexture2D
 
+	// boxRT is the bigger, rarer target box select renders into.
+
+	boxRT rl.RenderTexture2D
+
+	boxW, boxH int
+
+	boxReady bool
+
 	// Table is rebuilt by every pick pass and read by the resolver.
 	Table PickTable
 
@@ -91,6 +99,10 @@ func NewRenderer() *Renderer {
 // rather than risking a double free.
 func (r *Renderer) Close() {
 	rl.UnloadRenderTexture(r.pickRT)
+	if r.boxReady {
+		rl.UnloadRenderTexture(r.boxRT)
+		r.boxReady = false
+	}
 	rl.UnloadTexture(r.whiteTex)
 	rl.UnloadTexture(r.blankTex)
 	rl.UnloadShader(r.shaded)

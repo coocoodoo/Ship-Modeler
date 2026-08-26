@@ -238,6 +238,24 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return op.Errorf("the push/pull was refused")
 		}
 
+	case "move":
+		if err := r.moveOp(op); err != nil {
+			return err
+		}
+
+	case "rotate":
+		if err := r.rotateOp(op); err != nil {
+			return err
+		}
+
+	case "duplicate":
+		a.duplicateSelection()
+
+	case "box.select":
+		if err := r.boxSelectOp(op, vp); err != nil {
+			return err
+		}
+
 	case "sketch.begin":
 		k, ok := geom.ParsePlaneKind(op.Plane)
 		if !ok {
@@ -430,6 +448,21 @@ func (r *ScriptRunner) selectOp(op io.Op) error {
 			return err
 		}
 		a.Sel.Set(model.FaceRef(f.body.ID, f.uid))
+	case "vert":
+		b := a.Doc().BodyByName(op.Body)
+		if b == nil || b.Mesh == nil {
+			return op.Errorf("no body named %q", op.Body)
+		}
+		if op.Vert < 0 || op.Vert >= len(b.Mesh.Verts) {
+			return op.Errorf("body %q has no vertex %d", op.Body, op.Vert)
+		}
+		a.Sel.Set(model.VertRef(b.ID, op.Vert))
+	case "edge":
+		b := a.Doc().BodyByName(op.Body)
+		if b == nil || b.Mesh == nil {
+			return op.Errorf("no body named %q", op.Body)
+		}
+		a.Sel.Set(model.EdgeRef(b.ID, op.Edge))
 	case "sketch":
 		sk := a.Doc().SketchByName(op.Sketch)
 		if sk == nil {
@@ -606,6 +639,75 @@ func (r *ScriptRunner) extrudeOp(op io.Op, commit bool) error {
 	if !a.CommitExtrude() {
 		return op.Errorf("the extrude was refused")
 	}
+	return nil
+}
+
+// moveOp drags the transform gizmo by a fixed amount, through the same command
+// and the same coalescing a real drag uses.
+func (r *ScriptRunner) moveOp(op io.Op) error {
+	a := r.App
+	a.armTransform()
+	t := a.transform.tool
+	if t == nil {
+		return op.Errorf("nothing is selected to move")
+	}
+	t.Mode = tools.GizmoMove
+	t.Begin(tools.PartScreen, geom.Vec3{}, 0)
+	t.SetDelta(geom.Vec3{X: op.Delta[0], Y: op.Delta[1], Z: op.Delta[2]})
+	a.applyTransformLive()
+	t.End()
+	a.commitTransform()
+	return nil
+}
+
+// rotateOp turns the selection about a world axis through its pivot.
+func (r *ScriptRunner) rotateOp(op io.Op) error {
+	a := r.App
+	axis, ok := parseAxis(op.Axis)
+	if !ok {
+		return op.Errorf("unknown axis %q", op.Axis)
+	}
+	a.armTransform()
+	t := a.transform.tool
+	if t == nil {
+		return op.Errorf("nothing is selected to rotate")
+	}
+	t.Mode = tools.GizmoRotate
+	switch axis {
+	case geom.AxisX:
+		t.Begin(tools.PartRingX, geom.Vec3{}, 0)
+	case geom.AxisY:
+		t.Begin(tools.PartRingY, geom.Vec3{}, 0)
+	default:
+		t.Begin(tools.PartRingZ, geom.Vec3{}, 0)
+	}
+	t.UpdateRotate(op.Degrees, tools.DetentFree)
+	a.applyTransformLive()
+	t.End()
+	a.commitTransform()
+	return nil
+}
+
+// boxSelectOp runs a box select over a rectangle in window pixels.
+func (r *ScriptRunner) boxSelectOp(op io.Op, vp render.Viewport) error {
+	a := r.App
+	switch op.Kind {
+	case "", "vert", "verts":
+		a.box.Filter = render.PickVert
+	case "edge", "edges":
+		a.box.Filter = render.PickEdge
+	case "face", "faces":
+		a.box.Filter = render.PickFace
+	default:
+		return op.Errorf("unknown box filter %q", op.Kind)
+	}
+	a.box.rect = render.BoxRect{
+		X0: op.Rect[0], Y0: op.Rect[1], X1: op.Rect[2], Y1: op.Rect[3],
+	}
+	in := r.frame()
+	in.Shift, in.Ctrl = op.Shift, op.Ctrl
+	a.applyBoxSelect(in, vp)
+	a.armTransform()
 	return nil
 }
 
@@ -791,6 +893,11 @@ func (r *ScriptRunner) dump() {
 		fmt.Printf("boolean op=%q target=%d tools=%d keep=%d\n",
 			t.Op.String(), t.Target, len(t.Tools), boolBit(t.KeepTools))
 	}
+	if t := a.transform.tool; t != nil {
+		fmt.Printf("gizmo mode=%q pivot=%.4f,%.4f,%.4f boxfilter=%q\n",
+			t.Mode.String(), t.Pivot.X, t.Pivot.Y, t.Pivot.Z,
+			BoxFilterLabel(a.box.Filter))
+	}
 	if t := a.pushPull.tool; t != nil {
 		fmt.Printf("pushpull body=%d dist=%.4f adding=%d\n",
 			t.Body, t.DistanceUnits, boolBit(t.Adding()))
@@ -841,6 +948,7 @@ func RunHeadless(scriptPath, outDir string, size ShotSize, benchFrames int) erro
 
 	a := New(true)
 	defer a.Close()
+	a.box.init()
 	a.LoadTestScene()
 
 	runner := NewScriptRunner(a, outDir, size)

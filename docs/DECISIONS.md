@@ -414,3 +414,63 @@ three, and `select` with `kind: "face"`, name a face either by index or by
 `axis` — `"+y"` picks the outermost face pointing that way, which keeps meaning
 the same thing after an edit has renumbered everything. The `dump` op grew
 `pushpull` and `facesketch` lines and a `valid=` field on every body.
+
+### 2026-08-26 — M6
+
+**V-36 · Box select projects vertices and edges; only faces are rendered.**
+SPEC-RENDER §6.2 specifies one full-viewport ID render for box select, scanned
+by rectangle. That works for faces and cannot work for vertices. Two vertices at
+the same screen position — the near and far corners of a hull seen straight on,
+which is precisely the view somebody stretches a nose in — occupy one pixel, and
+one pixel holds one id. Whichever drew last wins, the other is invisible to the
+scan, and the workflow §12.1 names as box select's reason for existing tears the
+hull in half. Vertices and edges are therefore collected by projecting them,
+which is exact, needs no readback and is faster than the render it replaces.
+Faces keep the ID render, because "is this region inside the rectangle" is a
+question about area with no comparably cheap answer. Evidence:
+`TestStretchAHullAndRotateAWing` selects all four nose vertices from a
+front-on view.
+
+**V-37 · A quarter turn is a coordinate permutation, not a matrix.**
+SPEC-GEOMETRY §7.3 requires 90° rotations to be exact and grid-preserving.
+`sin(pi/2)` is 1 but `cos(pi/2)` is 6.1e-17, which is enough to take every vertex
+off the lattice and keep it off. Multiples of 90° about a world axis are applied
+as a permutation of coordinates and a sign flip instead. Evidence:
+`TestFourQuarterTurnsReturnExactly` — four turns return every vertex to its
+original bits, not to a tolerance.
+
+**V-38 · "Leaves the grid" is about the change, not the result.**
+The free-rotation warning fires when something that was on the lattice no longer
+is. A body already off the grid from an earlier free rotation stays off it
+through a subsequent quarter turn, and warning again there would be telling the
+user about something they did not just do.
+
+**V-39 · A second click on a selected face takes the body.**
+SPEC-UX §12.1 asks for double-click. Clicking an already-selected face is the
+same gesture without a timer to tune, and it cannot misfire on a slow
+double-click or a fast pair of deliberate single clicks.
+
+**V-40 · Bent faces warn by toast, not by a hover chip.**
+SPEC-UX §12.3 describes a tiny warn chip shown when hovering a bent face. The
+warning is given once when an edit bends something, which is when it is news.
+The hover chip needs per-face hover copy in the overlay pass and belongs with
+the polish pass in M9; what matters now — that sketching and push/pull refuse a
+bent face with guidance — is already true.
+
+**V-41 · A single flat face shows the push/pull arrow alone.**
+SPEC-UX §12.2 says a single-face selection "leads with its normal arrow". It
+shows that arrow and not the move gizmo, because two gizmos on one face would be
+two overlapping sets of handles arguing about the same drag. Moving a face
+rather than push/pulling it is a box-select away.
+
+**V-42 · Bent faces are triangulated on demand, not stored.**
+SPEC-GEOMETRY §7.2 says a flagged face's rendering and MeshGL handoff "use their
+stored triangulation". Ours re-runs the ear clipper in the face's own frame each
+time, which produces the same triangles from the same vertices and avoids a
+cache that would have to be invalidated on every vertex move. If profiling ever
+says otherwise this is the place to add one.
+
+**V-43 · Ops added for M6 flows.** `move` (delta), `rotate` (axis, degrees),
+`duplicate`, and `box.select` (rect, kind) drive the real gizmo and the real
+coalesced commands. `select` gained `kind: "vert"` and `kind: "edge"`. The
+`dump` op grew a `gizmo` line carrying the mode, the pivot and the box filter.

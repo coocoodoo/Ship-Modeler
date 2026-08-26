@@ -74,11 +74,13 @@ type App struct {
 	// body changed.
 	gpu map[uint32]*render.BodyGPU
 
-	tree     treeState
-	sketch   sketchState
-	extrude  extrudeState
-	boolean  booleanState
-	pushPull pushPullState
+	tree      treeState
+	sketch    sketchState
+	extrude   extrudeState
+	boolean   booleanState
+	pushPull  pushPullState
+	transform transformState
+	box       boxSelectState
 
 	// cubeDrag, orbiting and panning track camera navigation drags.
 	cubeDrag          bool
@@ -281,18 +283,35 @@ func (a *App) update(in InputFrame) {
 		} else if a.InSketch() {
 			a.updateSketch(in, vp)
 		} else {
-			// The arrow gets first refusal on a click: a face armed for
-			// push/pull must not be re-picked out from under its own gizmo.
-			a.updatePushPull(in, vp)
-			if !a.grabbedArrow() {
-				a.handleViewportClick(in, vp)
+			// The handles get first refusal on a click, in the order they are
+			// drawn: nothing armed on the selection may be picked out from
+			// under its own gizmo.
+			a.updateTransform(in, vp)
+			if !a.grabbedGizmo() {
+				a.updatePushPull(in, vp)
+			}
+			if !a.grabbedGizmo() && !a.grabbedArrow() {
+				a.updateBoxSelect(in, vp)
+				if !a.box.active {
+					a.handleViewportClick(in, vp)
+				}
 			}
 			a.updateHover(in, vp)
-			a.armPushPull()
 		}
 	} else {
 		a.Hover = render.PickResult{}
 		a.sketch.hasSnap = false
+	}
+
+	// The gizmos follow the selection, not the pointer. Arming them inside the
+	// branch above would leave them stale whenever the cursor happened to be
+	// over the tree — including in every headless run, where it always is.
+	if a.Mode == ModeIdle {
+		a.armPushPull()
+		a.armTransform()
+	} else {
+		a.dropPushPull()
+		a.transform.tool = nil
 	}
 	// Keyboard shortcuts never depend on where the pointer is: pressing L while
 	// the cursor rests over the tree panel must still pick the Line tool.
@@ -309,6 +328,7 @@ func (a *App) update(in InputFrame) {
 			a.handleSketchKeys(in)
 		default:
 			a.handleKeys(in, vp)
+			a.handleTransformKeys(in)
 		}
 	}
 }
@@ -371,6 +391,9 @@ func (a *App) HintText() string {
 	}
 	if a.InPushPull() {
 		return a.pushPullHint()
+	}
+	if a.InTransform() {
+		return a.transformHint()
 	}
 	if a.InSketch() {
 		return a.sketchHint()

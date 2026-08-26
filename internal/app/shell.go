@@ -68,6 +68,13 @@ func (a *App) buildShell(l Layout) {
 		a.buildBooleanCard(l.Viewport)
 	case a.InSketch():
 		a.buildSketchCard(l.Viewport)
+	case a.InTransform():
+		a.buildTransformCard(l.Viewport)
+	}
+	// The box-select rectangle is drawn over everything, including the cards,
+	// because a drag that started under one still has to be visible.
+	if a.BoxSelecting() {
+		a.drawBoxRect()
 	}
 	a.UI.HintBar(l.HintBar, a.HintText(), Version)
 
@@ -486,6 +493,14 @@ func (a *App) deleteRef(ref model.Ref) {
 		if a.Run(&model.DeleteSketch{ID: ref.Sketch}) {
 			a.toastWithUndo("Deleted " + name)
 		}
+	case model.SelFace, model.SelEdge, model.SelVert:
+		// Deleting part of a solid would leave a hole in it, which is not a
+		// solid any more. Say what to do instead of quietly doing nothing.
+		a.Toast(ui.Toast{
+			Text: "Faces, edges and vertices can't be deleted — " +
+				"push the face in, or delete the whole body",
+			Kind: ui.ToastWarn,
+		})
 	}
 }
 

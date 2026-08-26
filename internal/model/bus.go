@@ -253,6 +253,10 @@ func (b *Bus) UpdateDrag(cmd Command) error {
 	return nil
 }
 
+// Pending is the command a live drag is applying, or nil. It lets the UI ask
+// what the drag has actually done before deciding what to say about it.
+func (b *Bus) Pending() Command { return b.pending }
+
 // CommitDrag records the live command as a single history entry.
 func (b *Bus) CommitDrag() (string, bool) {
 	if b.pending == nil {

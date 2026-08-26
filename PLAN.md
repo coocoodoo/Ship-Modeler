@@ -198,11 +198,11 @@ Specs: UX §10, §12.5.
 
 ### M6 — Selection, direct edit, transform (L)
 Specs: UX §12, GEOM §7.
-- [ ] Unified selection: bodies / faces / edges / verts via pick pass (priority verts>edges>faces, radii per RENDER §6); Shift add, Ctrl toggle; box-select (one full-viewport ID render on drag-release, rect scan)
-- [ ] Move gizmo: 3 axes + 3 planes + screen-plane center; grid snap; numeric offset field; single-face selection leads with the normal arrow (push/pull consistency)
-- [ ] Vertex/edge/face moves (R10): mesh edit + non-planar policy GEOM §7.2 (auto-triangulate flagged faces, subtle warn chip); body move; Ctrl+D duplicate; Del delete with undo toast
-- [ ] Rotate rings: 90° detents (Shift 15°, Alt free) around selection pivot (R11); 90° paths exact/grid-preserving (GEOM §7.3)
-- [ ] Coalesced drag undo (one step per drag)
+- [x] Unified selection: bodies / faces / edges / verts via pick pass (priority verts>edges>faces, radii per RENDER §6); Shift add, Ctrl toggle; box-select (one full-viewport ID render on drag-release, rect scan)
+- [x] Move gizmo: 3 axes + 3 planes + screen-plane center; grid snap; numeric offset field; single-face selection leads with the normal arrow (push/pull consistency)
+- [x] Vertex/edge/face moves (R10): mesh edit + non-planar policy GEOM §7.2 (auto-triangulate flagged faces, subtle warn chip); body move; Ctrl+D duplicate; Del delete with undo toast
+- [x] Rotate rings: 90° detents (Shift 15°, Alt free) around selection pivot (R11); 90° paths exact/grid-preserving (GEOM §7.3)
+- [x] Coalesced drag undo (one step per drag)
 **Accept:** stretch a hull by box-selecting nose verts and dragging; rotate a wing 90°; goldens + tests.
 
 ### M7 — Paint mode (L)

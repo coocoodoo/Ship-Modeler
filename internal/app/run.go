@@ -39,6 +39,7 @@ func OpenWindow(w, h int, msaa, hidden bool) {
 func Run() {
 	a := New(false)
 	defer a.Close()
+	a.box.init()
 	a.LoadTestScene()
 	a.layout = a.Layout(rl.GetRenderWidth(), rl.GetRenderHeight())
 	a.FrameSelection(a.layout.RenderViewport())

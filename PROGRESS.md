@@ -2,7 +2,98 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M5 COMPLETE** — faces are sketchable and push/pullable; a stepped hull with windows can be built without touching a default plane. Next up: **M6** (unified selection, direct edit, transform).
+**Current state:** **M6 COMPLETE** — bodies, faces, edges and vertices are all selectable and movable; box select, move and rotate gizmos, Ctrl+D. Next up: **M7** (paint mode).
+
+---
+
+## 2026-08-26 — M6: selection, direct edit, transform
+
+**Done:**
+- `model.Selection.VertIndices` — every direct edit is the same operation on a
+  different set of vertices, so selection resolves to a deduplicated set first.
+  A vertex shared by two selected faces moves once, or the shape tears.
+- `model.MoveVerts` / `model.RotateVerts` — translations and rotations with the
+  planarity policy of SPEC-GEOMETRY §7.2 and exact undo from saved positions
+  rather than arithmetic run backwards.
+- `model.DuplicateBody` — Ctrl+D, offset one unit, fresh identity and fresh
+  face ids so paint and selection do not follow the copy home.
+- `tools.TransformTool` + `scene/transformgizmo.go` — three axis arrows, three
+  planar handles, a screen-plane centre, and three rotation rings, all sized in
+  screen pixels and hit-tested against the geometry that is drawn.
+- `app/transform.go` — the drag runs live through the bus, so the model really
+  is moving as you move it, and lands as exactly one undo step. Escape puts it
+  back and records nothing.
+- `app/boxselect.go` + `render/boxpick.go` — drag on empty space, filter chips
+  for Verts / Edges / Faces.
+- Clicking an edge selects the edge, a vertex the vertex, and a second click on
+  a selected face takes the whole body.
+
+**Verified:**
+- **M6's acceptance, as arithmetic.** Box-select the hull's four nose vertices
+  from a front-on view, drag them 4 units: the hull grows by **exactly 96**,
+  which is its 4×6 end face times four, and nothing bends. Rotate a wing 90°
+  about Y: its volume is **unchanged to the bit**.
+- Four quarter turns return every vertex to its original bits — not to a
+  tolerance. A rotation matrix could not do that: `cos(pi/2)` is 6.1e-17.
+- Moving one corner of a box bends exactly the three faces that meet there, and
+  undo clears the flags rather than merely leaving them set.
+- One drag is one history entry; undo and redo both land on exact volumes.
+- Box filters: the same rectangle over the hull collects 16 vertices, 24 edges
+  or 6 faces depending on the chip.
+- `gofmt -l`, `go vet ./...` clean; `go test ./...` green across 13 packages.
+- Shots read: `m6_boxed`, `m6_stretched`.
+
+**The spec's box-select design does not work, and why:**
+
+SPEC-RENDER §6.2 specifies one full-viewport ID render scanned by rectangle.
+For faces that is right. For vertices it cannot work, and the case where it
+fails is the exact case box select exists for. Two vertices at the same screen
+position — the near and far corners of a hull seen straight on, which is the
+view you stretch a nose in — share one pixel, and one pixel holds one id.
+Whichever drew last wins; the other is invisible to the scan. The first attempt
+selected two of the four nose corners, and dragging would have torn the hull in
+half.
+
+Turning the depth test off did not help: they are not occluded, they are
+coincident. Vertices and edges are now collected by projecting them and testing
+against the rectangle, which is exact, has nothing to read back, and is faster
+than the render it replaced. Faces keep the ID render, because "is this region
+inside the rectangle" is a question about area.
+
+**Decisions/deviations:** V-36 (box select projects points and lines), V-37
+(quarter turns are permutations), V-38 (the off-grid warning is about the
+change), V-39 (second click takes the body), V-40 (bent faces warn by toast,
+hover chip deferred to M9), V-41 (a single flat face shows the push/pull arrow
+alone), V-42 (bent faces triangulate on demand), V-43 (the new ops). All
+goldens regenerated: a selection now means a gizmo and a card, so every shot
+that ended with something selected changed.
+
+**A latent bug this milestone surfaced:** the gizmos were armed inside the
+branch that only runs when the pointer is over the viewport, so their pivot went
+stale whenever the cursor sat over the tree — which in a headless run it always
+does. They follow the selection now, not the pointer.
+
+**Open issues:**
+- The rotate gizmo's ring drag is implemented and reachable from the card and
+  the `rotate` op, but there is no golden of a ring being dragged mid-turn.
+- Rotation has no numeric angle field, only a readout. The move gizmo has its
+  three; the rotate one should get one in M9's polish pass.
+- `Del` on a face, edge or vertex refuses with guidance rather than doing
+  anything. Deleting part of a solid leaves something that is not a solid.
+
+**Next:** M7 — paint mode: per-face pixel-art textures, the texel cursor, the
+palette, and strokes as undo steps.
+
+**Try it (user):**
+1. Run `modeler.exe` and click the hull. A move gizmo appears at its centre.
+2. Drag the red arrow — the hull slides along X in whole units; hold Ctrl for
+   quarter units.
+3. Press `R`: the arrows become three rings. Drag one — it snaps to 90°, and
+   holding Shift gives 15°.
+4. Press `V`-style view keys or drag the view cube to a front view, then drag a
+   box on empty space around one end of the hull.
+5. The four corners there light up. Drag the red arrow and the hull stretches.
+6. `Ctrl+Z` puts it back in one step, however long the drag took.
 
 ---
 
