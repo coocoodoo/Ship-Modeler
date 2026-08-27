@@ -300,3 +300,133 @@ func TestStrokeReportsWhatTheRendererHasToReupload(t *testing.T) {
 		t.Error("a stroke that painted something reports no undo cost")
 	}
 }
+
+// TestAShapeRubberBandsRatherThanAccumulating is the property that makes a
+// two-point tool usable at all (SPEC-UX §13.4).
+//
+// The drag replaces its pending command with a longer version of itself each
+// frame, exactly as a freehand stroke does. For a path that is right: the
+// stroke really is everything you have drawn. For a shape it would be a
+// disaster — dragging a rectangle out and pulling it back in would leave every
+// size it passed through stamped on the face. The command has to read only the
+// two ends, and the bus has to undo the last version before applying the next.
+func TestAShapeRubberBandsRatherThanAccumulating(t *testing.T) {
+	bus, b, uid, fi := painted(t)
+	shape := func(pts ...image.Point) *StrokeFace {
+		return &StrokeFace{
+			Body: b.ID, Face: uid, Res: 32,
+			Tool: ToolRect, Color: red, Size: 1, Points: pts,
+		}
+	}
+	start := image.Point{X: 4, Y: 4}
+	if err := bus.BeginDrag(shape(start, image.Point{X: 20, Y: 16})); err != nil {
+		t.Fatal(err)
+	}
+	// Out to a big rectangle, then back to a small one.
+	for _, end := range []image.Point{{X: 24, Y: 20}, {X: 12, Y: 10}, {X: 8, Y: 7}} {
+		if err := bus.UpdateDrag(shape(start, end)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, ok := bus.CommitDrag(); !ok {
+		t.Fatal("the drag did not commit")
+	}
+
+	// What is left is the last rectangle and nothing else.
+	for x := 4; x <= 8; x++ {
+		if got := at(t, b, fi, x, 4); got != red {
+			t.Errorf("(%d,4) is %v, want the final rectangle's top wall", x, got)
+		}
+	}
+	for _, ghost := range []image.Point{{X: 20, Y: 16}, {X: 24, Y: 20}, {X: 12, Y: 10}} {
+		if got := at(t, b, fi, ghost.X, ghost.Y); got.A != 0 {
+			t.Errorf("a rectangle the drag passed through is still on the face at %v", ghost)
+		}
+	}
+	if got := at(t, b, fi, 6, 6); got.A != 0 {
+		t.Error("the rectangle came out filled, not outlined")
+	}
+}
+
+func TestAFilledShapeIsOneUndoStep(t *testing.T) {
+	bus, b, uid, fi := painted(t)
+	depth := bus.UndoDepth()
+	err := bus.Run(&StrokeFace{
+		Body: b.ID, Face: uid, Res: 32, Tool: ToolCircle,
+		Color: blue, Size: 1, Fill: true,
+		Points: []image.Point{{X: 4, Y: 4}, {X: 20, Y: 18}},
+	})
+	if err != nil {
+		t.Fatalf("circle: %v", err)
+	}
+	if got := bus.UndoDepth() - depth; got != 1 {
+		t.Errorf("a filled circle left %d history entries, want 1", got)
+	}
+	if got := at(t, b, fi, 12, 11); got != blue {
+		t.Errorf("the middle of a filled circle is %v, want %v", got, blue)
+	}
+	bus.Undo()
+	if b.Mesh.Faces[fi].Paint != nil {
+		t.Error("undoing the first shape on a face left its texture behind")
+	}
+}
+
+// TestAGradientBlendsIntoTheBodyColourOnlyWhereItIsAsked keeps the two ways a
+// tool can reach for the body's own colour apart: a soft brush blends into it,
+// a gradient does not — it ramps between the two colours it was given.
+func TestAGradientRunsBetweenTheTwoArmedColours(t *testing.T) {
+	bus, b, uid, fi := painted(t)
+	err := bus.Run(&StrokeFace{
+		Body: b.ID, Face: uid, Res: 32, Tool: ToolGradient,
+		Color: red, ColorB: blue, Size: 1,
+		Points: []image.Point{{X: 0, Y: 8}, {X: 31, Y: 8}},
+	})
+	if err != nil {
+		t.Fatalf("gradient: %v", err)
+	}
+	if got := at(t, b, fi, 0, 8); got != red {
+		t.Errorf("the near end is %v, want %v", got, red)
+	}
+	if got := at(t, b, fi, 31, 8); got != blue {
+		t.Errorf("the far end is %v, want %v", got, blue)
+	}
+	// A gradient covers the face, not just the line the drag drew.
+	if got := at(t, b, fi, 15, 0); got.A == 0 {
+		t.Error("the gradient left the top of the face unpainted")
+	}
+}
+
+// TestTheSoftBrushBlendsIntoTheBodyColour proves the command hands the body's
+// own colour down to the brush. Without it a soft edge fades into black, which
+// looks like a shadow nobody asked for.
+func TestTheSoftBrushBlendsIntoTheBodyColour(t *testing.T) {
+	bus, body, uid, fi := painted(t)
+	err := bus.Run(&StrokeFace{
+		Body: body.ID, Face: uid, Res: 128, Tool: ToolBrush,
+		Color: red, Size: 16,
+		Points: []image.Point{{X: 40, Y: 40}},
+	})
+	if err != nil {
+		t.Fatalf("soft brush: %v", err)
+	}
+	// Walk out from the centre until the colour stops being pure red; whatever
+	// it fades toward has to be the body's colour, not the zero value.
+	var edge color.RGBA
+	for d := 1; d < 12; d++ {
+		c := at(t, body, fi, 40+d, 48)
+		if c.A != 0 && c != red {
+			edge = c
+			break
+		}
+	}
+	if edge.A == 0 {
+		t.Fatal("the soft brush has no faded edge at all")
+	}
+	toward := func(v, from, to uint8) bool {
+		return (v > from) == (to > from) || v == to
+	}
+	if !toward(edge.R, red.R, body.Color.R) || !toward(edge.G, red.G, body.Color.G) {
+		t.Errorf("the soft edge %v is not fading toward the body colour %v",
+			edge, body.Color)
+	}
+}

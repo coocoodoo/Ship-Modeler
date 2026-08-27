@@ -270,6 +270,58 @@ func (c *Camera) FrameBox(b geom.AABB, aspect float64) {
 	c.Normalize()
 }
 
+// FrameTightly fits a set of world points to the screen using the camera's
+// current orientation, rather than fitting a sphere around them.
+//
+// FrameBox is deliberately orientation-independent: it frames the sphere
+// enclosing the box, so orbiting afterwards can never push anything out of
+// view. That safety costs screen, and on a flat wide face it costs most of it —
+// a hull side framed by its sphere sits in the middle of the viewport at a
+// third of the size it could be. Where the orientation is the point, as it is
+// when the camera has just been pointed squarely at a face, measuring the
+// points along the screen axes gives the view that face deserves.
+func (c *Camera) FrameTightly(pts []geom.Vec3, aspect, margin float64) {
+	if len(pts) == 0 || aspect <= 0 {
+		return
+	}
+	right, up, fwd := c.Right(), c.Up(), c.Forward()
+
+	var ctr geom.Vec3
+	for _, p := range pts {
+		ctr = ctr.Add(p)
+	}
+	ctr = ctr.Mul(1 / float64(len(pts)))
+
+	minR, maxR := math.Inf(1), math.Inf(-1)
+	minU, maxU := math.Inf(1), math.Inf(-1)
+	minF, maxF := math.Inf(1), math.Inf(-1)
+	for _, p := range pts {
+		d := p.Sub(ctr)
+		r, u, f := d.Dot(right), d.Dot(up), d.Dot(fwd)
+		minR, maxR = math.Min(minR, r), math.Max(maxR, r)
+		minU, maxU = math.Min(minU, u), math.Max(maxU, u)
+		minF, maxF = math.Min(minF, f), math.Max(maxF, f)
+	}
+
+	// Centre on the extents rather than on the centroid: a face whose vertices
+	// bunch at one end has a centroid that is not its middle.
+	c.Target = ctr.Add(right.Mul((minR + maxR) / 2)).Add(up.Mul((minU + maxU) / 2))
+
+	need := math.Max(maxU-minU, (maxR-minR)/aspect) * (1 + margin)
+	if need < 1e-6 {
+		need = 1
+	}
+	c.OrthoScale = need
+	if c.Perspective {
+		c.Dist = need / (2 * math.Tan(PerspectiveFOV*math.Pi/360))
+	} else {
+		// Ortho does not scale with distance, so the eye only has to stay clear
+		// of the geometry's near plane.
+		c.Dist = math.Max(c.Dist, (maxF-minF)+need*2)
+	}
+	c.Normalize()
+}
+
 // StandardView names the orientations the view cube and camera.view op script
 // can jump to (SPEC-DATA §7).
 type StandardView int

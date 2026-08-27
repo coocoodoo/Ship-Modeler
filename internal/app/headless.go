@@ -370,7 +370,8 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 
 	case "paint.begin", "paint.exit", "paint.res", "paint.color", "paint.tool",
 		"paint.size", "paint.pixel", "paint.stroke", "paint.resample",
-		"paint.textures", "paint.faceview":
+		"paint.textures", "paint.faceview", "paint.color2", "paint.swap",
+		"paint.dither", "paint.shapefill", "paint.lock", "paint.unlock":
 		if err := r.paintOp(op); err != nil {
 			return err
 		}
@@ -920,15 +921,37 @@ func (r *ScriptRunner) paintOp(op io.Op) error {
 			return op.Errorf("%d is not a paint resolution", op.Res)
 		}
 
-	case "paint.color":
+	case "paint.color", "paint.color2":
 		c, ok := paint.ParseColor(op.Hex)
 		if !ok {
 			return op.Errorf("%q is not an RRGGBB colour", op.Hex)
 		}
+		// Setting either colour goes through the slot the panel would have to
+		// be pointed at first, so a script and a session leave the same recents.
+		was := a.paint.slot
+		if op.Op == "paint.color2" {
+			a.paint.slot = 1
+		} else {
+			a.paint.slot = 0
+		}
 		a.setPaintColor(c)
+		a.paint.slot = was
+
+	case "paint.swap":
+		a.swapPaintColors()
+
+	case "paint.dither":
+		d, ok := paint.ParseDither(op.Kind)
+		if !ok {
+			return op.Errorf("unknown dither mode %q", op.Kind)
+		}
+		a.paint.dither = d
+
+	case "paint.shapefill":
+		a.paint.fillShape = *op.Visible
 
 	case "paint.tool":
-		t, ok := parsePaintTool(op.Kind)
+		t, ok := paint.ParseTool(op.Kind)
 		if !ok {
 			return op.Errorf("unknown paint tool %q", op.Kind)
 		}
@@ -947,6 +970,27 @@ func (r *ScriptRunner) paintOp(op io.Op) error {
 		if !a.FaceView() {
 			return op.Errorf("nothing is under the cursor to look at")
 		}
+
+	case "paint.lock":
+		// A script names the face rather than hovering it, which is the same
+		// entry point with the hover already resolved.
+		if op.Body != "" {
+			f, err := r.faceByIndex(op)
+			if err != nil {
+				return err
+			}
+			a.paint.hover = paintHover{ok: true, body: f.body.ID, face: f.uid, index: f.face}
+			a.paint.hover.paint, a.paint.hover.allocated = a.mappingFor(f)
+		}
+		if !a.LockToFace() {
+			return op.Errorf("there was no face to lock to")
+		}
+
+	case "paint.unlock":
+		if !a.paint.locked {
+			return op.Errorf("nothing is locked")
+		}
+		a.UnlockFace()
 
 	case "paint.pixel", "paint.stroke":
 		f, err := r.faceByIndex(op)
@@ -981,20 +1025,6 @@ func texelPoints(op io.Op) []image.Point {
 		pts = append(pts, image.Point{X: p[0], Y: p[1]})
 	}
 	return pts
-}
-
-func parsePaintTool(s string) (paint.Tool, bool) {
-	switch s {
-	case "pencil", "":
-		return paint.ToolPencil, true
-	case "eraser":
-		return paint.ToolEraser, true
-	case "fill":
-		return paint.ToolFill, true
-	case "pick":
-		return paint.ToolPick, true
-	}
-	return 0, false
 }
 
 func validBrushSize(v int) bool {
@@ -1134,9 +1164,12 @@ func (r *ScriptRunner) dump() {
 func (r *ScriptRunner) dumpPaint() {
 	a := r.App
 	st := &a.paint
-	fmt.Printf("paint mode=%d tool=%q size=%d res=%d color=%q textures=%d\n",
+	fmt.Printf("paint mode=%d tool=%q size=%d res=%d color=%q color2=%q "+
+		"dither=%q fill=%d slot=%d textures=%d locked=%d lockface=%d\n",
 		boolBit(a.InPaint()), st.tool.String(), st.size, st.res,
-		paint.Hex(st.color), boolBit(!st.hideTextures))
+		paint.Hex(st.color), paint.Hex(st.colorB), st.dither.String(),
+		boolBit(st.fillShape), st.slot, boolBit(!st.hideTextures),
+		boolBit(st.locked), st.lockFace.Seq())
 
 	if h := st.hover; h.ok && h.paint != nil {
 		fmt.Printf("painthover body=%d face=%d texel=%d,%d res=%d allocated=%d oblique=%.1f\n",

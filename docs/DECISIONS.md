@@ -552,3 +552,83 @@ which changed 243 pixels of every shot in the suite (x 291–336, y 12–27 —
 measured, then regenerated per TESTING §5). The `docs/shots` diary was
 deliberately *not* rewritten: it records what each milestone looked like when it
 landed, and a greyed-out Paint button was accurate then.
+
+### 2026-08-26 — M7 follow-up: shapes, gradients and the face lock
+
+Requested by the user after trying the build. All of it is specced in SPEC-UX
+§13.4 and §13.5, written at the same time as the code.
+
+**V-53 · Four two-point tools, decided by their ends and nothing between.**
+Line, rectangle, circle and gradient read only the first and last of the
+stroke's points; a freehand tool reads all of them. That is the whole
+difference, and it is what makes them rubber-band: the drag replaces its pending
+command with a longer version each frame, so a shape that read the whole path
+would stamp every size it passed through onto the face. Evidence:
+`TestAShapeRubberBandsRatherThanAccumulating`.
+
+**V-54 · Softness is spent on coverage, and coverage is spent one of two ways.**
+A soft brush and a gradient both produce a value between nothing and everything.
+With no dithering that value blends — a real colour between the two. With a
+Bayer mode it decides *how many whole texels* are painted instead, so the result
+stays inside the palette it was drawn from. One concept, one control, two tools:
+the Dither chips are shown for exactly the two tools that have a coverage to
+spend. This is the pixel-art answer to a soft edge and the reason the user asked
+for the matrices in the same breath as the brush.
+
+**V-55 · Brush sizes 8 and 16 were added.** SPEC-UX §13.1 lists 1/2/4, which is
+right for a pencil and useless for a soft brush: at four texels across there is
+nowhere for a falloff to happen. The soft brush also has a solid core (40% of
+its radius) before the falloff starts, because a brush that is never fully its
+own colour anywhere reads as weak rather than soft.
+
+**V-56 · A soft dab blends in the paint layer, against the body's colour.**
+The obvious implementation is a partial alpha, and it is wrong. The texture
+composites over the *body* colour, not over the paint already on the face, so a
+half-alpha texel laid over existing paint would show the hull through it. The
+command hands the body's own colour down to the brush, the blend happens against
+whatever is under the texel, and what is stored is always opaque — which also
+keeps alpha binary for the eraser, the eyedropper and the fill, all of which
+already assumed it. Evidence: `TestSoftBrushFadesIntoWhatIsUnderIt`,
+`TestTheSoftBrushBlendsIntoTheBodyColour`.
+
+**V-57 · An ellipse is rasterised by scanline, and its outline is a boundary
+test.** Solving the ellipse for x at each row gives runs that are symmetric by
+construction and trivially fillable; a midpoint walk needs special cases at both
+axis crossings and leaves gaps where the curve runs flat. The outline is then
+"in the shape, with a neighbour outside it", which is closed and symmetric for
+free. Evidence: `TestEllipseIsSymmetricInBothAxes`, `TestFilledEllipseHasNoHoles`.
+
+**V-58 · The face lock is a paint lock, not a camera lock.** The user asked for
+the camera to focus on a face and to be stopped from painting the others. Both
+happen, but navigation stays free: orbit, pan and zoom work identically in every
+mode (SPEC-UX §1), and checking your work from an angle is part of painting.
+What is fixed is where the paint can land.
+
+**V-59 · A locked cursor is resolved against the face's plane, not the ID pass.**
+The pick pass answers "what is in front here", which is the wrong question once
+a face has been chosen — a body drifting in front, or an edge along the border,
+would take the stroke. Intersecting the locked face's own plane cannot be
+stolen, confines the cursor to the face's texel rectangle, and costs no readback
+at all, so a locked session is cheaper than a free one. Evidence:
+`TestTheLockKeepsPaintOnOneFace`, where the same window pixel resolves a second
+face once unlocked and nothing at all while locked.
+
+**V-60 · `Camera.FrameTightly` frames along the screen axes.** `FrameBox` frames
+the sphere around a box so that orbiting afterwards can never lose anything,
+which on a flat wide face wastes most of the viewport. Where the orientation is
+the point — the camera has just been pointed squarely at a face — the points are
+measured along the camera's own right and up. The locked face is then offset
+clear of the palette panel, because the one camera move whose entire job is "let
+me see this face" should not put a quarter of it under a panel.
+
+**V-61 · Ops and dump fields added.** `paint.color2`, `paint.swap`,
+`paint.dither`, `paint.shapefill`, `paint.lock`, `paint.unlock`; `paint.tool`
+gained line/rect/circle/gradient/brush (and accepts "square" and "ellipse"). The
+`paint` dump line gained `color2`, `dither`, `fill`, `slot`, `locked` and
+`lockface`. Extending that line broke the parser written against its first
+version, which is why there is now one parser for it and not two.
+
+**V-62 · Goldens regenerated again.** The palette panel grew a second tool row,
+the dither chips, a second colour swatch and the lock row, so every M7 shot
+changed inside the panel — 53,076 pixels, none of them left of x=1027, measured
+before regenerating (TESTING §5).

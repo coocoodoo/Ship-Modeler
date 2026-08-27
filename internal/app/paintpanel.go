@@ -39,9 +39,14 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	// warning sometimes goes looks broken.
 	mismatch, mismatchRes := a.paintResMismatch()
 	oblique := a.paintOblique()
+	// The dither modes and the fill toggle only mean anything to some tools, so
+	// they only appear for those tools. A panel that showed every control every
+	// tool might ever want would be a panel mostly full of greyed-out rows.
+	showDither := st.tool == paint.ToolBrush || st.tool == paint.ToolGradient
+	showFill := st.tool.Shape()
 
 	h := a.px(38) + // title
-		line + a.px(26) + a.px(6) + // tools
+		line + a.px(26)*2 + a.px(4) + a.px(6) + // two rows of tools
 		line + a.px(24) + a.px(6) + // size
 		line + a.px(24) + a.px(8) + // res
 		line + float32(paintPaletteRows)*(swatch+gap) + a.px(6) + // palette
@@ -56,6 +61,19 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	}
 	if oblique {
 		h += a.px(26) + a.px(6)
+	}
+	// The lock row is always there. It is the one control whose state you have
+	// to be able to read at a glance — "am I about to paint the face I think I
+	// am" is not a question worth hunting for an answer to.
+	h += a.px(26) + a.px(6)
+	if st.locked {
+		h += line
+	}
+	if showDither {
+		h += line + a.px(24) + a.px(6)
+	}
+	if showFill {
+		h += a.px(24) + a.px(6)
 	}
 
 	box := ui.Rect(
@@ -85,7 +103,9 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	}
 
 	a.UI.Text(row(line), "Tools", ui.FontSizeSmall, ui.ColorTextDim)
-	a.paintToolRow(row(a.px(26)))
+	a.paintToolRow(row(a.px(26)), paintPixelTools())
+	space(4)
+	a.paintToolRow(row(a.px(26)), paintShapeTools())
 	space(6)
 
 	a.UI.Text(row(line), "Size", ui.FontSizeSmall, ui.ColorTextDim)
@@ -104,6 +124,21 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 		st.size = paint.BrushSizes[pick]
 	}
 	space(6)
+
+	if showFill {
+		if a.UI.Toggle(ui.MakeID("paint.fillshape"), row(a.px(24)), "Fill the shape",
+			st.fillShape, ui.ButtonOpts{
+				Tooltip: "Solid, or just the outline",
+			}) {
+			st.fillShape = !st.fillShape
+		}
+		space(6)
+	}
+
+	if showDither {
+		a.paintDitherRow(row(line), row(a.px(24)))
+		space(6)
+	}
 
 	a.paintResRow(row(line), row(a.px(24)))
 	if mismatch {
@@ -135,6 +170,9 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	space(6)
 	a.paintFooterRow(row(a.px(26)))
 
+	space(6)
+	a.paintLockRow(row, line)
+
 	if oblique {
 		space(6)
 		if a.UI.Button(ui.MakeID("paint.faceview"), row(a.px(26)), "Face view", ui.ButtonOpts{
@@ -145,20 +183,85 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	}
 }
 
-// paintToolRow is the four tools, each with its shortcut on the tooltip.
-func (a *App) paintToolRow(r rl.Rectangle) {
-	tools := []struct {
-		tool paint.Tool
-		icon ui.IconFunc
-		tip  string
-	}{
+// paintLockRow is the face lock (SPEC-UX §13.5): one button that becomes the
+// thing you press to get out of it, plus a line naming what you are locked to.
+func (a *App) paintLockRow(row func(float32) rl.Rectangle, line float32) {
+	st := &a.paint
+	if !st.locked {
+		hovering := st.hover.ok
+		if a.UI.Button(ui.MakeID("paint.lock"), row(a.px(26)), "Lock to this face",
+			ui.ButtonOpts{
+				Disabled:    !hovering,
+				Tooltip:     "Face the camera at it, and paint nothing else",
+				DisabledWhy: "Hover the face you want to lock to first",
+			}) {
+			a.LockToFace()
+		}
+		return
+	}
+
+	label := "this face"
+	if f, ok := a.resolveFace(st.lockBody, st.lockFace); ok {
+		label = fmt.Sprintf("face %d of %s", st.lockFace.Seq(), f.body.Name)
+	}
+	a.UI.Text(row(line), "Locked to "+label, ui.FontSizeSmall, ui.ColorAccent)
+
+	r := row(a.px(26))
+	recentre, unlock := ui.SplitLeft(r, r.Width*0.5)
+	unlock.X += a.px(6)
+	unlock.Width -= a.px(6)
+	if a.UI.Button(ui.MakeID("paint.recentre"), recentre, "Recentre", ui.ButtonOpts{
+		Tooltip: "Point the camera back at the locked face",
+	}) {
+		a.FaceView()
+	}
+	if a.UI.Button(ui.MakeID("paint.unlock"), unlock, "Unlock", ui.ButtonOpts{
+		Style:    ui.ButtonPrimary,
+		Tooltip:  "Paint any face again",
+		Shortcut: "Esc",
+	}) {
+		a.UnlockFace()
+	}
+}
+
+// paintTool is one entry in the tool rows.
+type paintTool struct {
+	tool paint.Tool
+	icon ui.IconFunc
+	tip  string
+}
+
+// paintPixelTools are the ones that paint where the pointer goes.
+func paintPixelTools() []paintTool {
+	return []paintTool{
 		{paint.ToolPencil, ui.DrawPencilIcon, "Paint one texel at a time"},
+		{paint.ToolBrush, ui.DrawPaintIcon, "A round brush that fades out at its edge"},
 		{paint.ToolEraser, ui.DrawEraserIcon, "Rub back to the body's own colour"},
 		{paint.ToolFill, ui.DrawFillIcon, "Flood the matching texels around the one you click"},
 		{paint.ToolPick, ui.DrawDropperIcon, "Pick up the colour under the cursor (or hold Alt)"},
 	}
+}
+
+// paintShapeTools are the ones decided by where you pressed and where you let
+// go. Shift keeps a line straight and a box square.
+func paintShapeTools() []paintTool {
+	return []paintTool{
+		{paint.ToolLine, ui.DrawLineToolIcon, "Drag a straight line — Shift keeps it square on"},
+		{paint.ToolRect, ui.DrawRectToolIcon, "Drag a rectangle — Shift makes it a square"},
+		{paint.ToolCircle, ui.DrawCircleToolIcon, "Drag an ellipse — Shift makes it a circle"},
+		{paint.ToolGradient, ui.DrawGradientIcon,
+			"Drag to ramp from the near colour to the far one"},
+	}
+}
+
+// paintToolRow draws one row of tools, each with its shortcut on the tooltip.
+//
+// Both rows are laid out on the same five-column grid so the icons line up
+// under each other even though one row is a tool shorter.
+func (a *App) paintToolRow(r rl.Rectangle, tools []paintTool) {
+	const columns = 5
 	gap := a.px(4)
-	w := (r.Width - gap*float32(len(tools)-1)) / float32(len(tools))
+	w := (r.Width - gap*float32(columns-1)) / float32(columns)
 	for i, t := range tools {
 		box := ui.Rect(r.X+float32(i)*(w+gap), r.Y, w, r.Height)
 		if a.UI.IconButton(ui.MakeID("paint.tool."+t.tool.String()), box, t.icon, ui.IconOpts{
@@ -168,6 +271,35 @@ func (a *App) paintToolRow(r rl.Rectangle) {
 		}) {
 			a.paint.tool = t.tool
 		}
+	}
+}
+
+// paintDitherRow is the Bayer modes (SPEC-UX §13.4). They apply to the soft
+// brush and to the gradient, which are the two tools with a coverage between
+// nothing and everything to spend.
+func (a *App) paintDitherRow(label, chips rl.Rectangle) {
+	st := &a.paint
+	a.UI.Text(label, "Dither", ui.FontSizeSmall, ui.ColorTextDim)
+	note, _ := ui.SplitRight(label, a.px(130))
+	text := "blends"
+	if st.dither != paint.DitherNone {
+		text = "two colours only"
+	}
+	a.UI.Text(note, text, ui.FontSizeSmall, ui.Fade(ui.ColorTextDim, 0.9))
+
+	labels := make([]string, len(paint.Dithers))
+	sel := 0
+	for i, d := range paint.Dithers {
+		labels[i] = d.String()
+		if d == st.dither {
+			sel = i
+		}
+	}
+	if pick, changed := a.UI.ChipGroup(ui.MakeID("paint.dither"), chips, labels, sel,
+		ui.ChipGroupOpts{
+			Tooltip: "Spread a half-shade over whole texels instead of blending",
+		}); changed {
+		st.dither = paint.Dithers[pick]
 	}
 }
 
@@ -264,7 +396,7 @@ func (a *App) paintPaletteGrid(r rl.Rectangle, swatch, gap float32) {
 		box := ui.Rect(r.X+float32(col)*(swatch+gap), r.Y+float32(row)*(swatch+gap), swatch, swatch)
 		if a.UI.ColorSwatch(ui.MakeID("paint.swatch"+itoa(i)), box, c, ui.SwatchOpts{
 			Tooltip:  "#" + paint.Hex(c),
-			Selected: sameColor(c, a.paint.color),
+			Selected: sameColor(c, a.activeColor()),
 		}) {
 			a.setPaintColor(c)
 		}
@@ -284,24 +416,52 @@ func (a *App) paintRecentsStrip(r rl.Rectangle, swatch, gap float32) {
 		c := recents[i]
 		if a.UI.ColorSwatch(ui.MakeID("paint.recent"+itoa(i)), box, c, ui.SwatchOpts{
 			Tooltip:  "#" + paint.Hex(c),
-			Selected: sameColor(c, a.paint.color),
+			Selected: sameColor(c, a.activeColor()),
 		}) {
 			a.setPaintColor(c)
 		}
 	}
 }
 
-// paintColorRow is the armed colour and the way to a custom one.
+// paintColorRow is the two armed colours and the way to a custom one.
+//
+// Two rather than one because a gradient needs both ends, and they are ordinary
+// armed colours rather than a setting buried in the gradient tool: picking the
+// far end up with the eyedropper has to be the same gesture as picking the near
+// one. Clicking a swatch points the palette, the dropper and the picker at it.
 func (a *App) paintColorRow(r rl.Rectangle) {
-	swatchBox, rest := ui.SplitLeft(r, a.px(paintSwatchSize+8))
-	swatchBox = ui.Inset(swatchBox, a.px(2))
-	swatchBox.Width = a.px(paintSwatchSize)
-	if a.UI.ColorSwatch(ui.MakeID("paint.current"), swatchBox, a.paint.color, ui.SwatchOpts{
-		Tooltip:  "The brush colour: #" + paint.Hex(a.paint.color),
-		Selected: true,
-	}) {
-		a.openPaintPicker(r)
+	st := &a.paint
+	sw := a.px(paintSwatchSize)
+	gap := a.px(4)
+
+	slot := func(i int, c color.RGBA, tip string, x float32) {
+		box := ui.Rect(x, r.Y+(r.Height-sw)/2, sw, sw)
+		if a.UI.ColorSwatch(ui.MakeID("paint.slot"+itoa(i)), box, c, ui.SwatchOpts{
+			Tooltip:  tip + ": #" + paint.Hex(c),
+			Selected: st.slot == i,
+		}) {
+			if st.slot == i {
+				// A second click on the slot already armed opens the mixer,
+				// which is where you were heading anyway.
+				a.openPaintPicker(r)
+			}
+			st.slot = i
+		}
 	}
+	slot(0, st.color, "Near colour", r.X)
+	slot(1, st.colorB, "Far colour", r.X+sw+gap)
+
+	swapBox := ui.Rect(r.X+2*(sw+gap), r.Y+(r.Height-sw)/2, sw, sw)
+	if a.UI.IconButton(ui.MakeID("paint.swap"), swapBox, ui.DrawSwapIcon, ui.IconOpts{
+		Tooltip:  "Swap the two colours",
+		Shortcut: "X",
+	}) {
+		a.swapPaintColors()
+	}
+
+	rest := r
+	rest.X = swapBox.X + sw + a.px(6)
+	rest.Width = r.X + r.Width - rest.X
 	if a.UI.Button(ui.MakeID("paint.custom"), rest, "Custom colour…", ui.ButtonOpts{
 		Tooltip: "Mix a colour that is not on the page",
 	}) {
@@ -336,7 +496,7 @@ func (a *App) paintFooterRow(r rl.Rectangle) {
 
 // openPaintPicker opens the HSV popover on the brush colour.
 func (a *App) openPaintPicker(anchor rl.Rectangle) {
-	a.UI.OpenColorPicker(ui.MakeID("paint.picker"), anchor, a.paint.color)
+	a.UI.OpenColorPicker(ui.MakeID("paint.picker"), anchor, a.activeColor())
 }
 
 // drawPaintPicker runs the open popover. Unlike a body's colour this is not a
@@ -350,12 +510,16 @@ func (a *App) drawPaintPicker() {
 	if res.Changed {
 		c := res.Color
 		c.A = 255
-		a.paint.color = c
+		if a.paint.slot == 1 {
+			a.paint.colorB = c
+		} else {
+			a.paint.color = c
+		}
 	}
 	if res.Closed {
 		// The strip records what you settled on, not every colour the cursor
 		// crossed on the way there.
-		a.paint.recents.Add(a.paint.color)
+		a.paint.recents.Add(a.activeColor())
 	}
 }
 

@@ -44,12 +44,29 @@ const ObliqueWarnDegrees = 70
 // steal the stroke half way through.
 const PaintPickIntervalMillis = 33
 
+// FaceViewMargin is the fraction of air left around a face when the camera
+// frames it. Without any, the face's edges sit exactly on the viewport border
+// and there is nowhere to see the shape it belongs to.
+const FaceViewMargin = 0.12
+
 // paintState is the app's half of paint mode.
 type paintState struct {
 	tool  paint.Tool
 	size  int
 	res   int
 	color color.RGBA
+	// colorB is the gradient's far end. It is a second armed colour rather than
+	// a gradient setting, because picking one up with the eyedropper and
+	// picking the other has to be the same gesture twice.
+	colorB color.RGBA
+	// slot is which of the two swatches a palette click, an eyedrop or the HSV
+	// popover writes to: 0 the near colour, 1 the far one.
+	slot int
+	// dither is the Bayer mode the soft brush and the gradient spread their
+	// coverage through (SPEC-UX §13.4).
+	dither paint.Dither
+	// fillShape makes a rectangle or an ellipse solid rather than an outline.
+	fillShape bool
 
 	// recents and custom are settings rather than document state
 	// (SPEC-DATA §3.3): picking a colour is not an undo step.
@@ -61,6 +78,16 @@ type paintState struct {
 	// hideTextures is the "Textures" eye: the geometry with the paint
 	// suppressed, for checking the shape under the pixels.
 	hideTextures bool
+
+	// locked confines every stroke to one face, and lockBody/lockFace name it.
+	//
+	// It is a paint lock and not a camera lock: navigation works the same in
+	// every mode (SPEC-UX §1), and checking your work from an angle is exactly
+	// what you want to do while painting. What it stops is the brush wandering
+	// onto the neighbouring face when the pointer runs over an edge.
+	locked   bool
+	lockBody uint32
+	lockFace mesh.FaceUID
 
 	// hover is what the pointer is over this frame.
 	hover paintHover
@@ -80,6 +107,11 @@ type paintState struct {
 	strokeFace mesh.FaceUID
 	strokePt   *mesh.FacePaint
 	points     []image.Point
+	// anchor is where a two-point tool was pressed. Those tools keep exactly
+	// two points — the anchor and wherever the pointer is now — so dragging out
+	// and back leaves the shape you let go of rather than every shape you
+	// passed through.
+	anchor image.Point
 
 	// pickCooldown throttles the hover pick.
 	pickCooldown float64
@@ -114,6 +146,9 @@ func (a *App) initPaint() {
 	// A first stroke should be unmistakable against a grey hull, so the default
 	// is the palette's warm accent rather than another grey.
 	a.paint.color = paint.DefaultPalette()[27]
+	// The far end of a ramp defaults to the palette's near-black, so a gradient
+	// straight out of the box fades into shadow rather than into nothing.
+	a.paint.colorB = paint.DefaultPalette()[0]
 	a.paint.custom = append([]color.RGBA(nil), a.Settings.CustomPalette...)
 	a.paint.recents.Set(a.Settings.RecentColors)
 	if len(a.paint.custom) == 0 {
@@ -153,6 +188,110 @@ func (a *App) ExitPaint() {
 	a.Mode = ModeIdle
 	a.paint.hover = paintHover{}
 	a.paint.prov = nil
+	a.paint.locked = false
+}
+
+// paintPanelReachPx is how far in from the viewport's right edge the palette
+// panel reaches, in device pixels.
+func (a *App) paintPanelReachPx() float64 {
+	if !a.InPaint() {
+		return 0
+	}
+	return float64(a.px(paintPanelWidth + ui.Spacing*3))
+}
+
+// LockToFace confines painting to the face under the cursor and turns the
+// camera square-on to it (the user's request, 2026-08-26; SPEC-UX §13.5).
+//
+// Fixing what can be painted is the point; the camera move is what makes it
+// worth doing, because a face you are locked to is a face you want to be
+// looking at. Both are one action rather than two, so there is one thing to
+// press and one thing to undo.
+func (a *App) LockToFace() bool {
+	h := a.paint.hover
+	f, ok := a.resolveFace(h.body, h.face)
+	if !h.ok || !ok {
+		a.Toast(ui.Toast{
+			Text: "Hover the face you want to lock to first",
+			Kind: ui.ToastWarn,
+		})
+		return false
+	}
+	a.finishStroke()
+	a.paint.locked = true
+	a.paint.lockBody, a.paint.lockFace = f.body.ID, f.uid
+	a.FaceView()
+	a.Toast(ui.Toast{
+		Text:     fmt.Sprintf("Locked to face %d of %s", f.uid.Seq(), f.body.Name),
+		Action:   "Unlock",
+		OnAction: func() { a.UnlockFace() },
+	})
+	return true
+}
+
+// UnlockFace releases the lock, leaving the camera where it is.
+func (a *App) UnlockFace() {
+	if !a.paint.locked {
+		return
+	}
+	a.finishStroke()
+	a.paint.locked = false
+	a.paint.hover = paintHover{}
+	a.Toast(ui.Toast{Text: "Unlocked — every face can be painted again"})
+}
+
+// lockedFace resolves the locked face, dropping the lock if it has been cut
+// away since.
+func (a *App) lockedFace() (faceRef, bool) {
+	if !a.paint.locked {
+		return faceRef{}, false
+	}
+	f, ok := a.resolveFace(a.paint.lockBody, a.paint.lockFace)
+	if !ok {
+		a.paint.locked = false
+		a.paint.hover = paintHover{}
+		a.Toast(ui.Toast{
+			Text: "The face you were locked to is gone — unlocked",
+			Kind: ui.ToastWarn,
+		})
+		return faceRef{}, false
+	}
+	return f, true
+}
+
+// hoverLockedFace resolves the cursor against the locked face's own plane
+// rather than against the ID pass.
+//
+// This is what makes the lock a lock. The pick pass answers "what is in front
+// here", which is the wrong question once you have chosen a face: a body
+// drifting in front of it, or an edge along its border, would take the stroke.
+// Intersecting the plane cannot be stolen — and it costs no readback at all, so
+// a locked session is cheaper than a free one.
+func (a *App) hoverLockedFace(in InputFrame, vp render.Viewport) {
+	f, ok := a.lockedFace()
+	if !ok {
+		return
+	}
+	h := paintHover{ok: true, body: f.body.ID, face: f.uid, index: f.face}
+	h.paint, h.allocated = a.mappingFor(f)
+	if h.paint == nil {
+		a.paint.hover = paintHover{}
+		return
+	}
+	p, hit := a.pointOnFace(in.MouseX, in.MouseY, vp, h.paint.Frame)
+	if !hit {
+		a.paint.hover = paintHover{}
+		return
+	}
+	h.texel = paint.Texel(h.paint, p)
+	// The plane runs on past the face, and paint out there would be paint on
+	// nothing. Off the face is the same as off the model: no cursor, no stroke.
+	if !h.texel.In(paint.FaceRect(f.body.Mesh, f.face, h.paint)) {
+		a.paint.hover = paintHover{}
+		return
+	}
+	h.obliqueDeg = obliqueDegrees(a.Camera, f.body.Mesh.FaceNormal(f.face))
+	a.paint.hover = h
 }
 
 // canPaint reports whether the tool can run, and why not if it cannot.
@@ -204,6 +343,10 @@ func (a *App) refreshPaintHover(in InputFrame, vp render.Viewport) {
 	if !vp.Contains(int(in.MouseX), int(in.MouseY)) ||
 		a.Cube.Contains(in.MouseX, in.MouseY) || a.orbiting || a.panning || a.cubeDrag {
 		a.paint.hover = paintHover{}
+		return
+	}
+	if a.paint.locked {
+		a.hoverLockedFace(in, vp)
 		return
 	}
 	a.pickPaintFace(in, vp)
@@ -323,11 +466,31 @@ func (a *App) eyedrop() {
 	a.Toast(ui.Toast{Text: "Picked #" + paint.Hex(c)})
 }
 
-// setPaintColor arms a colour and records it as recently used.
+// setPaintColor arms a colour in the active slot and records it as recently
+// used.
 func (a *App) setPaintColor(c color.RGBA) {
 	c.A = 255
-	a.paint.color = c
+	if a.paint.slot == 1 {
+		a.paint.colorB = c
+	} else {
+		a.paint.color = c
+	}
 	a.paint.recents.Add(c)
+}
+
+// activeColor is the colour the palette, the eyedropper and the picker are
+// currently pointed at.
+func (a *App) activeColor() color.RGBA {
+	if a.paint.slot == 1 {
+		return a.paint.colorB
+	}
+	return a.paint.color
+}
+
+// swapPaintColors exchanges the two armed colours, which is how a ramp gets
+// reversed without picking both again.
+func (a *App) swapPaintColors() {
+	a.paint.color, a.paint.colorB = a.paint.colorB, a.paint.color
 }
 
 // beginStroke starts a drag's worth of painting.
@@ -341,6 +504,7 @@ func (a *App) beginStroke() {
 	a.paint.strokeBody = h.body
 	a.paint.strokeFace = h.face
 	a.paint.strokePt = h.paint
+	a.paint.anchor = h.texel
 	a.paint.points = append(a.paint.points[:0], h.texel)
 	a.applyStroke()
 }
@@ -364,6 +528,17 @@ func (a *App) trackStroke(in InputFrame, vp render.Viewport) {
 		return
 	}
 	t := paint.Texel(a.paint.strokePt, p)
+	if a.paint.tool.TwoPoint() {
+		// Two points, always: the anchor and where the pointer is now. Shift
+		// constrains what "now" is allowed to mean.
+		t = constrainEnd(a.paint.anchor, t, a.paint.tool, in.Shift)
+		if len(a.paint.points) == 2 && a.paint.points[1] == t {
+			return
+		}
+		a.paint.points = append(a.paint.points[:1], t)
+		a.applyStroke()
+		return
+	}
 	if n := len(a.paint.points); n > 0 && a.paint.points[n-1] == t {
 		return // same texel: nothing new to say
 	}
@@ -376,12 +551,15 @@ func (a *App) trackStroke(in InputFrame, vp render.Viewport) {
 // mouse-down (SPEC-DATA §3.2).
 func (a *App) applyStroke() {
 	cmd := &paint.StrokeFace{
-		Body:  a.paint.strokeBody,
-		Face:  a.paint.strokeFace,
-		Tool:  a.paint.tool,
-		Color: a.paint.color,
-		Size:  a.paint.size,
-		Res:   a.paint.res,
+		Body:   a.paint.strokeBody,
+		Face:   a.paint.strokeFace,
+		Tool:   a.paint.tool,
+		Color:  a.paint.color,
+		ColorB: a.paint.colorB,
+		Size:   a.paint.size,
+		Res:    a.paint.res,
+		Dither: a.paint.dither,
+		Fill:   a.paint.fillShape,
 		// The command reruns the whole stroke from its points each frame, so it
 		// needs its own copy: the slice keeps growing under it otherwise.
 		Points: append([]image.Point(nil), a.paint.points...),
@@ -430,8 +608,10 @@ func (a *App) CancelStroke() bool {
 func (a *App) PaintFace(bodyID uint32, uid mesh.FaceUID, pts []image.Point) bool {
 	return a.Run(&paint.StrokeFace{
 		Body: bodyID, Face: uid,
-		Tool: a.paint.tool, Color: a.paint.color, Size: a.paint.size,
-		Res: a.paint.res, Points: pts,
+		Tool: a.paint.tool, Color: a.paint.color, ColorB: a.paint.colorB,
+		Size: a.paint.size, Res: a.paint.res,
+		Dither: a.paint.dither, Fill: a.paint.fillShape,
+		Points: pts,
 	})
 }
 
@@ -464,14 +644,48 @@ func (a *App) SetPaintRes(res int) bool {
 // FaceView turns the camera square-on to the face under the cursor
 // (SPEC-UX §13.2).
 func (a *App) FaceView() bool {
-	h := a.paint.hover
-	f, ok := a.resolveFace(h.body, h.face)
+	f, ok := a.lockedFace()
 	if !ok {
-		return false
+		h := a.paint.hover
+		if f, ok = a.resolveFace(h.body, h.face); !h.ok || !ok {
+			return false
+		}
 	}
+	m := f.body.Mesh
 	to := a.targetCamera()
-	to.LookAlong(f.body.Mesh.FaceNormal(f.face))
-	to.Target = f.body.Mesh.FaceCentroid(f.face)
+	to.LookAlong(m.FaceNormal(f.face))
+	to.Target = m.FaceCentroid(f.face)
+	// Fill the viewport with the face and a little air, so the texels are as
+	// big as they can be without the edges touching the frame. Measured along
+	// the screen axes, not around a sphere: a hull side is wide and flat, and
+	// its sphere is mostly empty space.
+	var pts []geom.Vec3
+	for _, loop := range m.Faces[f.face].Loops {
+		for _, vi := range loop {
+			pts = append(pts, m.Verts[vi])
+		}
+	}
+	// The palette panel floats over the right of the viewport, so the space a
+	// face can actually be worked in is narrower than the viewport is. Framing
+	// against the whole thing would put a quarter of the face under the panel,
+	// which on the one camera move whose entire job is "let me see this face"
+	// is the wrong answer.
+	vp := a.layout.RenderViewport()
+	clear := float64(vp.W) - a.paintPanelReachPx()
+	if clear < float64(vp.W)/3 {
+		clear = float64(vp.W) / 3
+	}
+	aspect := clear / float64(vp.H)
+	to.FrameTightly(pts, aspect, FaceViewMargin)
+
+	// FrameTightly centres on the viewport; slide the target so the face lands
+	// centred in the clear part of it instead.
+	if vp.H > 0 {
+		worldPerPx := to.OrthoScale / float64(vp.H)
+		// Moving the target along the camera's right slides the geometry left on
+		// screen, which is the direction the face has to go to clear the panel.
+		to.Target = to.Target.Add(to.Right().Mul(a.paintPanelReachPx() / 2 * worldPerPx))
+	}
 	a.Anim.Start(a.Camera, to)
 	return true
 }
@@ -512,27 +726,50 @@ func (a *App) paintCursorOverlay() *render.Overlay {
 	return scene.BuildPaintCursor(v)
 }
 
-// handlePaintKeys is the paint-mode keyboard map: the four tools, and Escape
-// stepping back out (SPEC-UX §1, §13).
+// paintToolKeys maps the paint-mode keyboard to the tools. The letters are the
+// ones paint.Tool.Shortcut already pins, and they are mode-local the way sketch
+// mode's V/L/R/C are (DECISIONS V-50).
+var paintToolKeys = []struct {
+	key  int32
+	tool paint.Tool
+}{
+	{rl.KeyD, paint.ToolPencil},
+	{rl.KeyB, paint.ToolBrush},
+	{rl.KeyE, paint.ToolEraser},
+	{rl.KeyG, paint.ToolFill},
+	{rl.KeyI, paint.ToolPick},
+	{rl.KeyL, paint.ToolLine},
+	{rl.KeyR, paint.ToolRect},
+	{rl.KeyC, paint.ToolCircle},
+	{rl.KeyN, paint.ToolGradient},
+}
+
+// handlePaintKeys is the paint-mode keyboard map: the tools, the colour swap,
+// and Escape stepping back out (SPEC-UX §1, §13).
 func (a *App) handlePaintKeys(in InputFrame) {
 	if in.Ctrl {
 		return
 	}
-	switch {
-	case in.KeyPressed(rl.KeyD):
-		a.paint.tool = paint.ToolPencil
-	case in.KeyPressed(rl.KeyE):
-		a.paint.tool = paint.ToolEraser
-	case in.KeyPressed(rl.KeyG):
-		a.paint.tool = paint.ToolFill
-	case in.KeyPressed(rl.KeyI):
-		a.paint.tool = paint.ToolPick
+	for _, k := range paintToolKeys {
+		if in.KeyPressed(k.key) {
+			a.paint.tool = k.tool
+			break
+		}
+	}
+	if in.KeyPressed(rl.KeyX) {
+		a.swapPaintColors()
 	}
 	if in.KeyPressed(rl.KeyP) {
 		a.ExitPaint()
 	}
 	if in.KeyPressed(rl.KeyEscape) {
-		if !a.CancelStroke() {
+		// One level per press (SPEC-UX §1): a live stroke, then the lock, then
+		// the mode.
+		switch {
+		case a.CancelStroke():
+		case a.paint.locked:
+			a.UnlockFace()
+		default:
 			a.ExitPaint()
 		}
 	}
@@ -546,6 +783,9 @@ func (a *App) paintHint() string {
 	}
 	h := st.hover
 	if !h.ok {
+		if st.locked {
+			return "Locked to one face — the pointer is off it · Esc unlocks"
+		}
 		return "Hover a face to paint it · Esc leaves paint mode"
 	}
 	if a.UI.In.Alt || st.tool == paint.ToolPick {
@@ -556,6 +796,10 @@ func (a *App) paintHint() string {
 	}
 	if !h.allocated {
 		return fmt.Sprintf("Paint this face at %d px · texel %d,%d", st.res, h.texel.X, h.texel.Y)
+	}
+	if st.tool.TwoPoint() {
+		return fmt.Sprintf("%s · drag from here · Shift constrains it",
+			st.tool.String())
 	}
 	return fmt.Sprintf("%s · texel %d,%d", st.tool.String(), h.texel.X, h.texel.Y)
 }
@@ -611,4 +855,56 @@ func (a *App) handleDroppedFiles(in InputFrame) {
 			Kind: ui.ToastWarn,
 		})
 	}
+}
+
+// constrainEnd applies Shift to a two-point tool's far end (SPEC-UX §13.4).
+//
+// What "constrained" means depends on the tool, and both meanings are the one a
+// hand expects: a box wants to be square, a line wants to be straight or at
+// forty-five degrees.
+func constrainEnd(anchor, end image.Point, tool paint.Tool, shift bool) image.Point {
+	if !shift {
+		return end
+	}
+	dx, dy := end.X-anchor.X, end.Y-anchor.Y
+	if tool.Shape() {
+		// Equal sides, taking the longer drag so the shape follows the pointer
+		// rather than shrinking to the shorter axis.
+		n := absInt(dx)
+		if m := absInt(dy); m > n {
+			n = m
+		}
+		return image.Point{X: anchor.X + n*signInt(dx), Y: anchor.Y + n*signInt(dy)}
+	}
+	// Horizontal, vertical, or the diagonal between them — whichever the drag
+	// is already closest to.
+	ax, ay := absInt(dx), absInt(dy)
+	switch {
+	case ax > 2*ay:
+		return image.Point{X: end.X, Y: anchor.Y}
+	case ay > 2*ax:
+		return image.Point{X: anchor.X, Y: end.Y}
+	}
+	n := ax
+	if ay > n {
+		n = ay
+	}
+	return image.Point{X: anchor.X + n*signInt(dx), Y: anchor.Y + n*signInt(dy)}
+}
+
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+func signInt(v int) int {
+	switch {
+	case v > 0:
+		return 1
+	case v < 0:
+		return -1
+	}
+	return 0
 }

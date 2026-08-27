@@ -235,6 +235,78 @@ Palette  [32 swatches, 8×4]
 ### 13.3 Palette
 Default: embedded original 32-color palette tuned for spaceship greys/hull/accent/glow ramps (author in code, document in README). Custom colors via HSV popover; recents auto-track 8. **Import .hex** (Lospec format: one RRGGBB per line) via file dialog, replaces "custom" page, never the built-in page.
 
+### 13.4 Shapes, the soft brush and gradients (added 2026-08-26 at the user's request)
+
+Four two-point tools and one more freehand one. A two-point tool is decided by
+where the press landed and where the pointer is now, so it rubber-bands: the
+shape you let go of is the shape you were looking at, and nothing it passed
+through on the way is left behind.
+
+```
+Tools  [pencil][brush][eraser][fill][pick]
+       [line][rect][circle][gradient]
+Size   (1)(2)(4)(8)(16)
+[Fill the shape]                 · rect and circle only
+Dither (None)(2x2)(4x4)(8x8)     · brush and gradient only
+```
+
+- **Line** — drag from one texel to another. Shift keeps it horizontal, vertical
+  or at 45°.
+- **Rect** / **Circle** — drag the box they are inscribed in; Shift makes it a
+  square or a circle. **Fill the shape** switches between a solid and an
+  outline; the outline is drawn with the brush, so size widens it.
+- **Soft brush** — a round dab that fades out toward its rim, as against the
+  pencil's hard square. The fade blends into whatever is under the texel — the
+  paint already there, or the body's own colour where there is none — and the
+  result is stored fully opaque. Sizes 8 and 16 exist for this tool: at four
+  texels across there is nowhere for a falloff to happen.
+- **Gradient** — drag to set the direction and the distance; the ramp runs from
+  the near colour to the far one, perpendicular to the drag, across the whole
+  face. Past either end it holds the colour it arrived at.
+
+**Two armed colours.** The panel shows a near and a far swatch with a swap
+button (**X**). Clicking a swatch points the palette, the eyedropper and the HSV
+mixer at it; clicking the armed one again opens the mixer. Every tool but the
+gradient uses the near colour.
+
+**Dither modes** are ordered (Bayer) matrices of order 2, 4 and 8, and they
+decide how a coverage between nothing and everything is spent:
+
+- **None** blends — a gradient ramps through real colours, a soft edge fades
+  through them. Smooth, and off the palette.
+- **2x2 / 4x4 / 8x8** spend it on *how many* texels are painted instead, so a
+  ramp between two palette colours stays two palette colours and a soft edge
+  stays one. This is the pixel-native mode and the reason the feature exists;
+  the larger the matrix the finer the gradation it can express.
+
+Thresholds are indexed by texel position in the face's own grid, never by
+position within the shape, so two passes over the same area line up instead of
+seaming.
+
+**Shortcuts** (mode-local, as sketch mode's are): D pencil · B brush · E eraser ·
+G fill · I pick · L line · R rect · C circle · N gradient · X swap colours.
+
+### 13.5 Face lock (added 2026-08-26 at the user's request)
+
+**Lock to this face** points the camera squarely at the face under the cursor
+and confines every stroke to it until you unlock. It exists because the brush
+has the widest hit area in the program: run the pointer over an edge while
+painting a hull side and the next dab lands on the neighbouring face.
+
+- The button is in the panel, disabled until something is under the cursor. It
+  is one action, not two: the camera move is what makes a lock worth taking.
+- The camera frames the face itself rather than a sphere around it, and offsets
+  it clear of the palette panel, so a hull side fills the space it is worked in.
+- While locked the panel names the face and offers **Recentre** (point the
+  camera back at it) and **Unlock**. **Esc** unlocks before it leaves the mode.
+- **The lock is on painting, not on the camera.** Orbit, pan and zoom work
+  exactly as they do everywhere else (§1) — checking your work from an angle is
+  part of painting. What is fixed is where the paint can land.
+- The cursor is resolved against the locked face's own plane instead of the ID
+  pass, so a body drifting in front of it cannot steal a stroke, and the pointer
+  running off the face simply shows no cursor.
+- If the face is cut away by a later boolean, the lock releases with a toast.
+
 ## 14. Welcome & empty states
 
 - First launch / Ctrl+N with nothing: viewport shows dim center card — **New ship** (starts empty doc + pulses the Sketch button subtly), **Open…**, **Sample ship** (loads embedded op-script-built model), recent files list. Dismisses on any action.

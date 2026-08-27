@@ -3,6 +3,7 @@ package paint
 import (
 	"image"
 	"image/color"
+	"strings"
 
 	"modeler/internal/geom/mesh"
 )
@@ -11,44 +12,116 @@ import (
 // in texel space so the result is exactly the pixels you were shown under the
 // cursor.
 
-// BrushSizes are the size chips: one texel, a 2x2 block, a 4x4 block.
-var BrushSizes = []int{1, 2, 4}
+// BrushSizes are the size chips. The three of SPEC-UX §13.1 plus two larger
+// ones, because a soft brush needs room to be soft: at four texels across there
+// is nowhere for a falloff to happen (DECISIONS V-55).
+var BrushSizes = []int{1, 2, 4, 8, 16}
 
 // Tool is which of the four paint tools is armed.
 type Tool uint8
 
 const (
 	ToolPencil Tool = iota
+	ToolBrush
 	ToolEraser
 	ToolFill
 	ToolPick
+	ToolLine
+	ToolRect
+	ToolCircle
+	ToolGradient
 )
+
+// Tools lists them in the order the panel draws them: the ones that paint where
+// the pointer goes first, then the ones decided by two points.
+var Tools = []Tool{
+	ToolPencil, ToolBrush, ToolEraser, ToolFill, ToolPick,
+	ToolLine, ToolRect, ToolCircle, ToolGradient,
+}
 
 func (t Tool) String() string {
 	switch t {
+	case ToolBrush:
+		return "Brush"
 	case ToolEraser:
 		return "Eraser"
 	case ToolFill:
 		return "Fill"
 	case ToolPick:
 		return "Pick"
+	case ToolLine:
+		return "Line"
+	case ToolRect:
+		return "Rect"
+	case ToolCircle:
+		return "Circle"
+	case ToolGradient:
+		return "Gradient"
 	default:
 		return "Pencil"
 	}
 }
 
+// ParseTool reads a tool name as the op scripts spell it, in lower case.
+func ParseTool(s string) (Tool, bool) {
+	if s == "" {
+		return ToolPencil, true
+	}
+	for _, t := range Tools {
+		if strings.EqualFold(t.String(), s) {
+			return t, true
+		}
+	}
+	// "square" and "ellipse" are what people call them; accept both.
+	switch strings.ToLower(s) {
+	case "square":
+		return ToolRect, true
+	case "ellipse":
+		return ToolCircle, true
+	case "soft", "softbrush":
+		return ToolBrush, true
+	}
+	return ToolPencil, false
+}
+
 // Shortcut is the key that arms a tool, listed in the palette panel.
 func (t Tool) Shortcut() string {
 	switch t {
+	case ToolBrush:
+		return "B"
 	case ToolEraser:
 		return "E"
 	case ToolFill:
 		return "G"
 	case ToolPick:
 		return "I"
+	case ToolLine:
+		return "L"
+	case ToolRect:
+		return "R"
+	case ToolCircle:
+		return "C"
+	case ToolGradient:
+		return "N"
 	default:
 		return "D"
 	}
+}
+
+// TwoPoint reports whether a tool is decided by where the drag started and
+// where it is now, rather than by the path between them. Those are the tools
+// that rubber-band, and the ones a click without a drag cannot use.
+func (t Tool) TwoPoint() bool {
+	switch t {
+	case ToolLine, ToolRect, ToolCircle, ToolGradient:
+		return true
+	}
+	return false
+}
+
+// Shape reports whether a tool draws an outline that can also be filled.
+func (t Tool) Shape() bool {
+	return t == ToolRect || t == ToolCircle
 }
 
 // Brush is one dab's worth of settings.
@@ -58,16 +131,15 @@ type Brush struct {
 	// Erase writes transparency instead of colour, which restores the body's
 	// own colour rather than painting over it in a colour that looks like it.
 	Erase bool
-}
-
-// value is what a dab writes.
-func (b Brush) value() color.RGBA {
-	if b.Erase {
-		return color.RGBA{}
-	}
-	c := b.Color
-	c.A = 255
-	return c
+	// Soft makes the dab a disc that fades out rather than a square that does
+	// not (SPEC-UX §13.4).
+	Soft bool
+	// Dither spends a partial coverage on whole texels instead of on a blend,
+	// which is how softness stays inside the palette.
+	Dither Dither
+	// Under is the colour a partial dab blends into where nothing is painted:
+	// the body's own colour, because that is what shows through.
+	Under color.RGBA
 }
 
 // Stroke paints from one texel to another and returns the texel rectangle it
@@ -92,23 +164,23 @@ func Stroke(p *mesh.FacePaint, b Brush, from, to image.Point) image.Rectangle {
 	return dirty
 }
 
-// dab paints one brush square anchored so the sample sits in its top-left,
-// and returns the rectangle it wrote.
+// dab paints one brush mark anchored so the sample sits in the top-left of its
+// box, and returns the rectangle it wrote.
+//
+// A hard brush fills that box; a soft one inscribes a disc in it and fades out
+// toward the rim. Both go through put, so erasing, dithering and blending are
+// decided in one place rather than in each tool.
 func dab(p *mesh.FacePaint, b Brush, at image.Point, size int) image.Rectangle {
 	r := image.Rectangle{Min: at, Max: at.Add(image.Point{X: size, Y: size})}
-	c := b.value()
 	wrote := image.Rectangle{}
 	for y := r.Min.Y; y < r.Max.Y; y++ {
 		for x := r.Min.X; x < r.Max.X; x++ {
 			t := image.Point{X: x, Y: y}
-			// An erase outside the image has nothing to rub out, and growing
-			// the image to store transparency would be pure waste.
-			if b.Erase && !t.In(Bounds(p)) {
-				continue
+			coverage := 1.0
+			if b.Soft {
+				coverage = softCoverage(t, at, size)
 			}
-			if Set(p, t, c) {
-				wrote = union(wrote, image.Rectangle{Min: t, Max: t.Add(image.Point{X: 1, Y: 1})})
-			}
+			wrote = union(wrote, put(p, b, t, coverage))
 		}
 	}
 	return wrote

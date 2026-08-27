@@ -66,8 +66,10 @@ func TestBrushSizePaintsASquare(t *testing.T) {
 		p := testPaint(t, 128)
 		Stroke(p, Brush{Color: red, Size: size}, image.Point{X: 40, Y: 40}, image.Point{X: 40, Y: 40})
 		painted := 0
-		for y := 30; y < 55; y++ {
-			for x := 30; x < 55; x++ {
+		// The window has to hold the largest brush with room to spare, or it
+		// counts a clipped square and calls the brush wrong.
+		for y := 30; y < 60; y++ {
+			for x := 30; x < 60; x++ {
 				if At(p, image.Point{X: x, Y: y}).A != 0 {
 					painted++
 				}

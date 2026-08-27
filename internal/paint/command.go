@@ -27,11 +27,18 @@ type StrokeFace struct {
 	Body uint32
 	Face mesh.FaceUID
 
-	// Tool is Pencil, Eraser or Fill. Pick never reaches here — sampling a
-	// colour changes the palette, which is settings, not document state.
+	// Tool is anything but Pick, which never reaches here: sampling a colour
+	// changes the palette, and the palette is settings, not document state.
 	Tool  Tool
 	Color color.RGBA
-	Size  int
+	// ColorB is the gradient's far end. Every other tool ignores it.
+	ColorB color.RGBA
+	Size   int
+	// Dither spends a partial coverage on whole texels rather than on a blend,
+	// which is what keeps a soft edge or a ramp inside the palette.
+	Dither Dither
+	// Fill makes a rectangle or an ellipse solid rather than an outline.
+	Fill bool
 
 	// Res is the chip a first stroke allocates at. It is ignored once the face
 	// has a texture, because texel density never changes implicitly
@@ -43,6 +50,7 @@ type StrokeFace struct {
 	Points []image.Point
 
 	// Filled in by Do.
+	under     color.RGBA
 	paint     *mesh.FacePaint
 	allocated bool
 	rect      image.Rectangle
@@ -56,6 +64,14 @@ func (c *StrokeFace) Name() string {
 		return "Erase"
 	case ToolFill:
 		return "Fill face"
+	case ToolLine:
+		return "Line"
+	case ToolRect:
+		return "Rectangle"
+	case ToolCircle:
+		return "Circle"
+	case ToolGradient:
+		return "Gradient"
 	default:
 		return "Paint"
 	}
@@ -90,6 +106,11 @@ func (c *StrokeFace) Do(doc *model.Document) error {
 	m, fi, err := resolveFace(doc, c.Body, c.Face)
 	if err != nil {
 		return err
+	}
+	// A partial dab blends into the body's own colour where nothing is painted,
+	// because that is what shows through an unpainted texel.
+	if b := doc.BodyByID(c.Body); b != nil {
+		c.under = b.Color
 	}
 
 	// A redo replays from the snapshot rather than from the brush: the picture
@@ -188,12 +209,21 @@ func (c *StrokeFace) Events() []model.Event {
 // between them, because every interpolated point lies inside the box its two
 // samples span.
 func (c *StrokeFace) plannedRect(m *mesh.Mesh, fi int, p *mesh.FacePaint) image.Rectangle {
-	if c.Tool == ToolFill {
+	if c.Tool == ToolFill || c.Tool == ToolGradient {
+		// Both cover the face rather than the path: a flood can reach anywhere
+		// its colour runs to, and a ramp fills what it is ramping across.
 		return FaceRect(m, fi, p)
 	}
 	size := c.Size
 	if size < 1 {
 		size = 1
+	}
+	if c.Tool.TwoPoint() {
+		// A shape is decided by its two ends, and its outline is drawn with the
+		// brush, so the box grows by a whole brush on every side.
+		box := boxOf(c.Points[0], c.Points[len(c.Points)-1])
+		pad := image.Point{X: size, Y: size}
+		return image.Rectangle{Min: box.Min.Sub(pad), Max: box.Max.Add(pad)}
 	}
 	r := image.Rectangle{}
 	for _, t := range c.Points {
@@ -207,35 +237,53 @@ func (c *StrokeFace) plannedRect(m *mesh.Mesh, fi int, p *mesh.FacePaint) image.
 	return r
 }
 
-// apply runs the brush and returns the rectangle it wrote.
+// apply runs the tool and returns the rectangle it wrote.
 func (c *StrokeFace) apply(m *mesh.Mesh, fi int, p *mesh.FacePaint) image.Rectangle {
 	if len(c.Points) == 0 {
 		return image.Rectangle{}
 	}
+	// The face's own texels, which is not the same as the image's: the image
+	// carries a margin that is not on the face at all, and paint there would be
+	// paint on nothing.
+	region := func() image.Rectangle { return FaceRect(m, fi, p) }
+	first, last := c.Points[0], c.Points[len(c.Points)-1]
+
 	if c.Tool == ToolFill {
-		// The fill is bounded by the face rather than by the image: the image
-		// carries a margin that is not on the face at all, and paint there
-		// would be paint on nothing.
-		region := FaceRect(m, fi, p)
-		if Fill(p, region, c.Points[0], c.Color) == 0 {
+		r := region()
+		if Fill(p, r, first, c.Color) == 0 {
 			return image.Rectangle{}
 		}
-		return region
+		return r
 	}
-	b := Brush{Color: c.Color, Size: c.Size, Erase: c.Tool == ToolEraser}
+	if c.Tool == ToolGradient {
+		return Gradient(p, region(), first, last, c.Color, c.ColorB, c.Dither)
+	}
+
+	b := Brush{
+		Color:  c.Color,
+		Size:   c.Size,
+		Erase:  c.Tool == ToolEraser,
+		Soft:   c.Tool == ToolBrush,
+		Dither: c.Dither,
+		Under:  c.under,
+	}
 	if b.Size < 1 {
 		b.Size = 1
 	}
+	switch c.Tool {
+	case ToolLine:
+		return Stroke(p, b, first, last)
+	case ToolRect:
+		return DrawRect(p, b, first, last, c.Fill)
+	case ToolCircle:
+		return DrawEllipse(p, b, first, last, c.Fill)
+	}
+
+	// A freehand tool follows every sample it was given.
 	dirty := image.Rectangle{}
-	prev := c.Points[0]
+	prev := first
 	for _, t := range c.Points {
-		if r := Stroke(p, b, prev, t); !r.Empty() {
-			if dirty.Empty() {
-				dirty = r
-			} else {
-				dirty = dirty.Union(r)
-			}
-		}
+		dirty = union(dirty, Stroke(p, b, prev, t))
 		prev = t
 	}
 	return dirty

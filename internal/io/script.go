@@ -155,6 +155,8 @@ var knownOps = map[string]bool{
 	"paint.color": true, "paint.tool": true, "paint.size": true,
 	"paint.pixel": true, "paint.stroke": true, "paint.resample": true,
 	"paint.textures": true, "paint.faceview": true,
+	"paint.color2": true, "paint.swap": true, "paint.dither": true,
+	"paint.shapefill": true, "paint.lock": true, "paint.unlock": true,
 	"body.visible": true, "plane.visible": true, "sketch.visible": true,
 	"deselect": true, "delete": true, "undo": true, "redo": true,
 	"hover": true, "click": true, "drag": true, "drag.release": true,
@@ -228,9 +230,17 @@ func (o Op) validate() error {
 		if o.Res == 0 {
 			return o.Errorf("needs a res")
 		}
-	case "paint.color":
+	case "paint.color", "paint.color2":
 		if o.Hex == "" {
 			return o.Errorf("needs a hex colour")
+		}
+	case "paint.dither":
+		if o.Kind == "" {
+			return o.Errorf("needs a mode: None, 2x2, 4x4 or 8x8")
+		}
+	case "paint.shapefill":
+		if o.Visible == nil {
+			return o.Errorf("needs visible")
 		}
 	case "paint.tool":
 		if o.Kind == "" {

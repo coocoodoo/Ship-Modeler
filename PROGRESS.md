@@ -2,10 +2,108 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M7 COMPLETE.** Paint mode ships: the texel cursor, the four
-tools, the five resolution chips, the palette panel, per-stroke undo, and paint
-that survives a boolean. `build`, `vet` and the full suite are green, and the
-goldens pass twice in a row. Next up: **M8** (save/load, autosave, export).
+**Current state:** **M7 COMPLETE**, plus a user-requested follow-up: shape,
+gradient and soft-brush tools, Bayer dithering, and a face lock. `build`, `vet`
+and the full suite are green; goldens pass twice in a row. Next up: **M8**
+(save/load, autosave, export).
+
+---
+
+## 2026-08-26 — Paint tools: shapes, gradients, dithering and a face lock
+
+**Asked for by the user, after running the build.** Two requests, one session:
+line/circle/square/soft-brush/gradient tools with 2x2, 4x4 and 8x8 Bayer
+gradient modes; and "when painting on a face, focus the camera on it and lock to
+it, to keep from painting other faces". Both are now specced — SPEC-UX §13.4 and
+§13.5 were written alongside the code, so the comments referring to them are not
+pointing at nothing.
+
+**The tools.** Nine now, in two rows: pencil, soft brush, eraser, fill, pick /
+line, rect, circle, gradient. The four on the second row are *two-point* tools —
+they read where you pressed and where the pointer is now, and nothing in
+between. That is what makes them rubber-band, and it was the one thing that
+could have gone badly: a drag replaces its pending command with a longer version
+of itself every frame, so a shape that read the whole path would have stamped
+every size it passed through onto the face. There is a test that drags a
+rectangle out and back and checks the ghosts are not there.
+
+**Dithering is one idea used twice.** A soft brush and a gradient both produce a
+coverage between nothing and everything. With **None** that coverage blends into
+a real colour; with **2x2 / 4x4 / 8x8** it decides *how many whole texels* get
+painted instead, so a ramp between two palette colours stays two palette
+colours. That is the pixel-art answer to a soft edge, and it is why the user
+asked for the matrices in the same breath as the brush. The chips show only for
+the two tools that have a coverage to spend.
+
+**Three things I got wrong first and the tests caught.**
+
+1. *The soft brush stored partial alpha.* Obvious, and wrong: the texture
+   composites over the **body** colour, not over the paint already on the face,
+   so a half-alpha texel over existing paint would show the hull through it. The
+   command now hands the body's own colour down and the blend happens in the
+   paint layer, storing opaque texels — which also keeps alpha binary for the
+   eraser, the dropper and the fill, all of which already assumed it.
+2. *The soft brush had no solid middle.* With a pure linear falloff no texel is
+   ever fully the brush colour, which reads as a weak brush rather than a soft
+   one. It has a 40%-of-radius solid core now.
+3. *The locked face was framed by its bounding sphere.* `FrameBox` is
+   deliberately orientation-independent so orbiting can never lose anything; on
+   a flat wide hull side that wastes most of the viewport. `FrameTightly`
+   measures the points along the camera's own axes instead, and the result is
+   then slid clear of the palette panel — the one camera move whose entire job
+   is "let me see this face" should not put a quarter of it behind a panel.
+
+**The lock is a paint lock, not a camera lock.** Orbit, pan and zoom keep working
+exactly as they do everywhere else, because checking your work from an angle is
+part of painting. What is fixed is where the paint can land. While locked the
+cursor is resolved against the locked face's own **plane** rather than through
+the ID pass — a body drifting in front of it cannot steal a stroke, the pointer
+running off the face simply shows no cursor, and it costs no readback at all, so
+a locked session is *cheaper* than a free one.
+
+**Verified.**
+
+- `go build ./...`, `go vet ./...`, `go test ./...` — all green, goldens twice.
+- 24 new unit tests in `internal/paint` (59 total there): the Bayer matrices are
+  checked as matrices — a permutation of 0..n²-1, tiling the grid, monotonic in
+  coverage, and exactly half the texels at half coverage — and the shapes are
+  checked for the things that are invisible in a screenshot: an ellipse
+  symmetric in both axes, filled rows with no gaps, a rectangle that is hollow
+  in the middle, a ramp that is monotonic along its axis and perpendicular to
+  the drag.
+- 4 new app flow tests. **The lock's proof**: the same window pixel resolves a
+  *different* face once unlocked, and nothing at all while locked.
+  **Dithering's proof**: the same drag between the same two colours produces four
+  different pictures under the four modes, covering exactly the same texels.
+- 8 new goldens across two scripts (`m7_shapes`, `m7_lock`), 23 for M7 in all.
+
+**Open.**
+
+- The dither mode, the two colours, the brush size and the lock are **session
+  state, not settings** — none of it survives a restart yet. That goes with M8's
+  settings pass, alongside the custom palette noted below.
+- A **soft brush with no dithering is off the palette** by construction. That is
+  what "blends" means and the panel says so, but a pixel-art purist should stay
+  on a Bayer mode.
+- Everything still open from the M7 entry below: the Import .hex button waits on
+  M8's dialogs (drop a file on the window meanwhile), and custom colours are not
+  persisted.
+
+**Try it** (`go run ./cmd/modeler`, then **P**):
+
+1. Hover a face and press **Lock to this face**. The camera turns square-on and
+   fills the screen with it. Now run the pointer off the edge — nothing arms.
+2. **N** for the gradient. Click the second colour swatch, pick something dark,
+   then drag across the face. Try each **Dither** chip and drag again.
+3. **C** for a circle, **R** for a rectangle — hold **Shift** for a true circle
+   or square, and toggle **Fill the shape**.
+4. **B** for the soft brush at size 16, dither **None**: it fades into the hull.
+   Switch to **4x4** and it fades in whole texels instead.
+5. **X** swaps the two colours. **Esc** unlocks; **Esc** again leaves paint mode.
+
+**Next:** M8 — `.ship` save/load, autosave and crash recovery, OBJ/STL/PNG
+export, the file dialogs that finish the palette import, and the settings pass
+that makes the brush remember itself.
 
 ---
 

@@ -370,3 +370,30 @@ func DrawImportIcon(cx, cy, size float64, col color.RGBA) {
 	poly(w, col, v2(cx-h*0.8, cy+h*0.35), v2(cx-h*0.8, cy+h*0.8),
 		v2(cx+h*0.8, cy+h*0.8), v2(cx+h*0.8, cy+h*0.35))
 }
+
+// DrawGradientIcon is a ramp: a box whose fill steps from dense to sparse,
+// drawn as bands because that is what an ordered-dither ramp looks like.
+func DrawGradientIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	l, t := cx-h*0.85, cy-h*0.75
+	r, b := cx+h*0.85, cy+h*0.75
+	closedPoly(w, col, v2(l, t), v2(r, t), v2(r, b), v2(l, b))
+	// Four bands thinning left to right: solid, three-quarters, half, a dash.
+	span := (r - l) / 5
+	for i := 0; i < 4; i++ {
+		x := l + span*(float64(i)+0.5)
+		frac := 1 - float64(i)*0.28
+		line(v2(x, cy-h*0.55*frac), v2(x, cy+h*0.55*frac), w, col)
+	}
+}
+
+// DrawSwapIcon is the two-way arrow that exchanges the near and far colours.
+func DrawSwapIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	line(v2(cx-h*0.7, cy-h*0.35), v2(cx+h*0.7, cy-h*0.35), w, col)
+	poly(w, col, v2(cx+h*0.3, cy-h*0.7), v2(cx+h*0.75, cy-h*0.35), v2(cx+h*0.3, cy))
+	line(v2(cx-h*0.7, cy+h*0.35), v2(cx+h*0.7, cy+h*0.35), w, col)
+	poly(w, col, v2(cx-h*0.3, cy), v2(cx-h*0.75, cy+h*0.35), v2(cx-h*0.3, cy+h*0.7))
+}

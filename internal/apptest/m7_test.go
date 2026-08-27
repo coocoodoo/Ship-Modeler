@@ -37,7 +37,13 @@ type paintDump struct {
 	size     int
 	res      int
 	color    string
+	color2   string
+	dither   string
+	fill     bool
+	slot     int
 	textures bool
+	locked   bool
+	lockFace int
 
 	hovering  bool
 	hoverBody int
@@ -54,7 +60,8 @@ type paintDump struct {
 
 var (
 	m7ModeLine = regexp.MustCompile(
-		`^paint mode=(\d) tool="(\w+)" size=(\d+) res=(\d+) color="(\w+)" textures=(\d)$`)
+		`^paint mode=(\d) tool="(\w+)" size=(\d+) res=(\d+) color="(\w+)" color2="(\w+)" ` +
+			`dither="(\w+)" fill=(\d) slot=(\d) textures=(\d) locked=(\d) lockface=(\d+)$`)
 	m7HoverLine = regexp.MustCompile(
 		`^painthover body=(\d+) face=(\d+) texel=(-?\d+),(-?\d+) res=(\d+) ` +
 			`allocated=(\d) oblique=([\d.]+)$`)
@@ -91,7 +98,13 @@ func parseM7Dumps(t *testing.T, stdout string) []paintDump {
 			cur.size = atoi(t, m[3])
 			cur.res = atoi(t, m[4])
 			cur.color = m[5]
-			cur.textures = m[6] == "1"
+			cur.color2 = m[6]
+			cur.dither = m[7]
+			cur.fill = m[8] == "1"
+			cur.slot = atoi(t, m[9])
+			cur.textures = m[10] == "1"
+			cur.locked = m[11] == "1"
+			cur.lockFace = atoi(t, m[12])
 		case strings.HasPrefix(line, "painthover "):
 			m := m7HoverLine.FindStringSubmatch(line)
 			if m == nil {
@@ -531,4 +544,145 @@ func undoDepth(t *testing.T, stdout string) []int {
 		out = append(out, atoi(t, m[1]))
 	}
 	return out
+}
+
+// --- Shapes, the soft brush, gradients and the face lock (SPEC-UX §13.4–13.5) ---
+
+func TestGoldenPaintShapes(t *testing.T) {
+	_, outDir := runScript(t, "m7_shapes")
+	checkGolden(t, "m7_shapes", outDir)
+}
+
+// TestEachDitherModeIsItsOwnPicture is the point of having four of them.
+//
+// The same drag between the same two colours has to come out differently under
+// each Bayer order, and the smooth mode has to differ from all three. A mode
+// chip that quietly did nothing would still produce a gradient, and a
+// screenshot of one ramp looks much like a screenshot of another.
+func TestEachDitherModeIsItsOwnPicture(t *testing.T) {
+	stdout, _ := runScript(t, "m7_shapes")
+	dumps := parseM7Dumps(t, stdout)
+	if len(dumps) != 6 {
+		t.Fatalf("expected 6 dumps, got %d:\n%s", len(dumps), stdout)
+	}
+
+	want := []string{"None", "2x2", "4x4", "8x8"}
+	seen := map[string]string{}
+	for i, mode := range want {
+		if got := dumps[i].dither; got != mode {
+			t.Fatalf("dump %d was taken in %q mode, want %q", i, got, mode)
+		}
+		sum := dumps[i].picture(t, 1, 7).sum
+		for other, otherSum := range seen {
+			if sum == otherSum {
+				t.Errorf("%s and %s produced the same picture (%s)", mode, other, sum)
+			}
+		}
+		seen[mode] = sum
+	}
+
+	// Every ramp covers the same texels — they differ in colour, not in reach.
+	base := dumps[0].picture(t, 1, 7).opaque
+	for i := 1; i < len(want); i++ {
+		if got := dumps[i].picture(t, 1, 7).opaque; got != base {
+			t.Errorf("%s painted %d texels, want the same %d as the smooth ramp",
+				want[i], got, base)
+		}
+	}
+}
+
+// TestTheShapeToolsEachLeaveTheirOwnMark keeps the four two-point tools honest
+// about being four tools: each adds to the picture, and the fill toggle and the
+// brush size reach them.
+func TestTheShapeToolsEachLeaveTheirOwnMark(t *testing.T) {
+	stdout, _ := runScript(t, "m7_shapes")
+	dumps := parseM7Dumps(t, stdout)
+	ramp, shapes, soft := dumps[3], dumps[4], dumps[5]
+
+	if shapes.picture(t, 1, 7).sum == ramp.picture(t, 1, 7).sum {
+		t.Error("the circle, rectangle and line left the gradient untouched")
+	}
+	// The ramp already filled the face, so the shapes recolour rather than add:
+	// the count stays put and only the picture changes. That is exactly the
+	// case a texel count cannot see.
+	if got, want := shapes.picture(t, 1, 7).opaque, ramp.picture(t, 1, 7).opaque; got != want {
+		t.Errorf("the shapes changed the painted count from %d to %d", want, got)
+	}
+	if b := dumps[4]; b.tool != "Line" || b.fill != true {
+		t.Errorf("the shapes dump was taken with tool=%q fill=%v", b.tool, b.fill)
+	}
+
+	// The soft brush lands on a different face, at a size the chips only gained
+	// for it.
+	if b := dumps[5]; b.tool != "Brush" || b.size != 16 {
+		t.Errorf("the soft brush dump has tool=%q size=%d, want Brush at 16", b.tool, b.size)
+	}
+	if got := soft.picture(t, 1, 17).opaque; got == 0 {
+		t.Error("the soft brush painted nothing on the cockpit face")
+	}
+}
+
+func TestGoldenFaceLock(t *testing.T) {
+	_, outDir := runScript(t, "m7_lock")
+	checkGolden(t, "m7_lock", outDir)
+}
+
+// TestTheLockKeepsPaintOnOneFace is the user's request, as arithmetic: the same
+// window pixel that resolves a second face when nothing is locked must resolve
+// nothing at all while the first one is.
+func TestTheLockKeepsPaintOnOneFace(t *testing.T) {
+	stdout, _ := runScript(t, "m7_lock")
+	dumps := parseM7Dumps(t, stdout)
+	if len(dumps) != 5 {
+		t.Fatalf("expected 5 dumps, got %d:\n%s", len(dumps), stdout)
+	}
+	before, locked, painted, offFace, unlocked := dumps[0], dumps[1], dumps[2], dumps[3], dumps[4]
+
+	if before.locked {
+		t.Fatal("something was locked before the script asked for it")
+	}
+	if !locked.locked || locked.lockFace != before.hoverFace {
+		t.Errorf("locked to face %d, want the hovered face %d",
+			locked.lockFace, before.hoverFace)
+	}
+
+	// Locking turns the camera square-on: that is half of what the button is for.
+	if before.oblique < 20 {
+		t.Fatalf("the starting view was already %v° on, so this proves nothing",
+			before.oblique)
+	}
+	if locked.oblique > 1 {
+		t.Errorf("after locking the face is still %v° off square-on", locked.oblique)
+	}
+
+	// A drag paints the locked face.
+	if len(painted.pictures) != 1 || painted.pictures[0].face != locked.lockFace {
+		t.Fatalf("the drag did not paint the locked face; pictures were %+v",
+			painted.pictures)
+	}
+
+	// The pointer over a different face, while locked: nothing to paint.
+	if offFace.hovering {
+		t.Errorf("while locked, the pointer over another face resolved face %d",
+			offFace.hoverFace)
+	}
+	if !strings.Contains(offFace.hint, "Locked") {
+		t.Errorf("the hint bar said %q, which does not explain why nothing is armed",
+			offFace.hint)
+	}
+	// Unlock, same pixel: now it resolves — and it is a different face, which is
+	// what the lock was stopping.
+	if !unlocked.hovering {
+		t.Fatal("unlocking left the pointer resolving nothing")
+	}
+	if unlocked.hoverFace == locked.lockFace {
+		t.Fatal("the test pixel is over the locked face, so the lock proved nothing")
+	}
+	if unlocked.locked {
+		t.Error("the lock survived Unlock")
+	}
+	// And the paint that was made under the lock is untouched by any of it.
+	if got, want := unlocked.pictures[0].sum, painted.pictures[0].sum; got != want {
+		t.Errorf("unlocking changed the picture: %s, was %s", got, want)
+	}
 }

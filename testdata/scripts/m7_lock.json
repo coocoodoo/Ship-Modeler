@@ -1,0 +1,35 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"select","kind":"body","body":"Hull"},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"deselect"},
+  {"op":"settle"},
+
+  {"op":"paint.begin"},
+  {"op":"paint.res","res":32},
+  {"op":"hover","at":[700,420]},
+  {"op":"dump"},
+
+  {"op":"paint.lock","body":"Hull","axis":"+z"},
+  {"op":"settle"},
+  {"op":"hover","at":[600,380]},
+  {"op":"dump"},
+  {"op":"shot","name":"m7_locked"},
+
+  {"op":"paint.color","hex":"F2542D"},
+  {"op":"paint.size","size":2},
+  {"op":"drag","from":[400,300],"to":[900,440],"segs":12},
+  {"op":"settle"},
+  {"op":"dump"},
+
+  {"op":"hover","at":[700,120]},
+  {"op":"dump"},
+
+  {"op":"paint.unlock"},
+  {"op":"hover","at":[700,120]},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m7_unlocked"}
+]
