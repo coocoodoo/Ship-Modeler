@@ -72,8 +72,10 @@ Exports carry the same promise as far as the format allows:
 ## Files
 
 Ships are saved as `.ship`: a zip holding the document, one PNG per painted
-face, and a thumbnail. Unsaved work is autosaved every two minutes and again if
-the program ever crashes; the next launch offers it back.
+face, and a thumbnail. Dropping a `.ship` on the window opens it. Unsaved work
+is autosaved every two minutes and again if the program ever crashes; the next
+launch offers it back — and anything that would replace unsaved work, from
+Ctrl+N to the window's close button, asks first.
 
 Settings, autosaves and crash logs live in `%APPDATA%\Modeler`. Set
 `MODELER_CONFIG_DIR` to put them somewhere else.

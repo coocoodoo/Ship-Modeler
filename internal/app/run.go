@@ -40,7 +40,11 @@ func Run() {
 	a := New(false)
 	defer a.Close()
 	a.box.init()
-	a.LoadTestScene()
+	// The document starts empty, which is what makes the welcome card appear
+	// (SPEC-UX §14). The test scene is for headless scripts only: shipping it
+	// here meant every launch opened on three debug boxes and the welcome card
+	// — New, Open, the sample ship, the recents — could never show at all.
+	a.applySavedWindow()
 	a.layout = a.Layout(rl.GetRenderWidth(), rl.GetRenderHeight())
 	a.FrameSelection(a.layout.RenderViewport())
 
@@ -79,8 +83,11 @@ func Run() {
 
 		// Dialogs run out here. A native one is modal and pumps its own message
 		// loop, and doing that between BeginDrawing and EndDrawing would mean
-		// running somebody else's loop with a frame half submitted.
+		// running somebody else's loop with a frame half submitted. The
+		// autosave writes here for the same family of reason: zipping the
+		// document mid-frame was a hitch the next stroke could feel.
 		a.RunPendingFile()
+		a.writeDueAutosave()
 		a.stepClose()
 
 		if want := a.WindowTitle(); want != title {
@@ -95,4 +102,28 @@ func Run() {
 // WindowTitle is what the OS window is called: the document, then the program.
 func (a *App) WindowTitle() string {
 	return a.DocumentTitle() + " — " + WindowTitle
+}
+
+// applySavedWindow puts the window back where the last session left it. The
+// settings have remembered the rect since M8; nothing ever read it back, so
+// the program forgot its size every time it was closed.
+//
+// The size is taken whenever it is usable. The position is taken only if that
+// corner still lands on a monitor — a rect saved on an unplugged second screen
+// must not put the title bar somewhere nothing can grab it.
+func (a *App) applySavedWindow() {
+	w := a.Settings.Window
+	if w.Width >= ui.MinWindowW && w.Height >= ui.MinWindowH {
+		rl.SetWindowSize(w.Width, w.Height)
+	}
+	for m := 0; m < rl.GetMonitorCount(); m++ {
+		p := rl.GetMonitorPosition(m)
+		mw, mh := float32(rl.GetMonitorWidth(m)), float32(rl.GetMonitorHeight(m))
+		const grab = 64 // pixels of title bar that must stay reachable
+		if float32(w.X) >= p.X-grab && float32(w.X) <= p.X+mw-grab &&
+			float32(w.Y) >= p.Y && float32(w.Y) <= p.Y+mh-grab {
+			rl.SetWindowPosition(w.X, w.Y)
+			return
+		}
+	}
 }

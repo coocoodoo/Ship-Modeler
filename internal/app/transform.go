@@ -290,6 +290,34 @@ func (a *App) buildTransformGizmo(vp render.Viewport) *render.Overlay {
 	return scene.BuildTransformGizmo(a.gizmoView(vp))
 }
 
+// focusMove is what the Move button and the M key do. The gizmo is a property
+// of the selection rather than a mode, so there is nothing to enter: with
+// something selected this points the armed gizmo at moving, and with nothing
+// selected it says what to select — which is more than the button managed for
+// three milestones, disabled behind a tooltip claiming Move "arrives with M6".
+func (a *App) focusMove() {
+	a.ExitPaint()
+	if t := a.transform.tool; t != nil {
+		t.Mode = tools.GizmoMove
+		return
+	}
+	a.Toast(ui.Toast{
+		Text: "Select a body to move it — or drag a box around vertices",
+		Kind: ui.ToastWarn,
+	})
+}
+
+// canMove reports whether the Move button has anything to act on: a gizmo is
+// armed. Asking the armed state rather than the selection keeps the button
+// honest for the selections that cannot move — a plane, a sketch — which have
+// rows in the tree but no vertices to carry.
+func (a *App) canMove() (bool, string) {
+	if a.InTransform() {
+		return true, ""
+	}
+	return false, "Select a body, face, edge or vertex — the gizmo appears on it"
+}
+
 // handleTransformKeys implements the shortcuts that act on a selection.
 func (a *App) handleTransformKeys(in InputFrame) {
 	if in.Ctrl && in.KeyPressed(rl.KeyD) {

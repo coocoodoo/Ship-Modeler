@@ -170,10 +170,14 @@ func (a *App) tiltOffAxis(axis geom.Vec3) {
 	a.Anim.Start(a.Camera, to)
 }
 
-// CancelExtrude drops the pending solid and goes back to the sketch.
+// CancelExtrude drops the pending solid and goes back to the sketch, putting
+// the camera back where it was when the tool opened. The tool tilted it off
+// the sketch plane on the way in; a cancel that leaves the tilt behind reads
+// as the cancel having done something, and it did nothing — that is the point.
 func (a *App) CancelExtrude() {
 	a.dropExtrudePreview()
 	a.extrude.tool = nil
+	a.Anim.Start(a.Camera, a.extrude.returnCamera)
 	a.Mode = ModeSketch
 	if a.ActiveSketch() == nil {
 		a.Mode = ModeIdle

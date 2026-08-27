@@ -792,3 +792,60 @@ answer: it lives in a folder the user has never seen, under a name they did not
 choose. The window's close is intercepted and the prompt offers Save or Close
 without saving; cancelling the save dialog cancels the close too, rather than
 quietly discarding.
+
+**V-81 · Escape on a modal is "dismissed", not "cancelled".** The close prompt's
+cancel button reads "Close without saving" — words, which can be read. Escape is
+a reflex, and DrawModal used to report it as that same cancel, so the reflex key
+on "Save before closing?" threw the work away. ModalResult now carries a third
+outcome: Confirm and the labelled button each mean what they say, and Escape
+dismisses the question leaving everything as it was.
+
+**V-82 · A modal owns the keyboard.** The mode key handlers ran under an open
+modal: Escape on the close prompt also reached paint mode and exited it, Enter
+also committed a pending extrude, and S started a sketch behind the dialog. The
+update loop now skips every mode handler while a modal is up — the dialog's own
+Esc/Enter handling is the whole keyboard. The shortcut sheet owns it the same
+way, so the sheet explaining the S key is no longer a thing the S key acts
+through.
+
+**V-83 · New, Open, a recent, the sample and a dropped .ship all stop at
+"Discard unsaved changes?" when there is unsaved work.** The window's close has
+asked since M8 (V-80); Ctrl+N reached the same cliff with no fence at all — one
+reflexive "new ship" and the old one was gone. The guard parks the action, asks
+with a danger-styled Discard / Keep working pair, and only an explicit Discard
+releases it. Headless runs are exempt: scripts drive NewDocument and OpenPath
+directly, below the dialog layer, as they always have.
+
+**V-84 · The interactive app starts empty; the test scene is headless-only.**
+`Run()` still loaded the M1 debug scene — a hull, an engine pod and a wing pod —
+on every launch, which buried the entire M8/M9 entry experience: with a
+non-empty document the welcome card, and with it New, Open, the recents and the
+Sample ship button, could never appear at all. The golden scripts are written
+against those three bodies, so `LoadTestScene` stays for `RunHeadless`; the
+interactive path starts on an empty document and the welcome card, which is
+what SPEC-UX §14 said all along.
+
+**V-85 · Move is wired, and it is not a mode.** The toolbar's Move button
+shipped disabled behind "Move arrives with milestone M6" — three milestones
+after M6 shipped — and the M key, listed in the shortcut sheet, was bound to
+nothing. Both now point the armed gizmo at moving, and with nothing selected
+they say what to select. The button lights whenever a gizmo is up, because the
+gizmo is a property of the selection (V-38) and there is no mode to enter.
+
+**V-86 · A camera drag survives the chrome.** An orbit is decided when the
+button goes down, not re-litigated every pixel: the drag used to freeze the
+moment the pointer crossed the toolbar or the tree and resume on the way back,
+which read as the camera stuttering. An active orbit, pan or cube drag now keeps
+receiving input wherever the pointer is; starting one over chrome is still
+impossible, because the press is only honoured inside the viewport.
+
+**V-87 · Small keeps from the same audit.** Escape cancels the armed "click a
+plane" state the hint bar was already promising it would. Cancelling an extrude
+restores the camera the tool tilted, as its own comment claimed. A recovered
+autosave no longer plants its hidden-folder path in the recents or the
+last-used directory. Closing the colour picker mid-scrub commits the drag it
+was holding, instead of wedging the bus. The autosave writes after EndDrawing
+rather than mid-frame, so the two-minute tick cannot hitch a stroke. The saved
+window rectangle — written since M8, read by nothing — is applied at launch,
+position only if it still lands on a monitor. And a dropped .ship opens the way
+a dropped .hex imports, through the same guard as Ctrl+O.

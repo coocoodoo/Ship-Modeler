@@ -2,10 +2,74 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M9 DONE bar your sign-off.** The reported Through-all bug is
-fixed, the sample ship ships, and the program calls itself v1.0.0. `build`,
-`vet` and the full suite are green. **What is left is the UX §15 feel checklist —
-that one is yours, not mine.**
+**Current state:** **Post-M9 audit done.** "A lot of things aren't working" was
+right, and the biggest finding explains the rest: the interactive app never
+showed what M8 and M9 built. All fixed, suite green (15 packages), exe rebuilt.
+The UX §15 feel checklist is still yours.
+
+---
+
+## 2026-08-27 — The audit: why it looked broken
+
+The user came back from trying v1.0.0 with "a lot of things aren't working, do
+an audit." Every finding below came from reading the interactive layer — the
+one place the headless suite cannot see, because scripts drive the app below
+the input layer. That is also why all of it was green while being wrong.
+
+**The flagship: every launch loaded the M1 debug scene.** `Run()` still called
+`LoadTestScene()`, so the program opened on a hull, an engine pod and a wing
+pod — and with a non-empty document `showWelcome()` could never be true. The
+welcome card, New, Open, the recents, the Sample ship button: all of M8/M9's
+entry experience, unreachable since the day it was written. The comment in
+testscene.go even said M9 replaces it; nothing did. The interactive app now
+starts empty (V-84); headless keeps the scene — the golden scripts are written
+against it.
+
+**Dead controls that claimed otherwise.** The Move button was disabled behind
+"Move arrives with milestone M6", three milestones after M6 shipped, and the M
+key — listed in the shortcut sheet — was bound to nothing. P entered paint from
+nowhere: `handleKeys` had no case for it, so the key only worked for leaving.
+Wired (V-85); Move lights whenever a gizmo is armed and says what to select
+when none is.
+
+**Two ways to lose work without being asked.** Ctrl+N, Open, a recent, the
+sample: all replaced a dirty document silently — only the window's close asked
+(V-80). They now stop at "Discard unsaved changes?" (V-83). Worse: Escape on
+the close prompt itself was read as the cancel button, and in paint mode the
+same keypress also fell through to the mode underneath — the reflex key closed
+the program without saving. Escape is now "dismissed", its own outcome that
+keeps working (V-81), and a modal owns the whole keyboard while it is up
+(V-82). `guard_test.go` pins all of it, GPU-free.
+
+**Feel bugs.** An orbit froze the moment the pointer crossed the toolbar or
+tree and resumed on the way back (V-86 — drags are decided at press, not
+re-litigated every pixel). Esc did not cancel the armed "click a plane" state
+its own hint bar promised to cancel. Cancelling an extrude kept the camera
+tilt the tool had added, despite a comment claiming otherwise. The `?` sheet
+said "Esc to close" while Esc, in paint mode, exited paint behind it.
+
+**Smaller keeps (V-87).** A recovered autosave planted its hidden-folder path
+in the recents and LastDir. Closing the colour picker mid-scrub left a drag on
+the bus that refused every later command. The autosave zipped the document
+mid-frame (now after EndDrawing). The window rect was saved on every exit and
+read by nobody (now restored, position only if still on a monitor). Dropping a
+.ship said "opening projects arrives with M8" in a build whose title bar says
+v1.0.0 — it opens now, through the same unsaved-work guard as Ctrl+O.
+
+**Goldens.** Twelve stale, one cause, verified by cropping the diff region
+before regenerating: the Move button in the toolbar goes from greyed-out to
+accent-lit-with-underline in every shot whose script leaves a body or vertices
+selected (worst delta 215 at (228,34) — the underline row; 99.96% of pixels
+unchanged). m5's push/pull shots went stale under the first draft of `canMove`
+(any selection) and came back on their own once it asked "is a gizmo armed"
+instead — a face selection arms the push/pull arrow, not the gizmo, and the
+button now says so. Regenerated with GOLDEN_UPDATE=1 after the visual check.
+
+**Not fixed, recorded:** the tree panel's width is saved in settings but there
+is still no way to drag-resize it; sketch-toolbar "Finish" and "Close" are the
+same action twice (changing it moves every sketch golden for cosmetics); hover
+picking still waits for pointer motion, so orbiting under a stationary cursor
+can leave a stale highlight for a frame or two.
 
 ---
 

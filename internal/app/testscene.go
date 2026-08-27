@@ -13,8 +13,9 @@ import (
 // cylinder and a rotated box: enough geometry to exercise flat shading, crease
 // edges, face and vertex picking, the tree panel and the golden shots.
 //
-// M2 and M3 replace it with real sketching and extrude; M9 replaces it with the
-// embedded sample ship, built by an op script.
+// Headless runs load it as their known starting state — the golden scripts are
+// written against these three bodies. The interactive app does not: it starts
+// on an empty document and the welcome card (SPEC-UX §14).
 func (a *App) LoadTestScene() {
 	// The hull is a slab with a raised block, and the two are properly unioned
 	// rather than merely both present.

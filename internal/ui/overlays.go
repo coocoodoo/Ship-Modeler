@@ -326,9 +326,15 @@ func (c *Context) ModalOpen() bool { return c.modal != nil }
 func (c *Context) CloseModal() { c.modal = nil }
 
 // ModalResult reports the dialog's outcome.
+//
+// Dismissed is Escape, and it is its own answer. The cancel button carries
+// words — "Close without saving" — and words can be read; Escape is a reflex,
+// and a reflex must never be the one that throws work away. Dismissing a
+// question leaves things exactly as they were.
 type ModalResult struct {
 	Confirmed bool
 	Cancelled bool
+	Dismissed bool
 }
 
 // DrawModal paints the open dialog over the whole window and blocks everything
@@ -370,12 +376,12 @@ func (c *Context) DrawModal(screen rl.Rectangle) ModalResult {
 	}
 
 	if c.In.KeyPressed(rl.KeyEscape) {
-		out.Cancelled = true
+		out.Dismissed = true
 	}
 	if c.In.KeyPressed(rl.KeyEnter) {
 		out.Confirmed = true
 	}
-	if out.Confirmed || out.Cancelled {
+	if out.Confirmed || out.Cancelled || out.Dismissed {
 		c.CloseModal()
 	}
 	// Everything under the dialog is inert while it is up.

@@ -57,6 +57,10 @@ type fileState struct {
 
 	pending     fileAction
 	pendingPath string
+	// confirm holds an action that would replace unsaved work, parked behind
+	// the "discard unsaved changes?" modal until it is answered.
+	confirm     fileAction
+	confirmPath string
 	// exportOpen is the options card; exportFormat indexes io.ExportFormats,
 	// and exportScale and exportAlpha apply to the PNG one.
 	exportOpen   bool
@@ -66,6 +70,9 @@ type fileState struct {
 
 	// sinceAutosave counts up in milliseconds while the document is dirty.
 	sinceAutosave float64
+	// autosaveDue defers the actual write to after EndDrawing: zipping the
+	// document is a disk-and-encode job, and doing it mid-frame was a hitch.
+	autosaveDue bool
 	// autosavePath is the recovery file this session has written, if any.
 	autosavePath string
 
@@ -112,13 +119,47 @@ func (a *App) DocumentTitle() string {
 }
 
 // RequestFile queues a file operation for the end of the frame.
-func (a *App) RequestFile(act fileAction) { a.files.pending = act }
+//
+// An action that would replace unsaved work stops at a question first. The
+// window's close button has always asked; Ctrl+N and Open reached the same
+// cliff without the fence, and one reflexive "new ship" threw the old one away.
+func (a *App) RequestFile(act fileAction) {
+	if a.guardUnsaved(act, "") {
+		return
+	}
+	a.files.pending = act
+}
 
 // RequestOpenPath queues opening a specific file, which is what the welcome
 // screen's recent list does.
 func (a *App) RequestOpenPath(path string) {
+	if a.guardUnsaved(fileOpenPath, path) {
+		return
+	}
 	a.files.pending = fileOpenPath
 	a.files.pendingPath = path
+}
+
+// guardUnsaved parks a destructive action behind the discard prompt when there
+// is unsaved work to lose. It reports whether it did.
+func (a *App) guardUnsaved(act fileAction, path string) bool {
+	switch act {
+	case fileNew, fileOpen, fileOpenPath, fileSample:
+	default:
+		return false
+	}
+	if !a.Doc().DirtySinceSave || a.Headless {
+		return false
+	}
+	a.files.confirm, a.files.confirmPath = act, path
+	a.UI.ShowModal(ui.ModalState{
+		Title:       "Discard unsaved changes?",
+		Body:        a.DocumentName() + " has changes that are not saved.",
+		ConfirmText: "Discard",
+		CancelText:  "Keep working",
+		Danger:      true,
+	})
+	return true
 }
 
 // RunPendingFile performs whatever the frame asked for. It must be called
@@ -170,8 +211,14 @@ func (a *App) openWithDialog() {
 	a.OpenPath(path)
 }
 
-// OpenPath loads a document from disk.
-func (a *App) OpenPath(path string) bool {
+// OpenPath loads a document from disk and remembers where it came from.
+func (a *App) OpenPath(path string) bool { return a.openShip(path, true) }
+
+// openShip is the load itself. remember controls whether the path joins the
+// recents and the last-used directory: a document the user chose does, a
+// recovery file does not — its path is a hidden folder and a generated name,
+// and neither belongs on the welcome card.
+func (a *App) openShip(path string, remember bool) bool {
 	res, err := io.LoadShip(path)
 	if err != nil {
 		a.Toast(ui.Toast{Text: capitalize(err.Error()), Kind: ui.ToastError})
@@ -186,11 +233,12 @@ func (a *App) OpenPath(path string) bool {
 	a.applyCameraState(res.Doc.Camera)
 	a.clearAutosave()
 
-	a.Settings.LastDir = filepath.Dir(path)
-	a.Settings.AddRecentFile(path)
-	a.saveSettings()
-
-	a.Toast(ui.Toast{Text: "Opened " + filepath.Base(path)})
+	if remember {
+		a.Settings.LastDir = filepath.Dir(path)
+		a.Settings.AddRecentFile(path)
+		a.saveSettings()
+		a.Toast(ui.Toast{Text: "Opened " + filepath.Base(path)})
+	}
 	for _, w := range res.Warnings {
 		a.Toast(ui.Toast{Text: w, Kind: ui.ToastWarn})
 	}
@@ -366,7 +414,19 @@ func (a *App) stepAutosave(dtMillis float64) {
 		return
 	}
 	a.files.sinceAutosave = 0
-	a.writeAutosave(false)
+	a.files.autosaveDue = true
+}
+
+// writeDueAutosave runs the write stepAutosave scheduled. It is called from
+// the frame loop after EndDrawing, where a slow disk cannot stall a stroke.
+func (a *App) writeDueAutosave() {
+	if !a.files.autosaveDue {
+		return
+	}
+	a.files.autosaveDue = false
+	if a.Doc().DirtySinceSave {
+		a.writeAutosave(false)
+	}
 }
 
 // writeAutosave puts the whole document somewhere it can be found again.
@@ -415,7 +475,7 @@ func (a *App) RecoverNewest() bool {
 		return false
 	}
 	rec := a.files.recovery[0]
-	if !a.OpenPath(rec.Path) {
+	if !a.openShip(rec.Path, false) {
 		return false
 	}
 	// It came back under the autosave's name; the document it belongs to is

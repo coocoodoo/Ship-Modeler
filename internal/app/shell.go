@@ -125,7 +125,7 @@ func toolbarTools() []toolbarTool {
 		{mode: ModeBoolean, label: "Boolean", shortcut: "B", icon: ui.DrawBooleanIcon,
 			start: func(a *App) { a.BeginBoolean() }, ready: (*App).canBoolean},
 		{mode: ModeIdle, label: "Move", shortcut: "M", icon: ui.DrawMoveIcon,
-			milestone: "M6"},
+			start: func(a *App) { a.focusMove() }, ready: (*App).canMove},
 		{mode: ModePaint, label: "Paint", shortcut: "P", icon: ui.DrawPaintIcon,
 			start: func(a *App) { a.togglePaint() }, ready: (*App).canPaint},
 	}
@@ -154,7 +154,9 @@ func (t toolbarTool) active(a *App) bool {
 	case ModePaint:
 		return a.InPaint()
 	default:
-		return false
+		// Move is not a mode: the gizmo arms itself on the selection, so the
+		// button lights whenever a gizmo is up.
+		return a.InTransform()
 	}
 }
 
@@ -470,6 +472,12 @@ func (a *App) drawColorPicker(b *model.Body) {
 	id := ui.MakeID("body.color")
 	res := a.UI.ColorPicker(id, model.PaletteForBodies())
 	if res.Closed {
+		// Escape can close the popover in the middle of a scrub. The drag on
+		// the bus must not outlive it: a dangling drag refuses every command
+		// after it with "another edit is in progress".
+		if a.Bus.Dragging() {
+			a.Bus.CommitDrag()
+		}
 		a.tree.pickerFor = 0
 		return
 	}

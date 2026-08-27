@@ -335,7 +335,16 @@ func (a *App) update(in InputFrame) {
 			a.updateHover(in, vp)
 		}
 	} else {
-		if a.cardOnlyOwnsPointer(in) {
+		// A camera drag that is already running keeps running wherever the
+		// pointer goes. An orbit is decided when the button goes down, not
+		// re-litigated every pixel: without this it froze the moment the
+		// pointer crossed the toolbar or the tree and resumed on the way back,
+		// which read as the camera stuttering. New drags still cannot start
+		// over chrome — Pressed is only honoured inside the viewport.
+		navDragging := (a.orbiting || a.panning || a.cubeDrag) &&
+			!a.UI.ModalOpen() && !a.showShortcuts
+		if a.cardOnlyOwnsPointer(in) || navDragging {
+			a.handleCubeInput(in, vp)
 			a.handleCameraInput(in, vp)
 		}
 		a.Hover = render.PickResult{}
@@ -361,7 +370,19 @@ func (a *App) update(in InputFrame) {
 	}
 	// Keyboard shortcuts never depend on where the pointer is: pressing L while
 	// the cursor rests over the tree panel must still pick the Line tool.
-	if !a.UI.WantKeyboard() {
+	//
+	// A modal owns the keyboard outright. Without this, Escape on "Save before
+	// closing?" also fell through to the mode underneath — and in paint mode
+	// that left the modal to read the same Escape as its own answer, closing
+	// the program without saving. The shortcut sheet owns it the same way: a
+	// sheet explaining the S key must not be the thing the S key acts through.
+	if !a.UI.WantKeyboard() && !a.UI.ModalOpen() {
+		if a.showShortcuts {
+			if in.KeyPressed(rl.KeyEscape) || (in.KeyPressed(rl.KeySlash) && in.Shift) {
+				a.showShortcuts = false
+			}
+			return
+		}
 		switch {
 		case a.InExtrude():
 			a.handleGlobalKeys(in, vp)
@@ -443,16 +464,37 @@ func (a *App) draw(in InputFrame) {
 	if a.showShortcuts {
 		a.UI.DrawShortcutOverlay(l.Screen, shortcutSheet())
 	}
-	if res := a.UI.DrawModal(l.Screen); res.Confirmed || res.Cancelled {
-		a.UI.CloseModal()
-		if a.closing == closeAsking {
-			a.closeAnswer = closeAnswerDiscard
-			if res.Confirmed {
-				a.closeAnswer = closeAnswerSave
-			}
-		}
-	}
+	a.routeModalAnswer(a.UI.DrawModal(l.Screen))
 	a.UI.End()
+}
+
+// routeModalAnswer connects a dialog's outcome to whichever question put it up.
+//
+// Confirm and the labelled cancel button each mean what they say. Escape is
+// neither: it dismisses the question and keeps things exactly as they were,
+// because a reflex must never be the thing that throws work away.
+func (a *App) routeModalAnswer(res ui.ModalResult) {
+	if !res.Confirmed && !res.Cancelled && !res.Dismissed {
+		return
+	}
+	switch {
+	case a.closing == closeAsking:
+		switch {
+		case res.Confirmed:
+			a.closeAnswer = closeAnswerSave
+		case res.Cancelled:
+			a.closeAnswer = closeAnswerDiscard
+		default:
+			a.closeAnswer = closeAnswerNone
+		}
+	case a.files.confirm != fileNone:
+		// The "discard unsaved changes?" gate in front of New, Open and the
+		// sample. Only an explicit confirm lets the parked action through.
+		if res.Confirmed {
+			a.files.pending, a.files.pendingPath = a.files.confirm, a.files.confirmPath
+		}
+		a.files.confirm, a.files.confirmPath = fileNone, ""
+	}
 }
 
 // HintText is what the hint bar says right now. It never returns an empty

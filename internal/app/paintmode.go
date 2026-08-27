@@ -13,6 +13,7 @@ import (
 
 	"modeler/internal/geom"
 	"modeler/internal/geom/mesh"
+	"modeler/internal/io"
 	"modeler/internal/paint"
 	"modeler/internal/render"
 	"modeler/internal/scene"
@@ -927,23 +928,26 @@ func (a *App) ImportPalette(path string) bool {
 	return true
 }
 
-// handleDroppedFiles is the import path that works today: drop a .hex palette
-// on the window and it lands on the custom page.
-//
-// The file dialogs arrive with M8 (SPEC-DATA §5), and until they do this is the
-// difference between an import that exists and one that is only specced.
+// handleDroppedFiles routes files dragged onto the window: a .ship opens, a
+// .hex palette lands on the custom page.
 func (a *App) handleDroppedFiles(in InputFrame) {
 	for _, path := range in.Dropped {
-		if strings.EqualFold(filepath.Ext(path), ".hex") {
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".hex":
 			if a.ImportPalette(path) && !a.InPaint() {
 				a.BeginPaint()
 			}
-			continue
+		case io.ShipExtension:
+			// Through the request queue, not straight to OpenPath: the unsaved
+			// work guard and the after-frame dialog rules apply to a drop the
+			// same as to Ctrl+O.
+			a.RequestOpenPath(path)
+		default:
+			a.Toast(ui.Toast{
+				Text: "Drop a .ship to open it, or a .hex palette for colours",
+				Kind: ui.ToastWarn,
+			})
 		}
-		a.Toast(ui.Toast{
-			Text: "Only .hex palettes can be dropped for now — opening projects arrives with M8",
-			Kind: ui.ToastWarn,
-		})
 	}
 }
 

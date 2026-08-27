@@ -464,6 +464,12 @@ func (a *App) handleKeys(in InputFrame, vp render.Viewport) {
 	if in.KeyPressed(rl.KeyB) {
 		a.BeginBoolean()
 	}
+	if in.KeyPressed(rl.KeyM) {
+		a.focusMove()
+	}
+	if in.KeyPressed(rl.KeyP) {
+		a.togglePaint()
+	}
 	if in.KeyPressed(rl.KeyH) {
 		a.hideSelection()
 	}
@@ -512,6 +518,10 @@ func (a *App) escape() {
 	case a.tree.renaming.Kind != model.SelNone:
 		a.tree.renaming = model.Ref{}
 		a.UI.ClearFocus()
+	case a.sketch.awaitingPlane:
+		// The hint promises "Esc to cancel" while a plane pick is armed, and a
+		// promise the key does not keep teaches people to stop reading it.
+		a.sketch.awaitingPlane = false
 	case !a.Sel.Empty():
 		a.Sel.Clear()
 	}
