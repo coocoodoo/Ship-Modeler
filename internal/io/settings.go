@@ -43,6 +43,20 @@ type TipCounters struct {
 	PushPull int `json:"pushPull"`
 }
 
+// PaintSettings is what the brush remembers between sessions (SPEC-DATA §6).
+//
+// The armed *tool* is deliberately not here: reaching for a program and finding
+// the fill bucket loaded because that is what you finished with last week is a
+// surprise. What carries over is the setup — how fine the pixels are, how big
+// the brush is, which two colours, and how the ramp is spread.
+type PaintSettings struct {
+	Res    int        `json:"res"`
+	Size   int        `json:"size"`
+	Dither string     `json:"dither"`
+	Color  color.RGBA `json:"color"`
+	ColorB color.RGBA `json:"colorB"`
+}
+
 // Settings is the whole preferences file.
 type Settings struct {
 	Window WindowRect `json:"window"`
@@ -55,13 +69,18 @@ type Settings struct {
 	TreePanelWidth int  `json:"treePanelWidth"`
 	TreeCollapsed  bool `json:"treeCollapsed"`
 
-	GridStep        float64      `json:"gridStep"`
-	MSAA            bool         `json:"msaa"`
-	AutosaveSeconds int          `json:"autosaveSeconds"`
-	RecentFiles     []string     `json:"recentFiles"`
-	CustomPalette   []color.RGBA `json:"customPalette"`
-	RecentColors    []color.RGBA `json:"recentColors"`
-	Tips            TipCounters  `json:"tips"`
+	GridStep        float64       `json:"gridStep"`
+	MSAA            bool          `json:"msaa"`
+	AutosaveSeconds int           `json:"autosaveSeconds"`
+	RecentFiles     []string      `json:"recentFiles"`
+	CustomPalette   []color.RGBA  `json:"customPalette"`
+	RecentColors    []color.RGBA  `json:"recentColors"`
+	Paint           PaintSettings `json:"paint"`
+	Tips            TipCounters   `json:"tips"`
+
+	// LastDir is where the file dialogs open, so the second save starts where
+	// the first one ended.
+	LastDir string `json:"lastDir"`
 
 	// path is where this was loaded from, so Save can write it back.
 	path string
