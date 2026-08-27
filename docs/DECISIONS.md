@@ -897,3 +897,18 @@ surfaced before because until V-84 the interactive app never started empty, so
 the card had never actually been clicked. The state machine is pinned in
 welcome_test.go, GPU-free; there was no golden of the card and the layout was
 never the problem.
+
+**V-92 · A drag update announces what its undo changed, not only what its do
+did.** "Dragging one end of a line up and down leaves behind artifacts" — the
+rubber-band replace (UpdateDrag) undoes the previous frame's shape and draws
+the new one, and the document came out perfect every frame. The bus then
+emitted only the new command's events, so the renderer's texture cache — a
+mirror of the document driven by dirty rects — never heard about the pixels
+the undo had restored. The old shape stayed on screen wherever the new one's
+rect did not cover it. Freehand strokes only ever append, which is why M7
+never met this; shapes shrink and swing, and the gradient escaped because its
+dirty rect is the whole face. UpdateDrag now emits the previous command's
+events after the new one's Do succeeds, so both regions re-upload. Pinned by
+TestRubberBandReplaceKeepsAMirrorTrue, which rebuilds a texel mirror from the
+event stream and demands it match the document exactly — the honest statement
+of what a dirty rect is for.

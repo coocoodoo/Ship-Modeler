@@ -2,9 +2,28 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Post-audit polish: grid step control, cube click guard,
-the elevation pass — and the welcome card's New ship button actually answers
-now (V-91). Suite green (15 packages), exe rebuilt.
+**Current state:** Post-audit polish continues: grid step control, cube click
+guard, the elevation pass, the welcome card answers (V-91), and rubber-banded
+shapes no longer ghost (V-92). Suite green (15 packages), exe rebuilt.
+
+---
+
+## 2026-08-27 (later again) — The line that left its ghosts behind
+
+"When I'm about to place a line and I drag one end up and down, it leaves
+behind artifacts, same with circle." The two-point tools rubber-band by drag
+replace: every frame undoes the previous shape and draws the new one, and the
+document was perfect throughout — the bus just announced only the new
+command's dirty rect, so the texture cache never re-uploaded the region the
+undo had erased. The old line stayed on the GPU wherever the new line's box
+missed it (V-92). Freehand strokes append and never shrink, which is why M7
+never saw it; the gradient escaped because its rect is the whole face.
+
+UpdateDrag now emits the previous command's events too. The new test builds a
+texel mirror out of the event stream — the same thing the renderer is — and
+demands it match the document texel for texel; it failed with 10 stale texels
+on the old code, which is the vertical line minus the texel the two lines
+share.
 
 ---
 

@@ -288,16 +288,24 @@ func (b *Bus) UpdateDrag(cmd Command) error {
 	if b.pending == nil {
 		return b.BeginDrag(cmd)
 	}
-	b.pending.Undo(b.doc)
+	prev := b.pending
+	prev.Undo(b.doc)
 	if err := cmd.Do(b.doc); err != nil {
 		// Put the previous state back so a rejected update does not strand the
 		// document mid-drag.
-		if reErr := b.pending.Do(b.doc); reErr != nil {
+		if reErr := prev.Do(b.doc); reErr != nil {
 			b.pending = nil
 		}
 		return err
 	}
 	b.pending = cmd
+	// The undo above changed the document too: a rubber-banded shape erases
+	// its previous frame before drawing the next one. Whatever mirrors the
+	// document from events — the renderer's texture cache — has to hear about
+	// both regions, or the undone frame stays on screen wherever the new one's
+	// dirty rect happens not to cover it. That was the "dragging a line leaves
+	// artifacts" bug: the document was right and the announcement was half.
+	b.emitFor(prev)
 	b.emitFor(cmd)
 	return nil
 }

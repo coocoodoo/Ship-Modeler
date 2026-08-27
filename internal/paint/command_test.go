@@ -430,3 +430,88 @@ func TestTheSoftBrushBlendsIntoTheBodyColour(t *testing.T) {
 			edge, body.Color)
 	}
 }
+
+// TestRubberBandReplaceKeepsAMirrorTrue is the user's "dragging a line up and
+// down leaves artifacts", 2026-08-27.
+//
+// A two-point tool rubber-bands by drag replace: every UpdateDrag undoes the
+// previous frame's shape and draws the new one. The document came out right —
+// the artifacts lived in anything mirroring it from events, because the bus
+// announced only the new command's dirty rect and said nothing about the
+// pixels the undo had just changed. The renderer's texture cache is such a
+// mirror; this test builds a minimal one out of the same events and demands it
+// end up identical to the document, texel for texel.
+func TestRubberBandReplaceKeepsAMirrorTrue(t *testing.T) {
+	bus, b, uid, fi := painted(t)
+
+	// The face must already carry paint: a drag that allocates emits a full
+	// rebuild every frame, which hides exactly the bug this is pinning.
+	if err := bus.Run(stroke(b.ID, uid, 32, ToolPencil, red, image.Point{X: 0, Y: 0})); err != nil {
+		t.Fatalf("first dab: %v", err)
+	}
+
+	mirror := map[image.Point]color.RGBA{}
+	refreshAll := func() {
+		p := b.Mesh.Faces[fi].Paint
+		if p == nil {
+			mirror = map[image.Point]color.RGBA{}
+			return
+		}
+		r := FaceRect(b.Mesh, fi, p)
+		for y := r.Min.Y; y < r.Max.Y; y++ {
+			for x := r.Min.X; x < r.Max.X; x++ {
+				pt := image.Point{X: x, Y: y}
+				mirror[pt] = At(p, pt)
+			}
+		}
+	}
+	bus.Events.Listen(func(ev model.Event) {
+		switch ev.Kind {
+		case model.EvBodyChanged:
+			refreshAll()
+		case model.EvBodyPainted:
+			for y := ev.Rect.Min.Y; y < ev.Rect.Max.Y; y++ {
+				for x := ev.Rect.Min.X; x < ev.Rect.Max.X; x++ {
+					pt := image.Point{X: x, Y: y}
+					mirror[pt] = At(ev.Paint, pt)
+				}
+			}
+		}
+	})
+	refreshAll()
+
+	// A vertical line, then the drag swings it horizontal: the two overlap in
+	// one texel and nowhere else, so nearly all of the first line has to be
+	// erased — and announced.
+	a := image.Point{X: 2, Y: 2}
+	if err := bus.BeginDrag(stroke(b.ID, uid, 32, ToolLine, red, a, image.Point{X: 2, Y: 12})); err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	if err := bus.UpdateDrag(stroke(b.ID, uid, 32, ToolLine, red, a, image.Point{X: 12, Y: 2})); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	// The document must hold only the final line...
+	if got := at(t, b, fi, 2, 8); got == red {
+		t.Error("the old line's texels are still painted in the document")
+	}
+	if got := at(t, b, fi, 8, 2); got != red {
+		t.Error("the new line is missing from the document")
+	}
+
+	// ...and the mirror must agree with it everywhere.
+	p := b.Mesh.Faces[fi].Paint
+	r := FaceRect(b.Mesh, fi, p)
+	stale := 0
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			pt := image.Point{X: x, Y: y}
+			if mirror[pt] != At(p, pt) {
+				stale++
+			}
+		}
+	}
+	if stale > 0 {
+		t.Errorf("%d texels on screen no longer match the document — the undone shape was never announced", stale)
+	}
+}
