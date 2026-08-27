@@ -68,6 +68,8 @@ func (a *App) buildShell(l Layout) {
 		a.buildBooleanCard(l.Viewport)
 	case a.InSketch():
 		a.buildSketchCard(l.Viewport)
+	case a.InPaint():
+		a.buildPaintPanel(l.Viewport)
 	case a.InTransform():
 		a.buildTransformCard(l.Viewport)
 	}
@@ -118,8 +120,18 @@ func toolbarTools() []toolbarTool {
 		{mode: ModeIdle, label: "Move", shortcut: "M", icon: ui.DrawMoveIcon,
 			milestone: "M6"},
 		{mode: ModePaint, label: "Paint", shortcut: "P", icon: ui.DrawPaintIcon,
-			milestone: "M7"},
+			start: func(a *App) { a.togglePaint() }, ready: (*App).canPaint},
 	}
+}
+
+// togglePaint is what the Paint button and P both do: the same key that gets
+// you into a mode gets you out of it.
+func (a *App) togglePaint() {
+	if a.InPaint() {
+		a.ExitPaint()
+		return
+	}
+	a.BeginPaint()
 }
 
 // active reports whether this tool is the one currently running, which is what
@@ -132,6 +144,8 @@ func (t toolbarTool) active(a *App) bool {
 		return a.InExtrude()
 	case ModeBoolean:
 		return a.InBoolean()
+	case ModePaint:
+		return a.InPaint()
 	default:
 		return false
 	}

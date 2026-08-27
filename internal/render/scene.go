@@ -89,6 +89,13 @@ type Scene struct {
 	// DimFactor fades non-focus geometry while a mode owns the view, e.g.
 	// sketch mode dims the rest of the model to 30% (SPEC-UX §8.1).
 	DimFactor float64
+
+	// PickFacesOnly keeps edges and vertices out of the ID pass. A mode that
+	// can only act on surfaces must not have its cursor captured by the wire
+	// running across one: the pick ribbons are five pixels wide and sit in
+	// front of the faces they belong to (SPEC-RENDER §6.1), so on a busy mesh
+	// they would swallow a brush stroke aimed at the face behind them.
+	PickFacesOnly bool
 }
 
 // Viewport is the sub-rectangle of the window the 3D scene occupies, in device

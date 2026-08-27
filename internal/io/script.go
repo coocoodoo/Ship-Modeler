@@ -50,10 +50,14 @@ type Op struct {
 	// Rect is a box-select rectangle in window pixels.
 	Rect *[4]float64 `json:"rect,omitempty"`
 
-	// Paint ops.
-	Res int     `json:"res,omitempty"`
-	Hex string  `json:"hex,omitempty"`
-	UV  *[2]int `json:"uv,omitempty"`
+	// Paint ops. UV is a texel index, and Points is a run of them: a real
+	// stroke rather than a series of dabs, so a script exercises the same
+	// interpolation the pointer does.
+	Res    int      `json:"res,omitempty"`
+	Hex    string   `json:"hex,omitempty"`
+	UV     *[2]int  `json:"uv,omitempty"`
+	Points [][2]int `json:"points,omitempty"`
+	Size   int      `json:"size,omitempty"`
 
 	// Modifier keys held for the next pointer op. They matter as much as the
 	// position does: Shift adds to a selection, Ctrl snaps fine, Alt is free.
@@ -147,7 +151,10 @@ var knownOps = map[string]bool{
 	"boolean.commit": true, "boolean.cancel": true,
 	"select": true, "move": true, "rotate": true,
 	"duplicate": true, "box.select": true,
-	"paint.res": true, "paint.color": true, "paint.pixel": true,
+	"paint.begin": true, "paint.exit": true, "paint.res": true,
+	"paint.color": true, "paint.tool": true, "paint.size": true,
+	"paint.pixel": true, "paint.stroke": true, "paint.resample": true,
+	"paint.textures": true, "paint.faceview": true,
 	"body.visible": true, "plane.visible": true, "sketch.visible": true,
 	"deselect": true, "delete": true, "undo": true, "redo": true,
 	"hover": true, "click": true, "drag": true, "drag.release": true,
@@ -216,6 +223,34 @@ func (o Op) validate() error {
 	case "body.visible":
 		if o.Body == "" || o.Visible == nil {
 			return o.Errorf("needs body and visible")
+		}
+	case "paint.res", "paint.resample":
+		if o.Res == 0 {
+			return o.Errorf("needs a res")
+		}
+	case "paint.color":
+		if o.Hex == "" {
+			return o.Errorf("needs a hex colour")
+		}
+	case "paint.tool":
+		if o.Kind == "" {
+			return o.Errorf("needs a tool: pencil, eraser, fill or pick")
+		}
+	case "paint.size":
+		if o.Size == 0 {
+			return o.Errorf("needs a size")
+		}
+	case "paint.pixel":
+		if o.Body == "" || o.UV == nil {
+			return o.Errorf("needs body and uv [x,y] in texels")
+		}
+	case "paint.stroke":
+		if o.Body == "" || len(o.Points) == 0 {
+			return o.Errorf("needs body and points [[x,y],...] in texels")
+		}
+	case "paint.textures":
+		if o.Visible == nil {
+			return o.Errorf("needs visible")
 		}
 	}
 	return nil

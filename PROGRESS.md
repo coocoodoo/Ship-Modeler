@@ -2,7 +2,225 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M6 COMPLETE** — bodies, faces, edges and vertices are all selectable and movable; box select, move and rotate gizmos, Ctrl+D. Next up: **M7** (paint mode).
+**Current state:** **M7 COMPLETE.** Paint mode ships: the texel cursor, the four
+tools, the five resolution chips, the palette panel, per-stroke undo, and paint
+that survives a boolean. `build`, `vet` and the full suite are green, and the
+goldens pass twice in a row. Next up: **M8** (save/load, autosave, export).
+
+---
+
+## 2026-08-26 — M7 paint mode: finished
+
+Picking up the hand-off below. The tree it describes as "does not build" builds:
+`palette.go` landed in `75c845a`, and the stroke command plus the render atlas
+landed in `a10c4d9` before this session started. What was left was the whole app
+layer — the cursor, the mode, the panel, the ops, the tests — and it is done.
+
+**What shipped.**
+
+| Piece | Where |
+|---|---|
+| Texel cursor on the 3D face | `internal/scene/paintcursor.go` — brush square outlined in white, internal grid at 1 px, the armed colour previewed inside it, a dashed face rectangle under the fill tool |
+| The mode | `internal/app/paintmode.go` — entry/exit, hover→face→texel, the stroke drag, the eyedropper, Face view, palette import |
+| The panel | `internal/app/paintpanel.go` — tools, sizes, chips, the 8x4 page, recents, the mismatch prompt, the Textures eye |
+| Eraser / fill / dropper / import icons | `internal/ui/icons.go` (D-11: strokes, not glyphs) |
+| Ten paint ops + three dump lines | `internal/io/script.go`, `internal/app/headless.go` |
+| Five scripts, fifteen goldens, seven flow tests | `testdata/scripts/m7_*.json`, `internal/apptest/m7_test.go` |
+
+**Two bugs found by building it, both worth naming.**
+
+*The pick pass swallowed strokes after a cut.* Painting a face, cutting a slot
+through it and then eyedropping the surviving paint read **nothing** — and
+before the cut, at the same pixel, it read the paint. The ID pass draws edge
+ribbons five pixels wide and biases them toward the eye so they win over the
+faces they belong to (SPEC-RENDER §6.1), which is right when you are selecting
+and wrong when you are painting: the boolean had left a fragment boundary under
+the cursor. Paint mode now keeps edges and vertices out of the pass entirely
+(`Scene.PickFacesOnly`, DECISIONS V-46). A brush cannot paint an edge, so there
+was never anything to lose.
+
+*Entering a sketch from paint mode left a stroke pending on the bus.* Exactly one
+mode is active (SPEC-UX §1), but `enterSketch`, `BeginExtrude` and `BeginBoolean`
+each set `a.Mode` directly and none of them knew paint mode existed. A stroke
+mid-drag holds `Bus.pending`; the sketch's first edit would then have arrived on
+top of it. All three now call `ExitPaint`, which commits or drops the stroke
+first.
+
+**The trap the hand-off named was real, and it is handled.** Paint mode arms on
+hover over any face of any visible body, which is the widest hit area in the
+program. `update()` routes to `updatePaint` in its own branch, so
+`updateTransform`, `updatePushPull`, `handleViewportClick` and box select never
+run — disarmed, not merely undrawn. The `Mode == ModeIdle` guard already dropped
+both gizmos.
+
+**Two things from the hand-off's notes I deliberately did not do.**
+
+1. *Copy-on-write before painting a shared fragment.* SPEC-GEOMETRY §8.4 is
+   explicit that v1 keeps the picture shared, the kernel test asserts pointer
+   identity across the boolean, and `command.go` was already written that way.
+   Sharing is the contract, not an oversight (V-45). `paint.Copy` stays for the
+   day it changes.
+2. *Rewriting the `docs/shots` diary.* Turning the Paint button live changed 243
+   pixels of every golden in the repository (x 291–336, y 12–27 — measured
+   before regenerating, per TESTING §5). The regression baselines were
+   regenerated; the diary was not, because it records what each milestone looked
+   like when it landed and a greyed-out Paint button was accurate then (V-52).
+
+**Verified.**
+
+- `go build ./...`, `go vet ./...`, `go test ./...` — all green.
+- Goldens pass twice in a row from a clean run: determinism holds.
+- `go test -race ./internal/model/ ./internal/paint/` — clean.
+- 35 paint unit tests; 12 new app tests (7 flow, 5 golden); 15 new goldens
+  across five scripts.
+- **The persistence contract, end to end** (`TestPaintSurvivesACutInTheApp`):
+  paint the hull's front, cut a slot through it, and the same window pixel lands
+  on the same texel (6,5) of the same picture (sum `bd4f6efd`, texel 0.375 u) now
+  read by **two** fragment faces instead of one — while the mesh went 28 → 54
+  triangles and 348 → 320 u³. The eyedropper reads `#21E7E7` on both sides of the
+  cut.
+- **A real drag** (`TestADraggedStrokeIsLiveAndIsOneStep`): press, twelve frames
+  of motion, release. The picture is live mid-drag, the history does not grow
+  until release, and then by exactly one. This is the path M6's last bug lived
+  on, so it is driven through a real press rather than by calling the command.
+- **Density is per face and fixed** (`TestPaintingAShipAtThreeDensities`): the
+  same 32 px chip gives 0.375 u/texel on a 12 u face and 0.15625 u/texel on a 5 u
+  one, and 128 px gives 0.046875 u/texel on a 6 u one.
+- Frame cost with three painted faces: **mean 1.57 ms, p95 3.11 ms, p99 4.10 ms**
+  at 1280x720, against the 16.6 ms budget (SPEC-RENDER §8).
+
+**Open, and honest about it.**
+
+- The **Import .hex button is disabled**. The import works — drop a `.hex` file
+  on the window — and the button's tooltip says so, but the dialog itself is
+  M8's (`ncruces/zenity`, D-10). `ImportPalette` is the entry point M8 wires up.
+- **Custom colours are not persisted yet.** The HSV picker and the recents strip
+  work in-session; `Settings.CustomPalette` / `RecentColors` already exist and
+  are read at startup, but nothing writes them back. That belongs with M8's
+  settings pass.
+- **No toast per stroke** (V-49), deliberately.
+- The **bent-face warn chip** is still M9's (V-40, unchanged).
+
+**Try it** (`go run ./cmd/modeler`):
+
+1. Press **P**. The planes get out of the way and the palette docks on the right.
+2. Hover the hull — the texels under the brush are outlined *on the surface*.
+   Click a **Res** chip and watch the grid change before you have painted a thing.
+3. Drag across a face. Pick another colour, drag again. **Ctrl+Z** takes back one
+   stroke, not one texel.
+4. Press **G** and click: fill. **E** and drag: erase back to the body's colour.
+   Hold **Alt** and click: eyedropper.
+5. Orbit until a face is nearly edge-on — a **Face view** button appears; press
+   it. Then turn **Textures** off and on to see the bare geometry under the paint.
+6. Paint a face, then cut through it (sketch on the Front plane, extrude
+   subtract, through-all). The pixels stay exactly where they were.
+
+**Next:** M8 — `.ship` save/load, autosave and crash recovery, OBJ/STL/PNG
+export, and the file dialogs that finish the palette import.
+
+---
+
+## 2026-08-26 — M7 paint mode: PAUSED PART-WAY (hand-off to another machine)
+
+> **READ THIS FIRST. `go build ./...` FAILS at this commit and that is expected.**
+> `internal/paint` has its tests and two of its three source files. `palette.go`
+> does not exist yet, so the package does not compile. Nothing outside
+> `internal/paint/` has been touched — every other package is exactly as M6 left
+> it, and deleting the `internal/paint/` directory returns the tree to green.
+
+**Where the work stopped.** Mid-sentence, effectively: the last action was adding
+the `mesh` import to `internal/paint/brush.go`. The next action was to write
+`internal/paint/palette.go`, which is the file that would make the package build.
+
+**Nothing was committed this session, deliberately.** TESTING §5 makes a clean
+`build && test && vet` the gate for every commit, and this tree passes none of
+them, so `git log` still ends at M6's last fix (`901d38f`) and `HEAD` still
+builds. The work lives in the working tree — `git status` shows the untracked
+`internal/paint/` and this modified file, and that is the whole delta.
+
+**What exists (all new, all untracked):**
+
+| File | State | Notes |
+|---|---|---|
+| `internal/paint/mapping_test.go` | **complete** | 7 tests: density from bbox, uv↔world round trip, texel size surviving translate + 90° turn, growth keeping pixels put, the 1024² cap, chip validation, a slanted face |
+| `internal/paint/brush_test.go` | **complete** | 10 tests: stroke interpolation (the dotted-line bug), diagonal connectivity, brush-size squares, eraser to alpha 0, flood fill stopping at a wall and staying in its region, eyedropper compositing, the dirty rect covering everything it painted, nearest resample |
+| `internal/paint/palette_test.go` | **complete** | 4 tests: 32 opaque distinct colours, Lospec `.hex` parsing, rubbish rejection, recents promoting rather than duplicating |
+| `internal/paint/mapping.go` | **complete** | `Allocate`, `Resample`, `UV`, `Texel`, `World`, `Corners`, `Bounds`, `At`, `Set`, `Grow`, `Copy`, `SubImage`, `Blit` |
+| `internal/paint/brush.go` | **complete** | `Tool` (Pencil/Eraser/Fill/Pick), `Brush`, `Stroke` (Bresenham walk + square dabs, returns the dirty rect), `Fill`, `Sample` |
+| `internal/paint/palette.go` | **MISSING — write this first** | needs `PaletteSize = 32`, `RecentsSize = 8`, `DefaultPalette()`, `ParseHex(io.Reader)`, `Recents` with `Add`/`List`. The tests pin the exact contract |
+
+**None of the tests have ever been run.** They were written before the code they
+test, per PLAN §0, and the package has not compiled yet. Expect real failures on
+first run — that is the point of writing them first, not a sign something is wrong.
+
+**Design decisions already made** (so the next session does not re-litigate them):
+
+1. **Texture layout: one atlas per body, keyed by `*mesh.FacePaint` — not one GPU
+   texture per face.** PLAN's M7 checklist says "GPU texture per painted face";
+   this is a deliberate deviation and **still needs a `docs/DECISIONS.md` entry**.
+   Two reasons. A body is one `rl.Mesh` and one `rl.DrawMesh` call, so per-face
+   textures would mean splitting every painted body into N meshes and rebuilding
+   that split after every boolean. And SPEC-GEOMETRY §8.4 has boolean fragments
+   *share* one `FacePaint` by pointer — an atlas keyed by the paint object stores
+   that image once and lets every fragment sharing it map into the same region,
+   which is what the contract actually describes.
+2. **Atlas rebuild policy.** Pixels changing (every stroke) → `UpdateTextureRec`
+   on the stroke's dirty rect. *Layout* changing (first stroke on a face, or a
+   resample) → drop the whole `BodyGPU` via the existing `a.dropGPU(id)` path and
+   let it rebuild. Layout changes are rare; geometry edits already do exactly this.
+3. **The shader is already done.** `shadedFS` in `internal/render/shaders.go`
+   composites `texture0` over the body colour by texel alpha and is driven by the
+   `useTexture` uniform, whose location is already fetched in `NewRenderer`.
+   `drawBody` currently hard-codes `useTexture = 0` — that line and the diffuse
+   map binding are the whole render-side change.
+4. **Vertex UVs.** `BuildBodyGPU` already writes a `texcoords` entry per vertex
+   (currently `0,0`, with a comment saying M7 fills them). Vertices are duplicated
+   per face for flat shading, so each face can carry its own UVs, and because the
+   paint mapping is affine within the face's plane, linear interpolation across
+   its triangles is exact. No mesh re-upload is needed for a stroke.
+5. **Copy-on-write is required and is not written yet.** Fragments share a
+   `FacePaint` by pointer identity (`csg` guarantees it, `TestPaintSurvivesACut`
+   proves it). Painting one fragment must therefore `paint.Copy` first, or the
+   stroke lands on every sibling that came from the same original face. `Copy`
+   exists in `mapping.go`; nothing calls it yet.
+6. **Glyphs.** SPEC-UX §13.1 draws the panel with `✏ ◻ ▨ 💧 👁`. **None of those
+   are in the font atlas** and `TestEveryMessageIsRenderable` sweeps every script
+   for unrenderable runes. Use stroke icons (D-11) — `ui.DrawPencilIcon` and
+   `ui.DrawEyeIcon` already exist; an eraser, a fill bucket and a dropper need
+   drawing in `internal/ui/icons.go`.
+
+**Still to do after `palette.go`, in the order I intended to take them:**
+
+1. `go test ./internal/paint/` — fix whatever the 21 tests turn up.
+2. `internal/model/paint.go` — the `PaintStroke` command: dirty-rect before/after
+   sub-images (`paint.SubImage` / `paint.Blit`), coalesced per mouse-down through
+   the existing `BeginDrag`/`UpdateDrag`/`CommitDrag` bus API, 40 MB cap per
+   SPEC-DATA §3.3. Palette and recents are settings, **not** document state.
+3. Render: the per-body atlas, UV fill in `BuildBodyGPU`, `useTexture` in
+   `drawBody`, nearest filtering, dirty-rect uploads.
+4. `internal/scene/paintcursor.go` — the texel cursor as a `render.Overlay`
+   (`paint.Corners` gives the four world points; trace them as `OverlayLine`s).
+5. `internal/app/paintmode.go` — mode entry, ray→face→texel, stroke drag, the
+   res-mismatch prompt, the >70° oblique "Face view" chip, the Textures toggle.
+   Wire the toolbar button in `shell.go` (currently `start: nil, milestone: "M7"`)
+   and `P` in `handleKeys`.
+6. Ops: `paint.res`, `paint.color`, `paint.pixel` are already in `knownOps` in
+   `internal/io/script.go` and already have their `io.Op` fields (`Res`, `Hex`,
+   `UV`) — they just have no executor. Add `paint.tool` / `paint.size` /
+   `paint.textures` alongside them, and add a `paint` line to `dump()`.
+7. Scripts + goldens: at least `m7_painted.json` (TESTING §4 wants a painted ship
+   flow test), plus goldens at more than one resolution per the M7 accept clause.
+
+**One trap worth naming.** M6's last bug was two tools armed on the same pixel,
+where the invisible one ate the press. Paint mode arms on *hover over any face of
+any visible body*, which is the widest hit area in the program — check what else
+is live in `update()` when `ModePaint` is set, and make sure the transform gizmo
+and the push/pull arrow are both disarmed, not merely undrawn.
+
+**Verified:** nothing. No build, no tests, no shots this session — the package is
+incomplete by design of where the pause fell.
+
+**Next:** write `internal/paint/palette.go`, then run `go test ./internal/paint/`.
 
 ---
 

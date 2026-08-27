@@ -319,3 +319,54 @@ func DrawFlipIcon(cx, cy, size float64, col color.RGBA) {
 	line(v2(cx-h*0.8, cy+h*0.35), v2(cx+h*0.8, cy+h*0.35), w, col)
 	poly(w, col, v2(cx-h*0.4, cy-h*0.05), v2(cx-h*0.85, cy+h*0.35), v2(cx-h*0.4, cy+h*0.75))
 }
+
+// Paint tool icons (SPEC-UX §13.1). The panel is specced with emoji, which the
+// font atlas does not carry — every glyph in this program is a stroke drawing
+// for exactly that reason (D-11).
+
+// DrawEraserIcon is a rubber on its side, wiping right to left.
+func DrawEraserIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	// The block, leaning the way a held eraser does.
+	closedPoly(w, col,
+		v2(cx-h*0.35, cy+h*0.5), v2(cx+h*0.3, cy-h*0.7),
+		v2(cx+h*0.85, cy-h*0.2), v2(cx+h*0.2, cy+h*0.5))
+	// The worn edge it rubs with, and the line it has cleared.
+	line(v2(cx-h*0.05, cy-h*0.1), v2(cx+h*0.55, cy+h*0.4), w, col)
+	line(v2(cx-h*0.85, cy+h*0.75), v2(cx+h*0.6, cy+h*0.75), w, col)
+}
+
+// DrawFillIcon is a tipped bucket with a drop coming out of it.
+func DrawFillIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	closedPoly(w, col,
+		v2(cx-h*0.8, cy-h*0.15), v2(cx+h*0.15, cy-h*0.8),
+		v2(cx+h*0.7, cy+h*0.1), v2(cx-h*0.25, cy+h*0.75))
+	// The handle, and the drop that has already left.
+	poly(w, col, v2(cx-h*0.55, cy-h*0.4), v2(cx-h*0.2, cy-h*0.85), v2(cx+h*0.1, cy-h*0.55))
+	rl.DrawCircleV(v2(cx+h*0.72, cy+h*0.6), float32(h*0.2), col)
+}
+
+// DrawDropperIcon is the eyedropper: a slanted pipette with a bulb.
+func DrawDropperIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	line(v2(cx-h*0.8, cy+h*0.8), v2(cx+h*0.25, cy-h*0.25), w, col)
+	closedPoly(w, col,
+		v2(cx+h*0.05, cy-h*0.45), v2(cx+h*0.45, cy-h*0.85),
+		v2(cx+h*0.85, cy-h*0.45), v2(cx+h*0.45, cy-h*0.05))
+	// The tip, drawn solid: it is the part that touches the pixel.
+	rl.DrawCircleV(v2(cx-h*0.72, cy+h*0.72), float32(h*0.2), col)
+}
+
+// DrawImportIcon is an arrow landing in a tray, used by the palette import.
+func DrawImportIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	line(v2(cx, cy-h*0.85), v2(cx, cy+h*0.15), w, col)
+	poly(w, col, v2(cx-h*0.4, cy-h*0.25), v2(cx, cy+h*0.2), v2(cx+h*0.4, cy-h*0.25))
+	poly(w, col, v2(cx-h*0.8, cy+h*0.35), v2(cx-h*0.8, cy+h*0.8),
+		v2(cx+h*0.8, cy+h*0.8), v2(cx+h*0.8, cy+h*0.35))
+}

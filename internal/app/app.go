@@ -81,6 +81,7 @@ type App struct {
 	pushPull  pushPullState
 	transform transformState
 	box       boxSelectState
+	paint     paintState
 
 	// hoverSketch is the visible sketch under the pointer, which the ID buffer
 	// cannot report because an overlay is not geometry.
@@ -134,6 +135,7 @@ func New(headless bool) *App {
 		Headless: headless,
 	}
 	a.tree.init(settings)
+	a.initPaint()
 	a.Bus.Events.Listen(a.onDocumentEvent)
 
 	if settingsErr != nil && !headless {
@@ -182,6 +184,14 @@ func (a *App) onDocumentEvent(ev model.Event) {
 	switch ev.Kind {
 	case model.EvBodyChanged, model.EvBodyAdded, model.EvBodyRemoved:
 		a.dropGPU(ev.BodyID)
+	case model.EvBodyPainted:
+		// Texels changed and nothing else did, so the body's mesh and its atlas
+		// layout still stand: re-upload the rectangle the stroke wrote rather
+		// than rebuilding and re-uploading the whole body. That difference is
+		// what makes a stroke feel like a stroke.
+		if g, ok := a.gpu[ev.BodyID]; ok && !g.UpdatePaint(ev.Paint, ev.Rect) {
+			a.dropGPU(ev.BodyID)
+		}
 	case model.EvDocReplaced:
 		for id := range a.gpu {
 			a.dropGPU(id)
@@ -286,6 +296,12 @@ func (a *App) update(in InputFrame) {
 			a.updateBoolean(in, vp)
 		} else if a.InSketch() {
 			a.updateSketch(in, vp)
+		} else if a.InPaint() {
+			// Paint mode owns the left button outright. Nothing else may be
+			// hit-tested under the cursor: the selection tools, the box
+			// rectangle and both gizmos are all disarmed rather than merely
+			// undrawn, which is the trap M6 fell into.
+			a.updatePaint(in, vp)
 		} else {
 			// The handles get first refusal on a click, in the order they are
 			// drawn: nothing armed on the selection may be picked out from
@@ -305,7 +321,14 @@ func (a *App) update(in InputFrame) {
 	} else {
 		a.Hover = render.PickResult{}
 		a.sketch.hasSnap = false
+		// A stroke that runs off the viewport and is released over the palette
+		// still ends there. Leaving it open until the pointer wandered back
+		// would put the next click's texels on the end of the last stroke.
+		if a.InPaint() {
+			a.paintChromeFrame(in)
+		}
 	}
+	a.handleDroppedFiles(in)
 
 	// The gizmos follow the selection, not the pointer. Arming them inside the
 	// branch above would leave them stale whenever the cursor happened to be
@@ -330,6 +353,9 @@ func (a *App) update(in InputFrame) {
 		case a.InSketch():
 			a.handleGlobalKeys(in, vp)
 			a.handleSketchKeys(in)
+		case a.InPaint():
+			a.handleGlobalKeys(in, vp)
+			a.handlePaintKeys(in)
 		default:
 			a.handleKeys(in, vp)
 			a.handleTransformKeys(in)
@@ -392,6 +418,9 @@ func (a *App) HintText() string {
 	}
 	if a.InBoolean() {
 		return a.booleanHint()
+	}
+	if a.InPaint() {
+		return a.paintHint()
 	}
 	if a.InPushPull() {
 		return a.pushPullHint()

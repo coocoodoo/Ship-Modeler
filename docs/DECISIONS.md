@@ -474,3 +474,81 @@ says otherwise this is the place to add one.
 `duplicate`, and `box.select` (rect, kind) drive the real gizmo and the real
 coalesced commands. `select` gained `kind: "vert"` and `kind: "edge"`. The
 `dump` op grew a `gizmo` line carrying the mode, the pivot and the box filter.
+
+### 2026-08-26 — M7
+
+**V-44 · One texture atlas per body, not one texture per painted face.**
+PLAN's M7 checklist says "GPU texture per painted face". A body is one `rl.Mesh`
+drawn in one `DrawMesh` call, so per-face textures would mean splitting every
+painted body into as many meshes as it has painted faces and rebuilding that
+split after every boolean. The atlas is keyed by the `*mesh.FacePaint` pointer
+rather than by the face, which makes the shared-paint contract of
+SPEC-GEOMETRY §8.4 fall out for free: fragments of a cut face reference one
+picture, so they map into one region of the atlas and stay in step with no
+special case. Pixels changing re-uploads the stroke's dirty rectangle; only a
+*layout* change — a first stroke, a resample, a picture that grew past its slot
+— rebuilds the body's render form, and geometry edits already do exactly that.
+Evidence: `TestPaintSurvivesACutInTheApp`, `TestGoldenPaintedShip`.
+
+**V-45 · Fragments of a cut face keep sharing one picture; no copy-on-write.**
+SPEC-GEOMETRY §8.4 is explicit that v1 keeps the picture shared, and the kernel
+test (`TestPaintSurvivesACut`) asserts pointer identity across the boolean. So a
+stroke on one fragment shows on its siblings, which is right rather than
+surprising: the mapping is anchored in the world, so a texel belongs to exactly
+one place however many faces read the picture it lives in. `paint.Copy` exists
+for the day that changes. Evidence:
+`TestAStrokeOnOneFragmentShowsOnItsSiblings`.
+
+**V-46 · Paint mode picks faces only.**
+The ID pass draws edge ribbons five pixels wide and vertex quads nine, biased
+toward the eye so they beat the surfaces they belong to (SPEC-RENDER §6.1). A
+brush cannot paint an edge, so in paint mode they are kept out of the pass
+entirely (`Scene.PickFacesOnly`). This was not theoretical: after a boolean cut
+the fragment boundary sat under the cursor and swallowed a stroke aimed at the
+face behind it, and the eyedropper read nothing where there was plainly paint.
+
+**V-47 · The texel cursor shows the grid a face has not got yet.**
+Hovering an unpainted face allocates nothing, but the cursor still needs a
+mapping to outline. The resolution chip's provisional `paint.Allocate` is cached
+per (body, face, chip) and rebuilt only when one of the three changes — at 512 px
+that allocation is a megabyte, so doing it per frame was never an option. It also
+makes the chips mean something before you commit: you can see 16 px against
+128 px on the face itself. Evidence:
+`TestTheCursorShowsTheGridBeforeYouCommitToIt`.
+
+**V-48 · `.hex` import lands by file drop until M8 brings the dialogs.**
+SPEC-UX §13.3 wants Import .hex behind a file dialog, and dialogs
+(`ncruces/zenity`, D-10) belong to M8's file work. Rather than ship a parser
+nothing can reach, dropping a `.hex` file on the window imports it, and the
+button is disabled with a tooltip that says so — SPEC-UX §15's rule that a
+disabled control explains how to enable it. M8 wires the same `ImportPalette`
+entry point to the dialog.
+
+**V-49 · A stroke is not announced by a toast.**
+SPEC-UX §15 asks for a toast per completed op. A stroke per mouse-up is not that
+kind of op — a minute of painting would be a minute of toasts — so strokes are
+silent and the things that are genuinely news keep their toasts: a picked
+colour, a resample, an eraser on a face with no paint. The undo entry is still
+there and still named.
+
+**V-50 · Paint-mode keys are D/E/G/I, and they are mode-local.**
+SPEC-UX §16's global map gives E to Extrude. Inside paint mode E is the eraser,
+the way sketch mode already takes V/L/R/C for its own tools. The letters are the
+ones `paint.Tool.Shortcut` had already pinned. P leaves the mode, which is what
+pressing the tool's own key a second time should do.
+
+**V-51 · Ops added for M7 flows.** `paint.begin` / `paint.exit`, `paint.res`,
+`paint.color`, `paint.tool`, `paint.size`, `paint.pixel`, `paint.stroke` (a
+texel path, so a script exercises the same interpolation a drag does),
+`paint.resample`, `paint.textures` and `paint.faceview`. The `dump` op grew a
+`paint` line (brush state), a `painthover` line (face, texel, obliqueness) and a
+`facepaint` line per distinct picture — including a hash of its pixels, because
+a stroke over already-painted texels leaves the painted *count* exactly where it
+was, and that is most of what an undo has to put back.
+
+**V-52 · Every earlier golden was regenerated, for one button.**
+Shipping the Paint tool turned its toolbar button from disabled-grey to live,
+which changed 243 pixels of every shot in the suite (x 291–336, y 12–27 —
+measured, then regenerated per TESTING §5). The `docs/shots` diary was
+deliberately *not* rewritten: it records what each milestone looked like when it
+landed, and a greyed-out Paint button was accurate then.

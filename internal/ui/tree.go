@@ -116,7 +116,8 @@ func (c *Context) TreeRow(id ID, r rl.Rectangle, spec TreeRowSpec) TreeRowResult
 	if spec.Swatch != nil {
 		sw, remaining := SplitRight(rest, c.Px(TreeRowHeight))
 		rest = remaining
-		if c.ColorSwatch(id.Child("swatch"), Inset(sw, c.Px(5)), *spec.Swatch) {
+		if c.ColorSwatch(id.Child("swatch"), Inset(sw, c.Px(5)), *spec.Swatch,
+			SwatchOpts{Tooltip: "Body colour"}) {
 			out.ClickedSwatch = true
 		}
 	}

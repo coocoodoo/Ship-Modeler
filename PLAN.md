@@ -207,12 +207,12 @@ Specs: UX §12, GEOM §7.
 
 ### M7 — Paint mode (L)
 Specs: UX §13, GEOM §8.
-- [ ] Paint mode `P`: right palette panel (embedded default 32-color palette, custom colors via HSV picker, recents, `.hex` Lospec import)
-- [ ] Resolution chips **16/32/128/256/512** (R13) — texel density fixed at first paint from face bbox (GEOM §8.2); per-face resize prompt with nearest resample
-- [ ] Tools: Pencil, Eraser (to body color), Fill, Eyedropper (Alt), brush sizes 1/2/4; live **texel cursor** outline on the 3D face; strokes via pick-pass→face-frame UV; oblique-angle hint + "Face view" button
-- [ ] Textures: `image.RGBA` source of truth in `paint`, GPU texture per painted face with nearest filter, dirty-rect `UpdateTextureRec` uploads; per-stroke dirty-rect undo (DATA §3.3); texture on/off view toggle
-- [ ] **Paint persistence test:** paint a face, subtract a hole through it, pixels stay glued (GEOM §8.4)
-**Accept:** paint hull plating + cockpit glow on a ship; goldens at multiple resolutions.
+- [x] Paint mode `P`: right palette panel (embedded default 32-color palette, custom colors via HSV picker, recents, `.hex` Lospec import — by file drop until M8's dialogs, DECISIONS V-48)
+- [x] Resolution chips **16/32/128/256/512** (R13) — texel density fixed at first paint from face bbox (GEOM §8.2); per-face resize prompt with nearest resample
+- [x] Tools: Pencil, Eraser (to body color), Fill, Eyedropper (Alt), brush sizes 1/2/4; live **texel cursor** outline on the 3D face; strokes via pick-pass→face-frame UV; oblique-angle hint + "Face view" button
+- [x] Textures: `image.RGBA` source of truth in `paint`, one nearest-filtered atlas per body (V-44, not per face) with dirty-rect `UpdateTextureRec` uploads; per-stroke dirty-rect undo (DATA §3.3); texture on/off view toggle
+- [x] **Paint persistence test:** paint a face, subtract a hole through it, pixels stay glued (GEOM §8.4)
+**Accept:** paint hull plating + cockpit glow on a ship; goldens at multiple resolutions. — **MET** (goldens `m7_painted`, `m7_cursor`, `m7_resample`, `m7_persist`, `m7_stroke`; one hull painted at 32 px and 128 px in the same shot; frame cost 1.57 ms mean / 4.1 ms p99 against a 16.6 ms budget). `TestPaintSurvivesACutInTheApp` reads the painted colour back through the eyedropper at the same window pixel after a boolean rebuilt the mesh under it.
 
 ### M8 — Files: save/load, autosave, export (M)
 Specs: DATA §4–6.

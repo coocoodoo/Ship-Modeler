@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"image"
 	"os"
 	"path/filepath"
 	"sort"
@@ -16,6 +17,7 @@ import (
 	"modeler/internal/geom/mesh"
 	"modeler/internal/io"
 	"modeler/internal/model"
+	"modeler/internal/paint"
 	"modeler/internal/render"
 	"modeler/internal/scene"
 	"modeler/internal/sketch"
@@ -365,6 +367,13 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return op.Errorf("unknown sketch tool %q", op.Kind)
 		}
 		a.sketch.session.SetTool(t)
+
+	case "paint.begin", "paint.exit", "paint.res", "paint.color", "paint.tool",
+		"paint.size", "paint.pixel", "paint.stroke", "paint.resample",
+		"paint.textures", "paint.faceview":
+		if err := r.paintOp(op); err != nil {
+			return err
+		}
 
 	default:
 		return op.Errorf("op is not implemented yet in this build")
@@ -890,6 +899,113 @@ func (r *ScriptRunner) booleanOp(op io.Op, commit bool) error {
 	return nil
 }
 
+// paintOp runs the paint ops through the same brush, palette and command the
+// pointer drives, so a scripted ship and a painted one are the same code path.
+func (r *ScriptRunner) paintOp(op io.Op) error {
+	a := r.App
+	switch op.Op {
+	case "paint.begin":
+		if !a.BeginPaint() {
+			return op.Errorf("paint mode would not open")
+		}
+
+	case "paint.exit":
+		if !a.InPaint() {
+			return op.Errorf("paint mode is not open")
+		}
+		a.ExitPaint()
+
+	case "paint.res":
+		if !a.SetPaintRes(op.Res) {
+			return op.Errorf("%d is not a paint resolution", op.Res)
+		}
+
+	case "paint.color":
+		c, ok := paint.ParseColor(op.Hex)
+		if !ok {
+			return op.Errorf("%q is not an RRGGBB colour", op.Hex)
+		}
+		a.setPaintColor(c)
+
+	case "paint.tool":
+		t, ok := parsePaintTool(op.Kind)
+		if !ok {
+			return op.Errorf("unknown paint tool %q", op.Kind)
+		}
+		a.paint.tool = t
+
+	case "paint.size":
+		if !validBrushSize(op.Size) {
+			return op.Errorf("%d is not a brush size", op.Size)
+		}
+		a.paint.size = op.Size
+
+	case "paint.textures":
+		a.paint.hideTextures = !*op.Visible
+
+	case "paint.faceview":
+		if !a.FaceView() {
+			return op.Errorf("nothing is under the cursor to look at")
+		}
+
+	case "paint.pixel", "paint.stroke":
+		f, err := r.faceByIndex(op)
+		if err != nil {
+			return err
+		}
+		pts := texelPoints(op)
+		if !a.PaintFace(f.body.ID, f.uid, pts) {
+			return op.Errorf("the stroke was refused")
+		}
+
+	case "paint.resample":
+		f, err := r.faceByIndex(op)
+		if err != nil {
+			return err
+		}
+		if !a.ResampleFace(f.body.ID, f.uid, op.Res) {
+			return op.Errorf("the resample was refused")
+		}
+	}
+	return nil
+}
+
+// texelPoints reads a paint op's texel path: one point for a pixel, a run for
+// a stroke.
+func texelPoints(op io.Op) []image.Point {
+	if op.UV != nil {
+		return []image.Point{{X: op.UV[0], Y: op.UV[1]}}
+	}
+	pts := make([]image.Point, 0, len(op.Points))
+	for _, p := range op.Points {
+		pts = append(pts, image.Point{X: p[0], Y: p[1]})
+	}
+	return pts
+}
+
+func parsePaintTool(s string) (paint.Tool, bool) {
+	switch s {
+	case "pencil", "":
+		return paint.ToolPencil, true
+	case "eraser":
+		return paint.ToolEraser, true
+	case "fill":
+		return paint.ToolFill, true
+	case "pick":
+		return paint.ToolPick, true
+	}
+	return 0, false
+}
+
+func validBrushSize(v int) bool {
+	for _, s := range paint.BrushSizes {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
+
 // vec converts an op's world-unit point into sketch subunits.
 func vec(p *[2]float64) geom.Vec2i {
 	if p == nil {
@@ -1000,11 +1116,106 @@ func (r *ScriptRunner) dump() {
 				sk.ID, sk.Body, boolBit(a.faceRefAlive(sk)))
 		}
 	}
+	r.dumpPaint()
 	fmt.Printf("sel count=%d desc=%q\n", a.Sel.Len(), a.Sel.Describe(doc))
 	fmt.Printf("hint %q\n", a.HintText())
 	for _, t := range a.UI.Toasts() {
 		fmt.Printf("toast %q\n", t.Text)
 	}
+}
+
+// dumpPaint reports the brush and every painted face, which is how a flow test
+// asserts that paint went where it was aimed and stayed there.
+//
+// Texels are counted rather than compared as pixels: a picture that survived a
+// boolean with the right number of opaque texels in the right world positions
+// is the claim SPEC-GEOMETRY §8.4 actually makes, and it is one a screenshot
+// cannot make for you.
+func (r *ScriptRunner) dumpPaint() {
+	a := r.App
+	st := &a.paint
+	fmt.Printf("paint mode=%d tool=%q size=%d res=%d color=%q textures=%d\n",
+		boolBit(a.InPaint()), st.tool.String(), st.size, st.res,
+		paint.Hex(st.color), boolBit(!st.hideTextures))
+
+	if h := st.hover; h.ok && h.paint != nil {
+		fmt.Printf("painthover body=%d face=%d texel=%d,%d res=%d allocated=%d oblique=%.1f\n",
+			h.body, h.face.Seq(), h.texel.X, h.texel.Y, h.paint.Res,
+			boolBit(h.allocated), h.obliqueDeg)
+	}
+
+	for _, b := range a.Doc().Bodies {
+		if b.Mesh == nil {
+			continue
+		}
+		// One line per distinct picture, not per face: fragments of a cut face
+		// share theirs, and that sharing is the contract under test.
+		seen := map[*mesh.FacePaint]bool{}
+		for fi := range b.Mesh.Faces {
+			p := b.Mesh.Faces[fi].Paint
+			if p == nil || seen[p] {
+				continue
+			}
+			seen[p] = true
+			bounds := p.TexelBounds()
+			fmt.Printf("facepaint body=%d face=%d faces=%d res=%d texel=%.8f "+
+				"rect=%d,%d,%d,%d opaque=%d sum=%08x\n",
+				b.ID, b.Mesh.Faces[fi].ID.Seq(), facesSharing(b.Mesh, p), p.Res, p.Texel,
+				bounds.Min.X, bounds.Min.Y, bounds.Max.X, bounds.Max.Y,
+				opaqueTexels(p), pictureSum(p))
+		}
+	}
+}
+
+// facesSharing counts how many of a body's faces read from one picture.
+func facesSharing(m *mesh.Mesh, p *mesh.FacePaint) int {
+	n := 0
+	for fi := range m.Faces {
+		if m.Faces[fi].Paint == p {
+			n++
+		}
+	}
+	return n
+}
+
+// pictureSum is a hash of a picture's pixels, so a test can say "this is the
+// same picture as before" without shipping the picture.
+//
+// A count of painted texels cannot answer that: a stroke that recolours texels
+// that were already painted leaves the count exactly where it was, which is
+// most of what an undo has to put back.
+func pictureSum(p *mesh.FacePaint) uint32 {
+	if p == nil || p.Img == nil {
+		return 0
+	}
+	// FNV-1a over the pixels, plus the origin, because a picture that grew is
+	// not the same picture even if its bytes match.
+	const offset, prime = uint32(2166136261), uint32(16777619)
+	sum := offset
+	eat := func(b byte) { sum = (sum ^ uint32(b)) * prime }
+	for _, v := range [2]int{p.Off.X, p.Off.Y} {
+		for shift := 0; shift < 32; shift += 8 {
+			eat(byte(uint32(v) >> shift))
+		}
+	}
+	for _, b := range p.Img.Pix {
+		eat(b)
+	}
+	return sum
+}
+
+// opaqueTexels is how many texels of a picture have been painted.
+func opaqueTexels(p *mesh.FacePaint) int {
+	if p == nil || p.Img == nil {
+		return 0
+	}
+	n := 0
+	for i := 3; i < len(p.Img.Pix); i += 4 {
+		if p.Img.Pix[i] != 0 {
+			n++
+		}
+	}
+	return n
 }
 
 // bodyValid reports whether a body is a solid the rest of the program can

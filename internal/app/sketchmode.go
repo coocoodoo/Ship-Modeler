@@ -71,6 +71,10 @@ func (a *App) EditSketch(s *model.Sketch) {
 }
 
 func (a *App) enterSketch(s *model.Sketch) {
+	// Exactly one mode is active (SPEC-UX §1), so anything else running steps
+	// aside — including a paint stroke, which would otherwise still be holding
+	// the bus's pending command when the sketch's first edit arrives.
+	a.ExitPaint()
 	a.sketch.session = sketch.NewSession(s.ID)
 	a.sketch.selectedRegions = map[int]bool{}
 	a.sketch.hoverRegion = -1

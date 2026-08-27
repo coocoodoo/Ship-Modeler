@@ -26,6 +26,10 @@ type InputFrame struct {
 
 	Shift, Ctrl, Alt bool
 
+	// Dropped are files dragged onto the window this frame. It is how a .hex
+	// palette gets in before the file dialogs of M8 (SPEC-UX §13.3).
+	Dropped []string
+
 	WindowW, WindowH int
 	DeltaMillis      float64
 }
@@ -83,7 +87,7 @@ var watchedKeys = []int32{
 	rl.KeyLeftShift, rl.KeyRightShift,
 	rl.KeyLeftControl, rl.KeyRightControl,
 	rl.KeyLeftAlt, rl.KeyRightAlt,
-	rl.KeyZ, rl.KeyY, rl.KeyD, rl.KeyN, rl.KeyA,
+	rl.KeyZ, rl.KeyY, rl.KeyD, rl.KeyN, rl.KeyA, rl.KeyG, rl.KeyI,
 	rl.KeyBackspace, rl.KeyLeft, rl.KeyRight, rl.KeyHome, rl.KeyEnd,
 	rl.KeySlash,
 }
@@ -122,6 +126,11 @@ func PollInput(dtMillis float64) InputFrame {
 			break
 		}
 		f.Chars = append(f.Chars, rune(c))
+	}
+
+	if rl.IsFileDropped() {
+		f.Dropped = rl.LoadDroppedFiles()
+		rl.UnloadDroppedFiles()
 	}
 
 	f.Shift = f.KeysDown[rl.KeyLeftShift] || f.KeysDown[rl.KeyRightShift]

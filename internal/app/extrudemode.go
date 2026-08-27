@@ -50,6 +50,7 @@ func (a *App) InExtrude() bool { return a.Mode == ModeExtrude && a.extrude.tool 
 // BeginExtrude opens the tool on the selected regions of the active sketch
 // (SPEC-UX §9.1).
 func (a *App) BeginExtrude() bool {
+	a.ExitPaint()
 	s := a.ActiveSketch()
 	// From Idle, a sketch picked in the tree is enough to start: re-enter it and
 	// take all of its regions (SPEC-UX §9.1).

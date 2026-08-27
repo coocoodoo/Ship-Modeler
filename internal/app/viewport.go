@@ -17,7 +17,14 @@ import (
 // BuildScene assembles this frame's draw list from the document.
 func (a *App) BuildScene() render.Scene {
 	doc := a.Doc()
-	s := render.Scene{Camera: a.Camera, DimFactor: 1}
+	s := render.Scene{
+		Camera:    a.Camera,
+		DimFactor: 1,
+		// A brush paints faces. Letting an edge or a vertex win the pixel under
+		// the cursor would be a stroke that lands on nothing, on exactly the
+		// meshes where the wires are densest.
+		PickFacesOnly: a.InPaint(),
+	}
 
 	for _, b := range doc.Bodies {
 		if !b.Visible || b.Mesh == nil {
@@ -32,6 +39,10 @@ func (a *App) BuildScene() render.Scene {
 			Transform: geom.Identity(),
 			Pickable:  true,
 			Selected:  a.Sel.Contains(ref),
+			// The Textures eye shows the bare geometry under the pixels
+			// (SPEC-UX §13.2). It is a view setting, not an edit: the images
+			// are untouched and the eye puts them straight back.
+			HideTexture: a.paint.hideTextures,
 		}
 		// Hovering a body's row in the tree pre-highlights it in the viewport
 		// (SPEC-UX §7).
@@ -80,6 +91,8 @@ func (a *App) BuildScene() render.Scene {
 	switch {
 	case a.InExtrude():
 		s.Gizmo = a.buildExtrudeGizmo(vpr)
+	case a.InPaint():
+		s.Gizmo = a.paintCursorOverlay()
 	case a.InPushPull():
 		s.Gizmo = a.buildPushPullGizmo(vpr)
 	default:
@@ -236,6 +249,12 @@ func (a *App) FrameSelection(vp render.Viewport) {
 // pulled. The model itself stays exactly as it was.
 func (a *App) previewOwnsView() bool {
 	if a.InExtrude() {
+		return true
+	}
+	// Paint mode hides them for the same reason and for its whole duration
+	// (SPEC-UX §13.1): a translucent quad across a face is exactly the thing
+	// that makes you doubt the colour you are looking at.
+	if a.InPaint() {
 		return true
 	}
 	t := a.pushPull.tool

@@ -20,16 +20,42 @@ type popoverState struct {
 	alpha   uint8
 }
 
+// SwatchOpts configures a colour chip.
+type SwatchOpts struct {
+	// Tooltip names what this chip is for. A swatch is a colour and nothing
+	// else on screen, so the copy is the only thing that says whether clicking
+	// it recolours a body or arms a brush.
+	Tooltip string
+	// Selected rings the chip: which of a page of colours is the live one.
+	Selected bool
+	// Empty draws the chip as an unfilled slot, for a recents strip that has
+	// not filled up yet.
+	Empty bool
+}
+
 // ColorSwatch draws a colour chip and reports a click on it.
-func (c *Context) ColorSwatch(id ID, r rl.Rectangle, col color.RGBA) bool {
-	it := c.interact(id, r, false)
+func (c *Context) ColorSwatch(id ID, r rl.Rectangle, col color.RGBA, opts SwatchOpts) bool {
+	it := c.interact(id, r, opts.Empty)
+	if opts.Empty {
+		c.StrokeRounded(r, 4, Fade(ColorStroke, 0.7))
+		return false
+	}
 	c.FillRounded(r, 4, col)
+
 	border := ColorStroke
-	if it.Hovered {
+	switch {
+	case opts.Selected:
+		border = ColorText
+	case it.Hovered:
 		border = ColorText
 	}
 	c.StrokeRounded(r, 4, border)
-	c.queueTooltip(id, r, it, "Body colour", "", "")
+	if opts.Selected {
+		// A second ring outside the first, so the armed colour still reads as
+		// armed against a pale swatch where one white line would vanish.
+		c.StrokeRounded(Inset(r, -c.hairline()*2), 5, ColorAccent)
+	}
+	c.queueTooltip(id, r, it, opts.Tooltip, "", "")
 	return it.Clicked
 }
 
@@ -128,7 +154,9 @@ func (c *Context) ColorPicker(id ID, presets []color.RGBA) ColorPickerResult {
 		for i, p := range presets {
 			col, row := i%8, i/8
 			sr := Rect(inner.X+float32(col)*(size+c.Px(4)), y+float32(row)*(size+c.Px(4)), size, size)
-			if c.ColorSwatch(id.Child("preset"+itoa(i)), sr, p) {
+			if c.ColorSwatch(id.Child("preset"+itoa(i)), sr, p, SwatchOpts{
+				Tooltip: "#" + hexOf(p),
+			}) {
 				c.popover.h, c.popover.s, c.popover.v = rgbToHSV(p)
 				out.Changed = true
 			}
@@ -238,4 +266,17 @@ func hsvToRGB(h, s, v float64, alpha uint8) color.RGBA {
 	}
 	to8 := func(f float64) uint8 { return uint8(math.Round(clamp01(f+m) * 255)) }
 	return color.RGBA{R: to8(r), G: to8(g), B: to8(b), A: alpha}
+}
+
+// hexOf spells a colour the way the palette files and the tooltips do. It is a
+// copy of paint.Hex rather than a call to it, because the widget kit sits below
+// everything and imports none of it (PLAN §4).
+func hexOf(c color.RGBA) string {
+	const digits = "0123456789ABCDEF"
+	out := make([]byte, 6)
+	for i, v := range [3]uint8{c.R, c.G, c.B} {
+		out[i*2] = digits[v>>4]
+		out[i*2+1] = digits[v&0x0F]
+	}
+	return string(out)
 }

@@ -33,6 +33,7 @@ func (a *App) BeginBoolean() bool {
 		})
 		return false
 	}
+	a.ExitPaint()
 	t := tools.NewBooleanTool()
 	for _, ref := range a.Sel.Refs() {
 		if ref.Kind == model.SelBody {

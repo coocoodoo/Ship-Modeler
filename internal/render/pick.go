@@ -211,6 +211,9 @@ func (r *Renderer) pickPlanes(s *Scene) {
 // the faces, biased toward the eye so they win the depth test where they
 // overlap the surfaces they belong to (SPEC-RENDER §6.1).
 func (r *Renderer) pickEdgesAndVerts(s *Scene, vp Viewport) {
+	if s.PickFacesOnly {
+		return
+	}
 	c := r.ribbonCtx(s.Camera, vp)
 	rl.DisableBackfaceCulling()
 
