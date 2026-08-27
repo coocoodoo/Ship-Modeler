@@ -285,6 +285,12 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return op.Errorf("could not start a sketch on the %s plane", op.Plane)
 		}
 
+	case "sketch.grid":
+		if op.Step <= 0 {
+			return op.Errorf("sketch.grid needs a positive step")
+		}
+		a.Settings.GridStep = op.Step
+
 	case "sketch.line":
 		if err := r.addEntity(op, model.NewLine(vec(op.From), vec(op.To))); err != nil {
 			return err

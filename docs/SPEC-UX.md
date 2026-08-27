@@ -111,7 +111,7 @@ Row anatomy: `[eye] [type icon] [name] [color swatch (bodies)] […hover: rename
 ## 8. Sketch mode (R2, R3)
 
 ### 8.1 Entering
-From Idle: `S` then click a plane/flat face, or double-click a plane, or tree-row double-click. On enter: camera animates to look squarely at the plane (normal-on, 220 ms; nearest cardinal up), rest of scene dims to 30% + non-target geometry becomes non-pickable, sketch grid fades in (minor 1 u, major 8 u, both fade by zoom so ~≥8 px spacing), origin cross + U/V axis lines in soft X/Y colors. Toolbar swaps to sketch tools; contextual card shows sketch info (entity count, region count, open ends count).
+From Idle: `S` then click a plane/flat face, or double-click a plane, or tree-row double-click. On enter: camera animates to look squarely at the plane (normal-on, 220 ms; nearest cardinal up), rest of scene dims to 30% + non-target geometry becomes non-pickable, sketch grid fades in (minor every grid step, major every 8th line, both fade by zoom so ~≥8 px spacing), origin cross + U/V axis lines in soft X/Y colors. The grid step is a Grid chip row on the contextual card — 0.25 / 0.5 / 1 / 2 u, default 1, persisted in settings — and the snap grid follows it, so the drawn lines and the landing points are always the same lines (V-89). Toolbar swaps to sketch tools; contextual card shows sketch info (entity count, region count, open ends count).
 
 ### 8.2 Sketch toolbar
 Select (V) · Line (L) · Rectangle (R) · Circle (C) · Delete (Del works on selection too). Active tool highlighted; hint bar per tool:

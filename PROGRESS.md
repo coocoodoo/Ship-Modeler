@@ -2,10 +2,53 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **Post-M9 audit done.** "A lot of things aren't working" was
-right, and the biggest finding explains the rest: the interactive app never
-showed what M8 and M9 built. All fixed, suite green (15 packages), exe rebuilt.
-The UX §15 feel checklist is still yours.
+**Current state:** Post-audit polish round two: the sketch grid got a step
+control, the view cube stopped leaking clicks into the tools, and the whole
+chrome got the elevation pass it was missing. Suite green (15 packages),
+every golden regenerated once for the restyle, exe rebuilt.
+
+---
+
+## 2026-08-27 (later) — Grid steps, the cube's clicks, and the look
+
+Three user asks in one sitting.
+
+**"Add a way to change the grid size" (V-89).** `Settings.GridStep` had
+existed since M2: the snap read it, nothing ever set it, and the drawn grid
+ignored it entirely at a hardcoded unit — a setting wired to one consumer and
+no producer. Now a Grid chip row on the sketch card (0.25 / 0.5 / 1 / 2 u)
+sets it, and the drawn grid and the snap both read the one value. Major lines
+follow every eighth minor rather than every eight units, so the rhythm holds
+at every step and the default grid stays pixel-identical. New `sketch.grid`
+op; the `m9_grid` golden renders 0.5 u and 2 u and asserts the two shots
+differ — chips that changed nothing on screen would fail it. Snap-side unit
+tests in `grid_test.go` (including the Ctrl override and the zero-step
+fallback).
+
+**"Clicking the cube also triggers sketching" (V-90).** True, and not only
+sketching: updateSketch, updateBoolean, both arrow gizmos and the transform
+gizmo all consumed presses by geometry alone, and the cube floats inside the
+viewport. Idle's handleViewportClick has checked the cube since M1; the tools
+that came after each needed to learn it. It has a name now — cubeOwnsPointer —
+and all five ask it.
+
+**"Make the UI cooler, looks crappy and low quality" (V-88).** The honest
+diagnosis: no depth anywhere. Background, panel and card sat within a few
+points of value of each other; nothing cast a shadow; the viewport gradient
+ran dark-side-up. The pass, all in the kit so every widget inherits it:
+deeper, wider-spaced value ladder; a layered soft shadow with falloff under
+every floating surface (three iterations to get here — equal-strength rings
+read first as grey halos between stacked toasts, then as sticker outlines;
+the fixes were a shadows-before-bodies pass for the toast stack and a
+weighted falloff); a one-pixel top bevel on raised surfaces and filled
+buttons; the viewport gradient flipped light-side-up and widened; an accent
+wash on the active tool button. Reviewed by rendering the sample ship, sketch,
+paint and transform shots before regenerating — every golden changed, as a
+whole-frame gradient must. README hero updated as a new diary shot
+(docs/shots/v1_hero.png); the old m9_sample.png stays, historical as always.
+
+**Also:** `bareApp` in the app tests grew Settings; scene's grid test covers
+the step scaling and the zero fallback.
 
 ---
 

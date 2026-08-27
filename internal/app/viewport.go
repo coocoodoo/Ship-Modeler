@@ -112,7 +112,7 @@ func (a *App) BuildScene() render.Scene {
 	if a.InSketch() || a.InExtrude() {
 		s.DimFactor = SketchDimFactor
 		if sk := a.ActiveSketch(); sk != nil {
-			s.Grid = scene.SketchGridFor(sk)
+			s.Grid = scene.SketchGridFor(sk, a.gridStep())
 		}
 		for i := range s.Bodies {
 			s.Bodies[i].Pickable = false
@@ -164,6 +164,18 @@ func (a *App) viewportHoverRef() model.Ref {
 		return model.BodyRef(a.Hover.BodyID)
 	}
 	return model.Ref{}
+}
+
+// cubeOwnsPointer reports that the view cube is under the pointer or holds a
+// drag, so the viewport tools must leave this click alone.
+//
+// The cube floats inside the viewport, and every tool that consumed presses by
+// geometry alone acted straight through it: clicking FRONT while sketching
+// snapped the camera and put a line point down, both from the one click. Idle
+// mode always knew this (handleViewportClick has checked the cube since M1) —
+// the tools that came later each had to learn it, so now it has a name.
+func (a *App) cubeOwnsPointer(in InputFrame) bool {
+	return a.cubeDrag || a.Cube.Contains(in.MouseX, in.MouseY)
 }
 
 // handleCubeInput implements clicking a zone to snap and dragging to orbit.
@@ -339,7 +351,7 @@ func (a *App) handleCameraInput(in InputFrame, vp render.Viewport) {
 
 // handleViewportClick turns a left click in the 3D view into a selection.
 func (a *App) handleViewportClick(in InputFrame, vp render.Viewport) {
-	if !in.Pressed[MouseLeft] || a.cubeDrag || a.Cube.Contains(in.MouseX, in.MouseY) {
+	if !in.Pressed[MouseLeft] || a.cubeOwnsPointer(in) {
 		return
 	}
 	if !vp.Contains(int(in.MouseX), int(in.MouseY)) {

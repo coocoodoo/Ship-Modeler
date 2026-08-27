@@ -276,9 +276,10 @@ func appendSnapGlyph(d *render.Overlay, v SketchView) {
 	})
 }
 
-// SketchGrid builds the grid for a sketch plane at full strength.
-func SketchGridFor(s *model.Sketch) *render.GridDraw {
-	return SketchGrid(s.Frame(), SketchGridHalf, 1)
+// SketchGridFor builds the grid for a sketch plane at full strength, spaced at
+// the given step in units.
+func SketchGridFor(s *model.Sketch, step float64) *render.GridDraw {
+	return SketchGrid(s.Frame(), SketchGridHalf, 1, step)
 }
 
 // RegionAt returns the index of the region containing a sketch point, or -1.

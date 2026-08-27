@@ -77,6 +77,7 @@ func (c *Context) drawTooltip() {
 		box.Y = c.tip.anchor.Y - box.Height - c.Px(4)
 	}
 
+	c.Shadow(box, CornerRadius, 1)
 	c.FillRounded(box, CornerRadius, ColorCard)
 	c.StrokeRounded(box, CornerRadius, ColorStroke)
 	textBox := InsetXY(box, pad, 0)
@@ -160,15 +161,28 @@ func (c *Context) DrawToasts(area rl.Rectangle) {
 	gap := c.Px(toastStackGap)
 	baseY := area.Y + area.Height - h - c.Px(Spacing*2)
 
+	boxAt := func(i int) rl.Rectangle {
+		idx := len(c.toasts) - 1 - i
+		return Rect(area.X+(area.Width-w)/2, baseY-float32(idx)*(h+gap), w, h)
+	}
+	alphaOf := func(t *Toast) float64 {
+		if t.remaining < toastFadeMs {
+			return t.remaining / toastFadeMs
+		}
+		return 1
+	}
+
+	// Every shadow before any body: a stack sits closer together than a
+	// shadow reaches, and a shadow painted over the neighbouring toast reads
+	// as a grey halo around it rather than as depth under it.
+	for i := range c.toasts {
+		c.Shadow(boxAt(i), CornerRadius, alphaOf(&c.toasts[i]))
+	}
+
 	for i := len(c.toasts) - 1; i >= 0; i-- {
 		t := &c.toasts[i]
-		idx := len(c.toasts) - 1 - i
-		box := Rect(area.X+(area.Width-w)/2, baseY-float32(idx)*(h+gap), w, h)
-
-		alpha := 1.0
-		if t.remaining < toastFadeMs {
-			alpha = t.remaining / toastFadeMs
-		}
+		box := boxAt(i)
+		alpha := alphaOf(t)
 
 		c.FillRounded(box, CornerRadius, Fade(ColorCard, alpha))
 		c.StrokeRounded(box, CornerRadius, Fade(ColorStroke, alpha))

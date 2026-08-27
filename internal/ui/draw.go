@@ -130,10 +130,45 @@ func (c *Context) Panel(r rl.Rectangle) {
 	FillRect(r, ColorPanel)
 }
 
-// Card paints a floating card: rounded, slightly lighter, with a border.
+// Shadow lays the soft drop shadow a raised surface sits on: a few expanding
+// translucent layers standing in for a blur, offset downward because the light
+// comes from above. Cheap enough to run under every card every frame, and the
+// single biggest reason the chrome stopped looking pasted on (V-88).
+func (c *Context) Shadow(r rl.Rectangle, radius, alpha float64) {
+	ink := Fade(ColorShadow, alpha)
+	if ink.A == 0 {
+		return
+	}
+	// Layered rings standing in for a blur, with the density falling away as
+	// they spread. Equal-strength rings pile into a flat dark band with a hard
+	// outer rim — a sticker outline, not a shadow; the falloff is what makes
+	// the ink thin out the way light does.
+	weights := [5]float64{1, 0.65, 0.4, 0.22, 0.1}
+	for i := 1; i <= 5; i++ {
+		spread := c.Px(float64(i) * 1.8)
+		drop := c.Px(float64(i) * 1.1)
+		layer := rl.Rectangle{
+			X: r.X - spread, Y: r.Y - spread + drop,
+			Width: r.Width + 2*spread, Height: r.Height + 2*spread,
+		}
+		c.FillRounded(layer, radius+float64(i)*1.8, Fade(ink, weights[i-1]))
+	}
+}
+
+// Bevel runs the one-pixel light along a raised surface's top edge, inset past
+// the corner radius so it never pokes out of the rounding.
+func (c *Context) Bevel(r rl.Rectangle, radius float64) {
+	in := c.Px(radius)
+	c.HairlineH(r.X+in, r.Y+c.hairline(), r.Width-2*in, ColorBevel)
+}
+
+// Card paints a floating card: shadowed, rounded, lit along its top edge, with
+// a border.
 func (c *Context) Card(r rl.Rectangle) {
+	c.Shadow(r, CardRadius, 1)
 	c.FillRounded(r, CardRadius, ColorCard)
 	c.StrokeRounded(r, CardRadius, ColorStroke)
+	c.Bevel(r, CardRadius)
 }
 
 // HairlineH draws a horizontal separator across a rectangle's top edge.

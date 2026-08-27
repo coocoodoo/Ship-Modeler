@@ -113,3 +113,28 @@ func TestTheSampleShipBuildsEndToEnd(t *testing.T) {
 		}
 	}
 }
+
+// TestGoldenGridStep pins the grid-step control (the user's request,
+// 2026-08-27): the same sketch drawn over a half-unit grid and a two-unit one.
+// The two shots must differ from each other — a step that changed nothing on
+// screen would mean the chips are decoration.
+func TestGoldenGridStep(t *testing.T) {
+	_, outDir := runScript(t, "m9_grid")
+	checkGolden(t, "m9_grid", outDir)
+
+	half, err := LoadPNG(outDir + "/m9_grid_half.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	two, err := LoadPNG(outDir + "/m9_grid_two.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Compare(half, two)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Differs() {
+		t.Error("a 0.5 u grid and a 2 u grid rendered identically — the step is not reaching the drawn grid")
+	}
+}

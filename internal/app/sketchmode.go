@@ -129,10 +129,24 @@ func (a *App) subunitsPerPixel(vp render.Viewport) float64 {
 	return geom.Unit / px
 }
 
+// gridStep is the sketch grid's spacing in units: the setting when it is
+// sane, one unit when it is not. Snapping and the drawn grid both read this,
+// so what the eye lands on and what the point lands on are always the same
+// lines.
+func (a *App) gridStep() float64 {
+	if s := a.Settings.GridStep; s > 0 {
+		return s
+	}
+	return 1
+}
+
+// SketchGridSteps are the spacings the card offers, in units.
+var SketchGridSteps = []float64{0.25, 0.5, 1, 2}
+
 // snapConfig builds this frame's snap tolerances.
 func (a *App) snapConfig(in InputFrame, vp render.Viewport) sketch.Config {
 	c := sketch.DefaultConfig(a.subunitsPerPixel(vp))
-	c.GridStep = geom.ToSubunits(a.Settings.GridStep)
+	c.GridStep = geom.ToSubunits(a.gridStep())
 	if c.GridStep <= 0 {
 		c.GridStep = geom.SubunitsPerUnit
 	}
@@ -235,6 +249,14 @@ func (a *App) updateSketch(in InputFrame, vp render.Viewport) {
 		return
 	}
 	sess := a.sketch.session
+
+	// The view cube is not the sketch plane. Without this, clicking a zone to
+	// turn the camera also put a point down through it.
+	if a.cubeOwnsPointer(in) {
+		a.sketch.hasSnap = false
+		a.sketch.hoverRegion = -1
+		return
+	}
 
 	raw, ok := a.cursorInSketchPlane(in, vp)
 	a.sketch.hasSnap = ok

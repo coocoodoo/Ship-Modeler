@@ -86,7 +86,7 @@ func (a *App) updatePushPull(in InputFrame, vp render.Viewport) {
 		return
 	}
 	dist, along := tools.AxisDistancePx(in.MouseX, in.MouseY, ax, ay, bx, by)
-	a.pushPull.hoverArrow = dist <= tools.ArrowGrabRadiusPx
+	a.pushPull.hoverArrow = dist <= tools.ArrowGrabRadiusPx && !a.cubeOwnsPointer(in)
 
 	if in.Pressed[MouseLeft] && a.pushPull.hoverArrow {
 		t.BeginDrag(along)

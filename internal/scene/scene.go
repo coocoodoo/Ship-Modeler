@@ -68,15 +68,24 @@ func BuildPlaneDraws(vis PlaneVisibility, hovered, selected geom.PlaneKind, hasH
 	return out
 }
 
-// SketchGrid builds the grid draw for a sketch plane: minor lines every unit,
-// major every eight, with the frame's U and V axes tinted by the world axis
-// they follow (SPEC-UX §8.1).
-func SketchGrid(f geom.Frame, halfSize, alpha float64) *render.GridDraw {
+// SketchGrid builds the grid draw for a sketch plane: minor lines every step,
+// major every eighth line, with the frame's U and V axes tinted by the world
+// axis they follow (SPEC-UX §8.1).
+//
+// Major-every-eighth-line rather than major-every-eight-units keeps the visual
+// rhythm the same at every step, and at the default step of 1 it is exactly
+// the grid the program has always drawn. The renderer already drops lines
+// whose screen spacing falls under 8 px, so a fine grid zoomed out fades away
+// instead of dissolving into moire.
+func SketchGrid(f geom.Frame, halfSize, alpha, step float64) *render.GridDraw {
+	if step <= 0 {
+		step = 1
+	}
 	return &render.GridDraw{
 		Frame:      f,
 		HalfSize:   halfSize,
-		MinorStep:  1,
-		MajorStep:  8,
+		MinorStep:  step,
+		MajorStep:  step * 8,
 		Alpha:      alpha,
 		ShowAxes:   true,
 		AxisUColor: ui.Fade(axisTint(f.U), 0.8),

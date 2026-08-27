@@ -77,6 +77,9 @@ func (a *App) updateTransform(in InputFrame, vp render.Viewport) {
 
 	if !t.Dragging() {
 		t.Hover = scene.GizmoHit(view, in.MouseX, in.MouseY)
+		if a.cubeOwnsPointer(in) {
+			t.Hover = tools.PartNone
+		}
 		if in.Pressed[MouseLeft] && t.Hover != tools.PartNone {
 			raw, angle := a.rawDrag(t, t.Hover, in, vp)
 			t.Begin(t.Hover, raw, angle)

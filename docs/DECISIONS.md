@@ -849,3 +849,39 @@ rather than mid-frame, so the two-minute tick cannot hitch a stroke. The saved
 window rectangle — written since M8, read by nothing — is applied at launch,
 position only if it still lands on a monitor. And a dropped .ship opens the way
 a dropped .hex imports, through the same guard as Ctrl+O.
+
+**V-88 · The look: elevation, and a ladder with wider rungs.** "Make the UI
+cooler, looks crappy and low quality" — and the diagnosis is that nothing in
+the chrome had any depth: background, panel and card sat within a few points of
+value of each other and nothing cast a shadow, so every card read as pasted
+on. Three moves, all in the kit so every widget gets them for free: the value
+ladder deepened and widened (theme.go), every floating surface — card, popover,
+modal, tooltip, toast — now sits on a layered soft shadow with falloff (equal
+rings read as a sticker outline; the falloff is what makes it a shadow), and
+raised surfaces carry a one-pixel top bevel. The viewport gradient also
+flipped: it ran dark-on-top, and light falls from above. The active tool
+button gained an accent wash beside its underline. A toast stack draws all its
+shadows before any body, because a shadow painted over the neighbouring toast
+is a halo, not depth. Every golden regenerated — the gradient touches every
+pixel — after eyeballing the sample, sketch, paint and transform shots.
+
+**V-89 · The sketch grid has a step, and it is one setting.** The user asked
+for a way to change the grid size while sketching. `Settings.GridStep` had
+existed since M2 — the snap read it, nothing set it, and the drawn grid
+ignored it at a hardcoded unit. Now one row of chips on the sketch card
+(0.25 / 0.5 / 1 / 2 u) writes the setting, and both the snap and the drawn
+grid read it, so the lines the eye lands on are the lines the point lands on.
+The major line follows every eighth minor rather than every eight units,
+keeping the visual rhythm identical at every step — and making the default
+grid pixel-identical to what the program always drew. Ctrl remains the ¼ u
+override and Alt still suppresses snapping (SPEC-UX §16). The step persists in
+settings, drives the `sketch.grid` script op, and `m9_grid` pins two spacings
+against each other: a step that changed nothing on screen would fail the test.
+
+**V-90 · The view cube owns its clicks.** Clicking a cube zone while sketching
+turned the camera *and* put a point down through it — updateSketch consumed
+presses by plane geometry alone, and the cube lives inside the viewport. Idle
+mode has known this since M1 (handleViewportClick always checked the cube);
+every later tool had to learn it separately, so it now has a name —
+cubeOwnsPointer — and sketch, boolean, both arrow gizmos and the transform
+gizmo all ask it before taking a press.

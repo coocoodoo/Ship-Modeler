@@ -7,7 +7,7 @@ the result out as glTF, OBJ, STL or a PNG.
 Everything is grid-snapped and every texture is sampled nearest-neighbour, all
 the way out to the exported file. The pixels you place are the pixels you get.
 
-![The sample ship](docs/shots/m9_sample.png)
+![The sample ship](docs/shots/v1_hero.png)
 
 ## Quickstart
 
@@ -18,7 +18,8 @@ To build one yourself:
    camera turns to face it and a grid appears.
 2. **Draw a closed profile** with Line (`L`), Rectangle (`R`) or Circle (`C`).
    Closed shapes fill in; loose ends show as red rings, because only a closed
-   profile can be pulled into a solid.
+   profile can be pulled into a solid. The **Grid** chips on the sketch card
+   set the grid and snap spacing, from a quarter unit to two.
 3. **Press `E`** and drag the arrow. The Extrude card sets the depth, a draft
    angle, and whether the result is a new body or is added to, cut out of, or
    intersected with what it reaches.

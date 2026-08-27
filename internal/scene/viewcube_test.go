@@ -285,9 +285,17 @@ func TestPlaneColorsFollowTheirAxis(t *testing.T) {
 }
 
 func TestSketchGridSteps(t *testing.T) {
-	g := SketchGrid(geom.PlaneFrame(geom.PlaneFront), 24, 1)
+	g := SketchGrid(geom.PlaneFrame(geom.PlaneFront), 24, 1, 1)
 	if g.MinorStep != 1 || g.MajorStep != 8 {
 		t.Errorf("grid steps = %v/%v, want 1/8", g.MinorStep, g.MajorStep)
+	}
+	// The step scales both lines together, keeping the every-eighth rhythm.
+	if g := SketchGrid(geom.PlaneFrame(geom.PlaneFront), 24, 1, 0.5); g.MinorStep != 0.5 || g.MajorStep != 4 {
+		t.Errorf("half grid steps = %v/%v, want 0.5/4", g.MinorStep, g.MajorStep)
+	}
+	// A broken step falls back to the unit grid rather than to no lines.
+	if g := SketchGrid(geom.PlaneFrame(geom.PlaneFront), 24, 1, 0); g.MinorStep != 1 {
+		t.Errorf("zero step drew at %v, want the 1 u fallback", g.MinorStep)
 	}
 	if !g.ShowAxes {
 		t.Error("the sketch grid should show its origin axes")

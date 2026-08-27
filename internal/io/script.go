@@ -26,6 +26,7 @@ type Op struct {
 	C     *[2]float64 `json:"c,omitempty"`
 	R     float64     `json:"r,omitempty"`
 	Segs  int         `json:"segs,omitempty"`
+	Step  float64     `json:"step,omitempty"`
 
 	// Extrude and boolean ops.
 	Sketch  string   `json:"sketch,omitempty"`
@@ -149,7 +150,8 @@ func LoadScript(path string) (*Script, error) {
 var knownOps = map[string]bool{
 	"sketch.begin": true, "sketch.line": true, "sketch.rect": true,
 	"sketch.circle": true, "sketch.finish": true, "sketch.tool": true,
-	"sketch.face": true, "sketch.project": true, "pushpull": true,
+	"sketch.face": true, "sketch.project": true, "sketch.grid": true,
+	"pushpull": true,
 	"extrude": true, "extrude.begin": true, "extrude.commit": true,
 	"extrude.cancel": true,
 	"boolean":        true, "boolean.begin": true,

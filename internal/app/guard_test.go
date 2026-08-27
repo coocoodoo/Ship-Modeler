@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	"modeler/internal/io"
 	"modeler/internal/model"
 	"modeler/internal/ui"
 )
@@ -12,11 +13,12 @@ import (
 // disaster — an action or a keystroke quietly discarding work.
 
 // bareApp is the minimum App these flows touch. No renderer, no fonts, no
-// window: ShowModal and the file queue are plain fields.
+// window: ShowModal, the file queue and the settings are plain fields.
 func bareApp() *App {
 	return &App{
-		Bus: model.NewBus(model.NewDocument()),
-		UI:  ui.NewContext(nil, 1),
+		Bus:      model.NewBus(model.NewDocument()),
+		UI:       ui.NewContext(nil, 1),
+		Settings: io.DefaultSettings(),
 	}
 }
 

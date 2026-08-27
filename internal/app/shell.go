@@ -570,6 +570,9 @@ func (a *App) toastWithUndo(text string) {
 	})
 }
 
+// trimFloat prints a chip-sized number: "0.25", "0.5", "1", "2".
+func trimFloat(v float64) string { return fmt.Sprintf("%g", v) }
+
 func itoa(n int) string {
 	if n == 0 {
 		return "0"
@@ -686,7 +689,7 @@ func (a *App) buildSketchCard(viewport rl.Rectangle) {
 
 	onFace, faceGone := a.faceSketchState(s)
 	w := a.px(232)
-	h := a.px(150)
+	h := a.px(198)
 	if s.Consumed {
 		h += a.px(44)
 	}
@@ -744,6 +747,35 @@ func (a *App) buildSketchCard(viewport rl.Rectangle) {
 		if i, ok := a.selectedCircle(s, sess); ok {
 			a.Run(&model.SetCircleSegs{Sketch: s.ID, Index: i, Segs: values[pick]})
 		}
+	}
+
+	body.Y += a.px(6)
+	body.Height -= a.px(6)
+
+	// The grid step (the user's request, 2026-08-27). One row of chips, not a
+	// number field: four spacings cover pixel-art scales, and a chip can be
+	// hit without leaving the drawing headspace. Snap and the drawn grid both
+	// follow it, so the lines you see are the lines you land on.
+	row, body = ui.SplitTop(body, line)
+	a.UI.Text(row, "Grid", ui.FontSizeSmall, ui.ColorTextDim)
+	unitNote, _ := ui.SplitRight(row, a.px(90))
+	a.UI.Text(unitNote, "units", ui.FontSizeSmall, ui.Fade(ui.ColorTextDim, 0.7))
+
+	row, body = ui.SplitTop(body, a.px(24))
+	gridLabels := make([]string, len(SketchGridSteps))
+	gridSel := -1
+	for i, v := range SketchGridSteps {
+		gridLabels[i] = trimFloat(v)
+		if v == a.gridStep() {
+			gridSel = i
+		}
+	}
+	if pick, changed := a.UI.ChipGroup(ui.MakeID("sketch.grid"), row, gridLabels, gridSel,
+		ui.ChipGroupOpts{
+			Tooltip: "Grid and snap spacing — Ctrl snaps to 1/4 u, Alt to nothing",
+		}); changed {
+		a.Settings.GridStep = SketchGridSteps[pick]
+		a.saveSettings()
 	}
 
 	// A face sketch can copy the shape it is sitting on into real entities,

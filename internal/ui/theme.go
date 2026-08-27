@@ -6,29 +6,43 @@ package ui
 import "image/color"
 
 // Theme tokens — SPEC-UX §3. Nothing outside this file may invent a color.
+//
+// The 2026-08-27 pass deepened the whole ladder one step and widened the gaps
+// between its rungs. The old palette kept background, panel and card within a
+// few points of value of each other, which with no shadows anywhere read as one
+// flat sheet; depth needs both the contrast here and the elevation cues the
+// draw layer now adds (V-88).
 var (
-	ColorBG      = rgb(0x16, 0x18, 0x1D) // window background
-	ColorPanel   = rgb(0x1E, 0x21, 0x28) // toolbar, tree, hint bar
-	ColorCard    = rgb(0x26, 0x2A, 0x33) // floating cards, fields
-	ColorStroke  = rgb(0x34, 0x39, 0x45) // hairlines, borders
+	ColorBG      = rgb(0x11, 0x13, 0x19) // window background
+	ColorPanel   = rgb(0x1A, 0x1D, 0x25) // toolbar, tree, hint bar
+	ColorCard    = rgb(0x25, 0x2A, 0x35) // floating cards, fields
+	ColorStroke  = rgb(0x3A, 0x41, 0x50) // hairlines, borders
 	ColorText    = rgb(0xE8, 0xEA, 0xF0) // primary text
-	ColorTextDim = rgb(0x9A, 0xA3, 0xB2) // secondary text, hints
+	ColorTextDim = rgb(0x9C, 0xA6, 0xB6) // secondary text, hints
 
-	ColorAccent     = rgb(0x4C, 0x9A, 0xFF)        // selection, active tool
-	ColorAccentSoft = rgba(0x4C, 0x9A, 0xFF, 0x33) // region fills, soft highlights
+	ColorAccent     = rgb(0x53, 0xA4, 0xFF)        // selection, active tool
+	ColorAccentSoft = rgba(0x53, 0xA4, 0xFF, 0x33) // region fills, soft highlights
 	ColorWarn       = rgb(0xFF, 0xB4, 0x54)        // clamped draft, bent face
 	ColorError      = rgb(0xFF, 0x5D, 0x5D)        // open ends, failed ops
 	ColorSuccess    = rgb(0x3D, 0xD6, 0x8C)        // confirm, valid states
 
-	// The viewport background is a vertical gradient between these two.
-	ColorViewportTop    = rgb(0x1A, 0x1D, 0x23)
-	ColorViewportBottom = rgb(0x22, 0x26, 0x2E)
+	// The viewport background is a vertical gradient between these two: light
+	// falls from above, so the top is the bright end. The old ramp ran the
+	// other way and was narrow enough to pass for flat.
+	ColorViewportTop    = rgb(0x2A, 0x30, 0x3C)
+	ColorViewportBottom = rgb(0x12, 0x14, 0x1A)
 
 	ColorGridMinor = rgba(0xFF, 0xFF, 0xFF, 0x0F)
 	ColorGridMajor = rgba(0xFF, 0xFF, 0xFF, 0x24)
 
 	// ColorHover is overlaid on any hoverable element.
 	ColorHover = rgba(0xFF, 0xFF, 0xFF, 0x14)
+
+	// ColorBevel is the one-pixel light along a raised surface's top edge, and
+	// ColorShadow the ink its drop shadow is layered from. Together they are
+	// what makes a card sit above the viewport instead of being pasted on it.
+	ColorBevel  = rgba(0xFF, 0xFF, 0xFF, 0x16)
+	ColorShadow = rgba(0x00, 0x00, 0x08, 0x12)
 )
 
 // Axis colors are shared by the triad, the gizmo arrows and the plane tints.

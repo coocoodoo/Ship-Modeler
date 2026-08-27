@@ -55,8 +55,15 @@ func (c *Context) Button(id ID, r rl.Rectangle, label string, opts ButtonOpts) b
 	if fill.A > 0 {
 		c.FillRounded(r, CornerRadius, stateColor(fill, it))
 	}
-	if opts.Style == ButtonNormal {
+	switch opts.Style {
+	case ButtonNormal:
 		c.StrokeRounded(r, CornerRadius, ColorStroke)
+	case ButtonPrimary, ButtonDanger:
+		// A filled button carries the top-edge light every raised surface
+		// gets; disabled ones lie flat.
+		if !it.Disabled {
+			c.Bevel(r, CornerRadius)
+		}
 	}
 	c.TextCentered(r, label, FontSizeUI, textColorFor(text, it))
 
@@ -79,6 +86,11 @@ type IconOpts struct {
 func (c *Context) IconButton(id ID, r rl.Rectangle, icon IconFunc, opts IconOpts) bool {
 	it := c.interact(id, r, opts.Disabled)
 
+	// The active tool gets a soft accent wash as well as its underline, so the
+	// current mode reads from across the room and not only from two pixels.
+	if opts.Active {
+		c.FillRounded(r, CornerRadius, Fade(ColorAccentSoft, 0.55))
+	}
 	if it.Hovered && !it.Disabled {
 		c.FillRounded(r, CornerRadius, ColorHover)
 	}

@@ -420,7 +420,7 @@ func (a *App) updateExtrude(in InputFrame, vp render.Viewport) {
 	}
 
 	dist, along := tools.AxisDistancePx(in.MouseX, in.MouseY, ax, ay, bx, by)
-	a.extrude.hoverArrow = dist <= tools.ArrowGrabRadiusPx
+	a.extrude.hoverArrow = dist <= tools.ArrowGrabRadiusPx && !a.cubeOwnsPointer(in)
 
 	if in.Pressed[MouseLeft] && a.extrude.hoverArrow {
 		t.BeginDrag(along)

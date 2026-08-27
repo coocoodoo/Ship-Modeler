@@ -94,7 +94,7 @@ func (a *App) updateBoolean(in InputFrame, vp render.Viewport) {
 	if t == nil || !in.Pressed[MouseLeft] {
 		return
 	}
-	if !vp.Contains(int(in.MouseX), int(in.MouseY)) {
+	if !vp.Contains(int(in.MouseX), int(in.MouseY)) || a.cubeOwnsPointer(in) {
 		return
 	}
 	s := a.BuildScene()
