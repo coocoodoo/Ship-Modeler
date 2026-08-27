@@ -2,9 +2,27 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Post-audit polish continues: grid step control, cube click
-guard, the elevation pass, the welcome card answers (V-91), and rubber-banded
-shapes no longer ghost (V-92). Suite green (15 packages), exe rebuilt.
+**Current state:** Suite green (15 packages), exe rebuilt, post-audit fixes
+all landed (V-81..V-92). **Next up: the sketch toolset — planned in
+Sketch_func.md as SK1–SK6, awaiting the user's word to start SK1.**
+
+---
+
+## 2026-08-27 (planning) — Sketch_func.md: the full sketch toolset, planned
+
+The user brought Onshape's sketch toolbar — line/midpoint, three rectangles,
+circles/ellipse, four arcs and a conic, polygons, splines, point, project,
+fillet/chamfer, offset/slot, mirror, construction geometry, patterns,
+transform, image underlay — and asked for a robust plan another executor can
+follow. Written as **Sketch_func.md**: milestones SK1–SK6 on the one seam
+everything already funnels through (Entity → Points() → Segments →
+Arrangement — every curve is a tessellation, exactly as circles are n-gons),
+with a per-kind checklist of the eight places a new entity touches, storage
+decided per kind, gestures and Esc-staging specified, ops named, tests named,
+the traps recorded (one parser per dump line, knownOps registration, frozen
+widget kit), and a risk register. Non-goal stated loudly: no constraint
+solver — the pixel grid is this program's solver. PLAN.md §M10 now points at
+it. No code in this session; the plan is the deliverable.
 
 ---
 

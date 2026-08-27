@@ -232,6 +232,12 @@ Specs: UX §15 checklist is the work list. Highlights:
 **Accept:** the user runs through UX §15 "feel checklist" and signs off. Tag `v1.0.0`. — **awaiting the user's sign-off**; everything the executor can verify is green.
 
 ### M10 — Backlog (post-v1, priority order — do not start without user)
+
+> 2026-08-27: the user directed a full sketch-toolset expansion (Onshape's
+> sketch toolbar: arcs, ellipses, polygons, splines, slots, fillet/chamfer,
+> offset, mirror, patterns, construction geometry, project, image underlay).
+> It is planned in **Sketch_func.md** as milestones SK1–SK6 and takes
+> priority over the list below for sketch-related work.
 1. **Live mirror symmetry** (model+paint across X plane) — the single biggest win for spaceships; strongly recommended next
 2. Bevel/chamfer edges at 45° (blocky-friendly; Manifold makes this tractable)
 3. Sketch re-edit → parametric-lite regeneration of the owning extrude
