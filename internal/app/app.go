@@ -13,7 +13,7 @@ import (
 )
 
 // Version is shown in the hint bar's right corner.
-const Version = "v0.2.0-m1"
+const Version = "v1.0.0"
 
 // Mode is the app's state machine (SPEC-UX §1). Exactly one is active. M1 only
 // implements Idle; the rest arrive with the tools that own them.
@@ -101,6 +101,14 @@ type App struct {
 	// lastMouse remembers the cursor so the draw pass can re-run the widget
 	// code with the same hover states the update pass saw.
 	lastMouseX, lastMouseY float64
+
+	// cursor is the pointer shape set last frame, so it is only changed when it
+	// actually changes (SPEC-UX §15).
+	cursor int32
+
+	// closing tracks the "save before closing?" prompt.
+	closing     closeState
+	closeAnswer closeAnswerKind
 
 	// Headless suppresses window presentation and drives a virtual clock.
 	Headless bool
@@ -268,6 +276,9 @@ func (a *App) Viewport(fbW, fbH int) render.Viewport {
 func (a *App) Frame(in InputFrame) {
 	a.update(in)
 	a.draw(in)
+	// After both, because what the pointer will do depends on what the widgets
+	// decided this frame as well as on the mode.
+	a.updateCursor(in)
 }
 
 // update advances the non-drawing logic: camera, picking and keys.
@@ -432,7 +443,15 @@ func (a *App) draw(in InputFrame) {
 	if a.showShortcuts {
 		a.UI.DrawShortcutOverlay(l.Screen, shortcutSheet())
 	}
-	a.UI.DrawModal(l.Screen)
+	if res := a.UI.DrawModal(l.Screen); res.Confirmed || res.Cancelled {
+		a.UI.CloseModal()
+		if a.closing == closeAsking {
+			a.closeAnswer = closeAnswerDiscard
+			if res.Confirmed {
+				a.closeAnswer = closeAnswerSave
+			}
+		}
+	}
 	a.UI.End()
 }
 
@@ -556,6 +575,12 @@ func shortcutSheet() []ui.Shortcut {
 		{Keys: "L / R / C", Description: "Line / rectangle / circle"},
 		{Keys: "N", Description: "Gradient"},
 		{Keys: "X", Description: "Swap the two colours"},
+		{Section: "Files"},
+		{Keys: "Ctrl+N", Description: "New ship"},
+		{Keys: "Ctrl+O", Description: "Open"},
+		{Keys: "Ctrl+S", Description: "Save"},
+		{Keys: "Ctrl+Shift+S", Description: "Save as"},
+		{Keys: "Ctrl+E", Description: "Export"},
 		{Section: "Edit"},
 		{Keys: "Ctrl+Z", Description: "Undo"},
 		{Keys: "Ctrl+Y", Description: "Redo"},

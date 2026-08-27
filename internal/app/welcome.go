@@ -76,10 +76,9 @@ func (a *App) buildWelcome(viewport rl.Rectangle) {
 	gap()
 	if a.UI.Button(ui.MakeID("welcome.sample"), row(a.px(welcomeRow)), "Sample ship",
 		ui.ButtonOpts{
-			Disabled:    true,
-			Tooltip:     "A ship to take apart and see how it was made",
-			DisabledWhy: "The sample ship arrives with milestone M9",
+			Tooltip: "A ship to take apart and see how it was made",
 		}) {
+		a.RequestFile(fileSample)
 	}
 
 	if len(recents) == 0 {

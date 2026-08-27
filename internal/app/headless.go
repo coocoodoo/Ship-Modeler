@@ -578,6 +578,12 @@ func (r *ScriptRunner) settle() error {
 
 // shot renders one frame into the capture target and writes it as a PNG.
 func (r *ScriptRunner) shot(name string) error {
+	// A runner with nowhere to write is building a document rather than
+	// capturing one — the in-app sample ship runs the same script.
+	if r.OutDir == "" {
+		r.step()
+		return nil
+	}
 	if err := os.MkdirAll(r.OutDir, 0o755); err != nil {
 		return fmt.Errorf("create output dir: %w", err)
 	}

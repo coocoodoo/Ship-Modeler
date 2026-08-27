@@ -764,3 +764,31 @@ who asked for a hole and got a pocket has no other way to tell why.
 The bug survived M3 because the only Through-all test used `dir: "symmetric"`
 explicitly, which is the one case that already worked. `m9_throughcut` uses the
 default direction and measures the hole: 24 units of hull, not 12.
+
+**V-77 · The async boolean is deliberately not built.**
+SPEC-RENDER §8 says an operation over 120 ms should run on a goroutine behind a
+spinner, with a cancel path. `BenchmarkBooleanOnAShip` measures the commonest
+expensive case — cutting a window through a 1282-triangle hull, which is the
+sample ship's scale — at **4.7 ms**. That is 25 times under the threshold, so
+the machinery would be complexity with no cause, and PLAN §13 says not to
+optimize past a budget without profiling evidence. The benchmark stays, so the
+day somebody builds a ship an order of magnitude heavier the number says so.
+
+**V-78 · No about card.** UX §15 asks for the version "in title bar & about
+card". The gear an about card would have lived behind became the export button
+in M8, and inventing a menu for one line of text is worse than not having it.
+The version is in the window title and the hint bar's right corner — two places
+the user already looks.
+
+**V-79 · The sample ship is a script, and that is the point.**
+`assets/sample_ship.json` is embedded and run through the same ScriptRunner the
+headless tests use. So the thing a first-time user is shown is built by the path
+a test drives: it cannot rot without `TestTheSampleShipBuildsEndToEnd` going
+red, and it doubles as the full-app end-to-end and the README's hero image. A
+saved `.ship` would only have proved the loader works.
+
+**V-80 · Closing with unsaved work asks.** The autosave is a safety net, not an
+answer: it lives in a folder the user has never seen, under a name they did not
+choose. The window's close is intercepted and the prompt offers Save or Close
+without saving; cancelling the save dialog cancels the close too, rather than
+quietly discarding.

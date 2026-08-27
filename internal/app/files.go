@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"modeler/assets"
 	"modeler/internal/geom"
 	"modeler/internal/io"
 	"modeler/internal/model"
@@ -46,6 +47,7 @@ const (
 	fileSaveAs
 	fileExport
 	fileImportPalette
+	fileSample
 )
 
 // fileState is where the document lives and what is queued against it.
@@ -139,6 +141,8 @@ func (a *App) RunPendingFile() {
 		a.runExport()
 	case fileImportPalette:
 		a.importPaletteWithDialog()
+	case fileSample:
+		a.BuildSampleShip()
 	}
 }
 
@@ -601,3 +605,102 @@ func (a *App) ExportTo(path string, scale int, transparent bool) error {
 	}
 	return fmt.Errorf("%s is not a format this exports", filepath.Ext(path))
 }
+
+// BuildSampleShip runs the embedded op script against the live document
+// (SPEC-UX §14).
+//
+// It runs through the same ScriptRunner the headless tests use, which is the
+// whole reason the sample is a script: what a first-time user is shown is
+// built by the same path a test drives, so it cannot rot without a test going
+// red. It must be called outside BeginDrawing — the runner draws its own
+// frames.
+func (a *App) BuildSampleShip() bool {
+	script, err := io.ParseScript(assets.SampleShip)
+	if err != nil {
+		a.Toast(ui.Toast{Text: "The sample ship could not be read", Kind: ui.ToastError})
+		return false
+	}
+	w, h := a.Renderer.FramebufferSize()
+	if w <= 0 || h <= 0 {
+		w, h = DefaultWindowW, DefaultWindowH
+	}
+	runner := NewScriptRunner(a, "", ShotSize{W: w, H: h})
+	defer runner.Close()
+
+	if err := runner.Run(script); err != nil {
+		a.Toast(ui.Toast{Text: "The sample ship could not be built", Kind: ui.ToastError})
+		return false
+	}
+	// It is a sample, not a document: it has no home on disk, and it is unsaved
+	// work from the moment it appears, so Ctrl+S asks where to put it.
+	a.files.path = ""
+	a.Doc().DirtySinceSave = true
+	a.Toast(ui.Toast{Text: "Sample ship — take it apart and see how it was made"})
+	return true
+}
+
+// --- closing with unsaved work (SPEC-UX §15) ---
+
+// closeState is how far through the "are you sure" the window close has got.
+type closeState uint8
+
+const (
+	closeNotAsked closeState = iota
+	closeAsking
+	closeConfirmed
+)
+
+// RequestClose is what the window's X and Alt+F4 come down to.
+//
+// The autosave is a safety net, not an answer: it lives in a folder the user
+// has never seen, under a name they did not choose. Work that has a name it
+// could be saved under deserves to be asked about.
+func (a *App) RequestClose() {
+	if !a.Doc().DirtySinceSave {
+		a.closing = closeConfirmed
+		return
+	}
+	if a.closing == closeNotAsked {
+		a.closing = closeAsking
+		a.UI.ShowModal(ui.ModalState{
+			Title:       "Save before closing?",
+			Body:        a.DocumentName() + " has changes that are not saved.",
+			ConfirmText: "Save",
+			CancelText:  "Close without saving",
+		})
+	}
+}
+
+// ShouldClose reports whether the window may go now.
+func (a *App) ShouldClose() bool { return a.closing == closeConfirmed }
+
+// stepClose runs the prompt's answer. It is called after the frame, where the
+// save dialog is allowed to open.
+func (a *App) stepClose() {
+	if a.closing != closeAsking || a.UI.ModalOpen() {
+		return
+	}
+	switch a.closeAnswer {
+	case closeAnswerSave:
+		if a.Save() {
+			a.closing = closeConfirmed
+			return
+		}
+		// The save was cancelled or failed, so neither has the close.
+		a.closing = closeNotAsked
+	case closeAnswerDiscard:
+		a.closing = closeConfirmed
+	default:
+		a.closing = closeNotAsked
+	}
+	a.closeAnswer = closeAnswerNone
+}
+
+// closeAnswer is what the prompt was told.
+type closeAnswerKind uint8
+
+const (
+	closeAnswerNone closeAnswerKind = iota
+	closeAnswerSave
+	closeAnswerDiscard
+)

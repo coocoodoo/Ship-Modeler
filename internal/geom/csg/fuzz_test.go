@@ -366,3 +366,38 @@ func sampleAt(p *mesh.FacePaint, world geom.Vec3) color.RGBA {
 	}
 	return p.Img.RGBAAt(x, y)
 }
+
+// BenchmarkBooleanOnAShip is TESTING §6's boolean budget, measured on geometry
+// the size this program actually produces.
+//
+// It exists to answer one design question with a number rather than a guess:
+// SPEC-RENDER §8 says a boolean over 120 ms should run asynchronously behind a
+// spinner. Building that means a goroutine, a main-thread apply and a cancel
+// path — real complexity — and it is only worth it if the operation is ever
+// slow enough to be felt.
+func BenchmarkBooleanOnAShip(b *testing.B) {
+	// A hull the size of the sample ship's, and a cutter crossing it: the
+	// commonest expensive op in the program is cutting a window.
+	hull := mesh.Box(geom.Vec3{X: -5, Y: -2, Z: -15}, geom.Vec3{X: 5, Y: 2, Z: 11}, 1)
+	frame := geom.PlaneFrame(geom.PlaneTop)
+	for i := 0; i < 12; i++ {
+		frame.O = geom.Vec3{X: float64(i%4)*2 - 3, Y: -3, Z: float64(i/4)*6 - 8}
+		pod := mesh.NGonPrism(frame, 1.2, 16, 6, uint32(10+i))
+		res, err := Boolean(Union, hull, pod)
+		if err != nil {
+			b.Fatalf("setup union %d: %v", i, err)
+		}
+		hull = res.Mesh
+	}
+	cutter := mesh.Box(geom.Vec3{X: -1, Y: -4, Z: -2}, geom.Vec3{X: 1, Y: 4, Z: 2}, 99)
+	b.Logf("hull is %d triangles", hull.TriangleCount())
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		res, err := Boolean(Subtract, hull, cutter)
+		if err != nil {
+			b.Fatalf("subtract: %v", err)
+		}
+		_ = res
+	}
+}

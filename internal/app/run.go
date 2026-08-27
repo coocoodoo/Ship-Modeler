@@ -55,8 +55,18 @@ func Run() {
 		}
 	}()
 
+	// The window's own close is intercepted: unsaved work gets asked about
+	// first (SPEC-UX §15). raylib's flag is cleared by reading it, so the loop
+	// keeps running until the prompt has an answer.
+	rl.SetExitKey(0)
 	title := ""
-	for !rl.WindowShouldClose() {
+	for {
+		if rl.WindowShouldClose() {
+			a.RequestClose()
+		}
+		if a.ShouldClose() {
+			break
+		}
 		dt := float64(rl.GetFrameTime()) * 1000
 		if dt <= 0 || dt > 250 {
 			dt = 1000.0 / 60.0 // first frame, or after a long stall
@@ -71,6 +81,7 @@ func Run() {
 		// loop, and doing that between BeginDrawing and EndDrawing would mean
 		// running somebody else's loop with a frame half submitted.
 		a.RunPendingFile()
+		a.stepClose()
 
 		if want := a.WindowTitle(); want != title {
 			rl.SetWindowTitle(want)
