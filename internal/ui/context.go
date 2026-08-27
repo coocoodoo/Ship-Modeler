@@ -113,6 +113,17 @@ type Context struct {
 	clicks clickTracker
 
 	// popover is the open colour picker, drawn above everything, and
+	// cards are the floating panels drawn last frame, so hit-testing can see
+	// them. A card is not chrome — it floats inside the viewport — but the
+	// pointer over one belongs to it and not to the model behind it, and the
+	// app has to be able to decide that before the widgets run.
+	//
+	// Asking whether a widget is hovered is not enough: the gaps between a
+	// card's controls are still the card, and a viewport tool that treated them
+	// as open air would act through the panel.
+	cards     []rl.Rectangle
+	lastCards []rl.Rectangle
+
 	// popoverBox is where it landed last frame so hit-testing can see it.
 	popover    popoverState
 	popoverBox rl.Rectangle
@@ -148,6 +159,7 @@ func (c *Context) Begin(in Input) {
 	c.hot = c.nextHot
 	c.nextHot = NoID
 	c.wantMouse = false
+	c.lastCards, c.cards = c.cards, c.cards[:0]
 	c.wantKeyboard = c.focus != NoID
 	c.overlays = c.overlays[:0]
 	c.blocked = false
@@ -302,3 +314,24 @@ func (c *Context) OverlayCapturesPointer(x, y float64) bool {
 	return rl.CheckCollisionPointRec(p, c.popoverBox) ||
 		rl.CheckCollisionPointRec(p, c.popover.anchor)
 }
+
+// CardCapturesPointer reports whether a floating card drawn last frame sits
+// under a window pixel.
+//
+// A card is not chrome — it floats inside the viewport — but the pointer over
+// one belongs to it. It is asked separately from OverlayCapturesPointer because
+// the answer is used differently: a card takes the left button and leaves
+// navigation alone, while a modal takes everything.
+func (c *Context) CardCapturesPointer(x, y float64) bool {
+	p := rl.Vector2{X: float32(x), Y: float32(y)}
+	for _, card := range c.lastCards {
+		if rl.CheckCollisionPointRec(p, card) {
+			return true
+		}
+	}
+	return false
+}
+
+// registerCard records a floating panel's rectangle for the next frame's
+// hit-testing.
+func (c *Context) registerCard(r rl.Rectangle) { c.cards = append(c.cards, r) }

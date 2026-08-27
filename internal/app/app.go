@@ -319,6 +319,9 @@ func (a *App) update(in InputFrame) {
 			a.updateHover(in, vp)
 		}
 	} else {
+		if a.cardOnlyOwnsPointer(in) {
+			a.handleCameraInput(in, vp)
+		}
 		a.Hover = render.PickResult{}
 		a.sketch.hasSnap = false
 		// A stroke that runs off the viewport and is released over the palette
@@ -375,7 +378,31 @@ func (a *App) chromeOwnsPointer(in InputFrame) bool {
 	if a.UI.OverlayCapturesPointer(in.MouseX, in.MouseY) {
 		return true
 	}
+	// A floating card sits inside the viewport but owns what is under it. Without
+	// this a click on the palette panel also painted the face behind the panel,
+	// and every chip left a dab on the model.
+	if a.UI.CardCapturesPointer(in.MouseX, in.MouseY) {
+		return true
+	}
 	return !rl.CheckCollisionPointRec(
+		rl.Vector2{X: float32(in.MouseX), Y: float32(in.MouseY)}, a.layout.Viewport)
+}
+
+// cardOnlyOwnsPointer reports that the one thing between the pointer and the
+// model is a floating card.
+//
+// Camera navigation still runs there. A card is inside the viewport, and
+// orbiting from wherever the pointer happens to be is how this program moves
+// (SPEC-UX §1); it is only the left button that belongs to the card. Over the
+// toolbar or the tree — real chrome — nothing does.
+func (a *App) cardOnlyOwnsPointer(in InputFrame) bool {
+	if a.showShortcuts || a.UI.ModalOpen() || a.UI.Dragging() {
+		return false
+	}
+	if a.UI.OverlayCapturesPointer(in.MouseX, in.MouseY) {
+		return false
+	}
+	return rl.CheckCollisionPointRec(
 		rl.Vector2{X: float32(in.MouseX), Y: float32(in.MouseY)}, a.layout.Viewport)
 }
 

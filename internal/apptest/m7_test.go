@@ -44,6 +44,9 @@ type paintDump struct {
 	textures bool
 	locked   bool
 	lockFace int
+	// target is the face the panel's controls would act on: the live hover, or
+	// the last one, so a button can be reached without the journey disarming it.
+	target int
 
 	hovering  bool
 	hoverBody int
@@ -61,7 +64,8 @@ type paintDump struct {
 var (
 	m7ModeLine = regexp.MustCompile(
 		`^paint mode=(\d) tool="(\w+)" size=(\d+) res=(\d+) color="(\w+)" color2="(\w+)" ` +
-			`dither="(\w+)" fill=(\d) slot=(\d) textures=(\d) locked=(\d) lockface=(\d+)$`)
+			`dither="(\w+)" fill=(\d) slot=(\d) textures=(\d) locked=(\d) lockface=(\d+) ` +
+			`target=(\d+)$`)
 	m7HoverLine = regexp.MustCompile(
 		`^painthover body=(\d+) face=(\d+) texel=(-?\d+),(-?\d+) res=(\d+) ` +
 			`allocated=(\d) oblique=([\d.]+)$`)
@@ -105,6 +109,7 @@ func parseM7Dumps(t *testing.T, stdout string) []paintDump {
 			cur.textures = m[10] == "1"
 			cur.locked = m[11] == "1"
 			cur.lockFace = atoi(t, m[12])
+			cur.target = atoi(t, m[13])
 		case strings.HasPrefix(line, "painthover "):
 			m := m7HoverLine.FindStringSubmatch(line)
 			if m == nil {
@@ -684,5 +689,66 @@ func TestTheLockKeepsPaintOnOneFace(t *testing.T) {
 	// And the paint that was made under the lock is untouched by any of it.
 	if got, want := unlocked.pictures[0].sum, painted.pictures[0].sum; got != want {
 		t.Errorf("unlocking changed the picture: %s, was %s", got, want)
+	}
+}
+
+func TestGoldenPanelReach(t *testing.T) {
+	_, outDir := runScript(t, "m7_panelreach")
+	checkGolden(t, "m7_panelreach", outDir)
+}
+
+// TestThePanelsControlsCanActuallyBeReached is a bug the user found: the Lock
+// and Face view buttons could not be clicked.
+//
+// Both act on "the face you are pointing at", and the pointer stops being on a
+// face the instant it leaves the viewport for the panel. So the button was live
+// while you looked at it and disabled by the time you arrived — and Face view,
+// which only appears at an oblique angle, vanished on the way there. The panel
+// reads the last face the pointer resolved rather than the live one, and this
+// drives the whole journey: hover a face, move onto the panel, click.
+func TestThePanelsControlsCanActuallyBeReached(t *testing.T) {
+	stdout, _ := runScript(t, "m7_panelreach")
+	dumps := parseM7Dumps(t, stdout)
+	if len(dumps) != 3 {
+		t.Fatalf("expected 3 dumps, got %d:\n%s", len(dumps), stdout)
+	}
+	onFace, onPanel, clicked := dumps[0], dumps[1], dumps[2]
+
+	if !onFace.hovering || onFace.target == 0 {
+		t.Fatal("the pointer never resolved a face to begin with")
+	}
+	// Over the panel there is no live cursor — there is no texel under a
+	// button — but the controls still know what they would act on.
+	if onPanel.hovering {
+		t.Error("the pointer over the panel still reports a texel under it")
+	}
+	if onPanel.target != onFace.target {
+		t.Errorf("moving onto the panel changed the target from face %d to %d, "+
+			"which is what made the button impossible to click",
+			onFace.target, onPanel.target)
+	}
+	// And the click lands.
+	if !clicked.locked {
+		t.Fatalf("clicking Lock to this face did nothing; toasts were %q", clicked.toasts)
+	}
+	if clicked.lockFace != onFace.target {
+		t.Errorf("locked to face %d, want the face that was hovered, %d",
+			clicked.lockFace, onFace.target)
+	}
+}
+
+// TestClickingThePanelDoesNotPaintThroughIt is the other half of the same bug.
+//
+// A floating card sits inside the viewport, so the viewport's own hit-testing
+// used to run behind it: every press on a chip resolved whatever face was
+// behind the panel and left a dab on it. Cards now own the pointer over them.
+func TestClickingThePanelDoesNotPaintThroughIt(t *testing.T) {
+	stdout, _ := runScript(t, "m7_panelreach")
+	dumps := parseM7Dumps(t, stdout)
+	clicked := dumps[2]
+
+	if len(clicked.pictures) != 0 {
+		t.Errorf("clicking a panel button painted %d face(s) behind it: %+v",
+			len(clicked.pictures), clicked.pictures)
 	}
 }

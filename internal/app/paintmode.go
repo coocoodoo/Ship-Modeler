@@ -91,6 +91,16 @@ type paintState struct {
 
 	// hover is what the pointer is over this frame.
 	hover paintHover
+	// sticky is the last face the pointer resolved, and it outlives the trip
+	// from the viewport to the panel.
+	//
+	// The live hover has to go the moment the pointer leaves the viewport —
+	// there is no texel under a button, and drawing a cursor for one would be a
+	// lie. But every control in the panel that acts on "the face you are
+	// pointing at" then disarms itself exactly as you reach for it: the Lock
+	// button greys out, the Face view button vanishes, and the resample prompt
+	// takes its own buttons with it. Those controls read this instead.
+	sticky paintHover
 
 	// prov caches the mapping an unpainted face *would* get, so the texel
 	// cursor can show the grid before the first stroke commits to it. It is
@@ -175,7 +185,7 @@ func (a *App) BeginPaint() bool {
 	a.dropPushPull()
 	a.transform.tool = nil
 	a.Mode = ModePaint
-	a.paint.hover = paintHover{}
+	a.clearPaintHover(true)
 	return true
 }
 
@@ -186,7 +196,7 @@ func (a *App) ExitPaint() {
 	}
 	a.finishStroke()
 	a.Mode = ModeIdle
-	a.paint.hover = paintHover{}
+	a.clearPaintHover(true)
 	a.paint.prov = nil
 	a.paint.locked = false
 }
@@ -208,9 +218,9 @@ func (a *App) paintPanelReachPx() float64 {
 // looking at. Both are one action rather than two, so there is one thing to
 // press and one thing to undo.
 func (a *App) LockToFace() bool {
-	h := a.paint.hover
+	h, hok := a.stickyFace()
 	f, ok := a.resolveFace(h.body, h.face)
-	if !h.ok || !ok {
+	if !hok || !ok {
 		a.Toast(ui.Toast{
 			Text: "Hover the face you want to lock to first",
 			Kind: ui.ToastWarn,
@@ -249,7 +259,7 @@ func (a *App) lockedFace() (faceRef, bool) {
 	f, ok := a.resolveFace(a.paint.lockBody, a.paint.lockFace)
 	if !ok {
 		a.paint.locked = false
-		a.paint.hover = paintHover{}
+		a.clearPaintHover(true)
 		a.Toast(ui.Toast{
 			Text: "The face you were locked to is gone — unlocked",
 			Kind: ui.ToastWarn,
@@ -275,19 +285,24 @@ func (a *App) hoverLockedFace(in InputFrame, vp render.Viewport) {
 	h := paintHover{ok: true, body: f.body.ID, face: f.uid, index: f.face}
 	h.paint, h.allocated = a.mappingFor(f)
 	if h.paint == nil {
-		a.paint.hover = paintHover{}
+		a.clearPaintHover(false)
 		return
 	}
 	p, hit := a.pointOnFace(in.MouseX, in.MouseY, vp, h.paint.Frame)
 	if !hit {
-		a.paint.hover = paintHover{}
+		a.clearPaintHover(false)
 		return
 	}
 	h.texel = paint.Texel(h.paint, p)
 	// The plane runs on past the face, and paint out there would be paint on
 	// nothing. Off the face is the same as off the model: no cursor, no stroke.
+	//
+	// The sticky face stays put through all of that: while a lock is on, the
+	// face the panel acts on is the locked one whether the pointer is on it,
+	// past its edge, or over the Unlock button.
+	a.paint.sticky = h
 	if !h.texel.In(paint.FaceRect(f.body.Mesh, f.face, h.paint)) {
-		a.paint.hover = paintHover{}
+		a.clearPaintHover(false)
 		return
 	}
 	h.obliqueDeg = obliqueDegrees(a.Camera, f.body.Mesh.FaceNormal(f.face))
@@ -331,18 +346,52 @@ func (a *App) updatePaint(in InputFrame, vp render.Viewport) {
 // paintChromeFrame runs the parts of paint mode that must keep running while
 // the pointer is over the chrome: a stroke that ends off the viewport still
 // ends, rather than staying open until the pointer wanders back.
+// This is also where the panel gets its own pointer: the live hover goes, and
+// the sticky one stays, so a control that acts on the face you were pointing at
+// is still armed when you reach it.
 func (a *App) paintChromeFrame(in InputFrame) {
-	a.paint.hover = paintHover{}
+	a.clearPaintHover(false)
 	if a.paint.stroking && !in.Down[MouseLeft] {
 		a.finishStroke()
 	}
+}
+
+// clearPaintHover drops the live hover. It keeps the sticky one unless the
+// pointer is genuinely resting on nothing paintable inside the viewport, which
+// is the only case where the panel should forget what it was pointed at.
+func (a *App) clearPaintHover(alsoSticky bool) {
+	a.paint.hover = paintHover{}
+	if alsoSticky {
+		a.paint.sticky = paintHover{}
+	}
+}
+
+// stickyFace is the face the panel's controls act on: the one under the
+// pointer, or the last one that was.
+//
+// It is re-resolved rather than trusted, because a boolean can take the face
+// away between the hover and the click.
+func (a *App) stickyFace() (paintHover, bool) {
+	h := a.paint.hover
+	if !h.ok {
+		h = a.paint.sticky
+	}
+	if !h.ok {
+		return paintHover{}, false
+	}
+	if _, ok := a.resolveFace(h.body, h.face); !ok {
+		return paintHover{}, false
+	}
+	return h, true
 }
 
 // refreshPaintHover resolves the face and texel under the pointer.
 func (a *App) refreshPaintHover(in InputFrame, vp render.Viewport) {
 	if !vp.Contains(int(in.MouseX), int(in.MouseY)) ||
 		a.Cube.Contains(in.MouseX, in.MouseY) || a.orbiting || a.panning || a.cubeDrag {
-		a.paint.hover = paintHover{}
+		// Off the viewport or navigating: no cursor, but the panel still knows
+		// which face you were on.
+		a.clearPaintHover(false)
 		return
 	}
 	if a.paint.locked {
@@ -357,23 +406,23 @@ func (a *App) refreshPaintHover(in InputFrame, vp render.Viewport) {
 	}
 	f, ok := a.resolveFace(h.body, h.face)
 	if !ok {
-		a.paint.hover = paintHover{}
+		a.clearPaintHover(true)
 		return
 	}
 	h.index = f.face
 	h.paint, h.allocated = a.mappingFor(f)
 	if h.paint == nil {
-		a.paint.hover = paintHover{}
+		a.clearPaintHover(true)
 		return
 	}
 	p, hit := a.pointOnFace(in.MouseX, in.MouseY, vp, h.paint.Frame)
 	if !hit {
-		a.paint.hover = paintHover{}
+		a.clearPaintHover(true)
 		return
 	}
 	h.texel = paint.Texel(h.paint, p)
 	h.obliqueDeg = obliqueDegrees(a.Camera, f.body.Mesh.FaceNormal(f.face))
-	a.paint.hover = h
+	a.paint.hover, a.paint.sticky = h, h
 }
 
 // pickPaintFace refreshes which face is under the cursor, throttled to the
@@ -395,7 +444,7 @@ func (a *App) pickPaintFace(in InputFrame, vp render.Viewport) {
 	hit := a.Renderer.Pick(&s, vp, in.MouseX, in.MouseY)
 	a.Hover = hit
 	if !hit.Hit || hit.Kind != render.PickFace {
-		a.paint.hover = paintHover{}
+		a.clearPaintHover(true)
 		return
 	}
 	a.paint.hover = paintHover{ok: true, body: hit.BodyID, face: hit.FaceUID}
@@ -646,8 +695,8 @@ func (a *App) SetPaintRes(res int) bool {
 func (a *App) FaceView() bool {
 	f, ok := a.lockedFace()
 	if !ok {
-		h := a.paint.hover
-		if f, ok = a.resolveFace(h.body, h.face); !h.ok || !ok {
+		h, hok := a.stickyFace()
+		if f, ok = a.resolveFace(h.body, h.face); !hok || !ok {
 			return false
 		}
 	}

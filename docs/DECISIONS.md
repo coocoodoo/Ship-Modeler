@@ -632,3 +632,32 @@ version, which is why there is now one parser for it and not two.
 the dither chips, a second colour swatch and the lock row, so every M7 shot
 changed inside the panel — 53,076 pixels, none of them left of x=1027, measured
 before regenerating (TESTING §5).
+
+### 2026-08-26 — Fix: panel controls that disarmed themselves on the way to being clicked
+
+**V-63 · The panel acts on the last face the pointer resolved, not the live one.**
+Reported by the user: Lock to this face and Face view were impossible to click.
+Both act on "the face you are pointing at", and the pointer stops being on a
+face the moment it leaves the viewport for the panel — so the button was live
+while you looked at it and disabled by the time you arrived, and Face view,
+which only shows at an oblique angle, vanished en route. The live hover still
+governs the cursor and the stroke, because there is no texel under a button;
+the panel reads a sticky hover that outlives the journey. The resolution
+mismatch prompt had the same bug and the same fix: its own buttons were in the
+panel it was disappearing from.
+
+**V-64 · A floating card owns the pointer over it.**
+The other half of the same report. `chromeOwnsPointer` treated the toolbar, the
+tree and the hint bar as chrome and everything inside the viewport rectangle as
+model — but the cards float *inside* the viewport, so the viewport's own
+hit-testing ran behind them. Every press on a chip resolved whatever face was
+behind the panel and left a dab on it. `FloatingCard` now registers its
+rectangle for the next frame's hit test, the way the colour popover already did.
+Asking whether a widget is hovered would not have been enough: the gaps between
+a card's controls are still the card.
+
+**V-65 · Cards take the left button and leave navigation alone.**
+Making a card chrome outright would also have stopped orbiting from starting on
+top of one, and navigation works from wherever the pointer is in every mode
+(SPEC-UX §1). `cardOnlyOwnsPointer` separates the two: over a card the camera
+still moves and the tools do not. Over real chrome, neither does.

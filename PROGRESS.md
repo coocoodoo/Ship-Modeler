@@ -2,10 +2,62 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M7 COMPLETE**, plus a user-requested follow-up: shape,
-gradient and soft-brush tools, Bayer dithering, and a face lock. `build`, `vet`
-and the full suite are green; goldens pass twice in a row. Next up: **M8**
-(save/load, autosave, export).
+**Current state:** **M7 COMPLETE**, plus the user-requested paint tools and face
+lock, plus a fix for two input-routing bugs the user found in them. `build`,
+`vet` and the full suite are green. Next up: **M8** (save/load, autosave,
+export).
+
+---
+
+## 2026-08-26 — Fix: the panel's buttons could not be clicked, and clicking them painted through the panel
+
+**Reported by the user:** "Lock to this face and faceview is buggy, the button
+is impossible to click when I am painting… when I am not painting it grays out
+and face view disappears, so there's no way for me to use it."
+
+Exactly right, and there were two bugs behind it.
+
+**The button disarmed itself as you reached for it.** Both controls act on "the
+face you are pointing at", and the pointer stops being on a face the instant it
+leaves the viewport for the panel. So Lock was enabled while you looked at it and
+disabled by the time you got there, and Face view — which only appears past 70°
+— vanished on the way. The live hover still drives the cursor and the stroke,
+because there is no texel under a button; the panel now reads a **sticky** hover
+that outlives the journey. The resolution mismatch prompt had the identical bug,
+which I had not noticed: its own Use/Resample buttons were in the panel it was
+disappearing from.
+
+**And clicking the panel painted the face behind it.** Found while fixing the
+first one. `chromeOwnsPointer` counted the toolbar, the tree and the hint bar as
+chrome and everything inside the viewport rectangle as model — but the cards
+float *inside* the viewport, so the viewport's hit-testing ran behind them. Every
+press on a chip resolved whatever face was behind the panel and left a dab on
+it. `FloatingCard` now registers its rectangle for the next frame's hit test,
+the way the colour popover already did; hovering a widget is not enough of a
+test, because the gaps between a card's controls are still the card.
+
+That fix is general — it applies to the extrude, boolean, sketch and transform
+cards too, which had the same latent hole.
+
+**One thing I deliberately did not do.** Making a card chrome outright would also
+stop an orbit from starting on top of one, and navigation works from wherever
+the pointer is in every mode (SPEC-UX §1). A card takes the left button and
+leaves the camera alone.
+
+**Verified.**
+
+- `TestThePanelsControlsCanActuallyBeReached` drives the whole journey: hover a
+  face, move onto the panel, click the button. It asserts the target survives
+  the move and that the click actually locks — the test fails on the old code at
+  the first assertion.
+- `TestClickingThePanelDoesNotPaintThroughIt` asserts the same click left no
+  paint on the model.
+- Full suite green; no golden moved, because none of this changes a pixel — it
+  changes who the pointer belongs to.
+
+**Try it:** press **P**, hover a face, then move to the panel. Lock stays live
+all the way there, and Face view stays put at an oblique angle. Clicking chips
+no longer leaves dabs on the hull behind the panel.
 
 ---
 

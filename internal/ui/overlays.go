@@ -228,6 +228,9 @@ type FloatingCardOpts struct {
 // FloatingCard draws the contextual panel that hosts a tool's options
 // (SPEC-UX §2). It returns the body rectangle for the caller to fill.
 func (c *Context) FloatingCard(id ID, r rl.Rectangle, title string, opts FloatingCardOpts) CardResult {
+	// The pointer over a card belongs to the card, gaps included, and the
+	// viewport has to be able to find that out before the widgets run.
+	c.registerCard(r)
 	c.Card(r)
 	var out CardResult
 

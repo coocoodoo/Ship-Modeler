@@ -1154,6 +1154,17 @@ func (r *ScriptRunner) dump() {
 	}
 }
 
+// stickyTargetSeq is the face the panel's controls would act on right now, or
+// zero when they would be disabled. It is dumped because the bug it guards
+// against is invisible in a screenshot: a button that is enabled while you look
+// at it and disabled by the time the pointer arrives.
+func stickyTargetSeq(a *App) uint32 {
+	if h, ok := a.stickyFace(); ok {
+		return h.face.Seq()
+	}
+	return 0
+}
+
 // dumpPaint reports the brush and every painted face, which is how a flow test
 // asserts that paint went where it was aimed and stayed there.
 //
@@ -1165,11 +1176,11 @@ func (r *ScriptRunner) dumpPaint() {
 	a := r.App
 	st := &a.paint
 	fmt.Printf("paint mode=%d tool=%q size=%d res=%d color=%q color2=%q "+
-		"dither=%q fill=%d slot=%d textures=%d locked=%d lockface=%d\n",
+		"dither=%q fill=%d slot=%d textures=%d locked=%d lockface=%d target=%d\n",
 		boolBit(a.InPaint()), st.tool.String(), st.size, st.res,
 		paint.Hex(st.color), paint.Hex(st.colorB), st.dither.String(),
 		boolBit(st.fillShape), st.slot, boolBit(!st.hideTextures),
-		boolBit(st.locked), st.lockFace.Seq())
+		boolBit(st.locked), st.lockFace.Seq(), stickyTargetSeq(a))
 
 	if h := st.hover; h.ok && h.paint != nil {
 		fmt.Printf("painthover body=%d face=%d texel=%d,%d res=%d allocated=%d oblique=%.1f\n",

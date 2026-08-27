@@ -188,7 +188,7 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 func (a *App) paintLockRow(row func(float32) rl.Rectangle, line float32) {
 	st := &a.paint
 	if !st.locked {
-		hovering := st.hover.ok
+		_, hovering := a.stickyFace()
 		if a.UI.Button(ui.MakeID("paint.lock"), row(a.px(26)), "Lock to this face",
 			ui.ButtonOpts{
 				Disabled:    !hovering,
@@ -308,7 +308,9 @@ func (a *App) paintDitherRow(label, chips rl.Rectangle) {
 func (a *App) paintResRow(label, chips rl.Rectangle) {
 	st := &a.paint
 	a.UI.Text(label, "Res", ui.FontSizeSmall, ui.ColorTextDim)
-	if h := st.hover; h.ok && h.paint != nil {
+	// The sticky face again, so the note and the prompt under it tell one story
+	// rather than one of them vanishing when the pointer reaches the panel.
+	if h, ok := a.stickyFace(); ok && h.paint != nil {
 		note, _ := ui.SplitRight(label, a.px(120))
 		text := fmt.Sprintf("%.3f u / texel", h.paint.Texel)
 		col := ui.ColorTextDim
@@ -338,8 +340,11 @@ func (a *App) paintResRow(label, chips rl.Rectangle) {
 // paintResMismatch reports whether the face under the cursor already has a
 // texture at a different resolution, and what that resolution is.
 func (a *App) paintResMismatch() (bool, int) {
-	h := a.paint.hover
-	if !h.ok || !h.allocated || h.paint == nil || h.paint.Res == a.paint.res {
+	// The sticky face, not the live one: this prompt's own buttons are in the
+	// panel, and reading the live hover would take them away as you reached for
+	// them.
+	h, ok := a.stickyFace()
+	if !ok || !h.allocated || h.paint == nil || h.paint.Res == a.paint.res {
 		return false, 0
 	}
 	return true, h.paint.Res
@@ -359,7 +364,7 @@ func (a *App) paintMismatchPrompt(text, buttons rl.Rectangle, faceRes int) {
 	a.UI.Text(second, fmt.Sprintf("brush to %d, or resample it to %d?", faceRes, a.paint.res),
 		ui.FontSizeSmall, ui.ColorWarn)
 
-	h := a.paint.hover
+	h, _ := a.stickyFace()
 	gap := a.px(6)
 	w := (buttons.Width - gap) / 2
 	left := ui.Rect(buttons.X, buttons.Y, w, buttons.Height)
@@ -381,8 +386,8 @@ func (a *App) paintMismatchPrompt(text, buttons rl.Rectangle, faceRes int) {
 // paintOblique reports whether the face under the cursor is steep enough to be
 // worth offering to turn the camera at.
 func (a *App) paintOblique() bool {
-	h := a.paint.hover
-	return h.ok && h.obliqueDeg > ObliqueWarnDegrees
+	h, ok := a.stickyFace()
+	return ok && h.obliqueDeg > ObliqueWarnDegrees
 }
 
 // paintPaletteGrid draws the 8x4 page of swatches.
