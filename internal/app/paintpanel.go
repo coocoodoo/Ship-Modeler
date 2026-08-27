@@ -188,14 +188,23 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 func (a *App) paintLockRow(row func(float32) rl.Rectangle, line float32) {
 	st := &a.paint
 	if !st.locked {
-		_, hovering := a.stickyFace()
-		if a.UI.Button(ui.MakeID("paint.lock"), row(a.px(26)), "Lock to this face",
-			ui.ButtonOpts{
-				Disabled:    !hovering,
-				Tooltip:     "Face the camera at it, and paint nothing else",
-				DisabledWhy: "Hover the face you want to lock to first",
-			}) {
-			a.LockToFace()
+		// Always live. The button arms the pick; the face is chosen by the click
+		// that follows. A button that needed a face already under the pointer
+		// could not be reached, because reaching for it is what takes the
+		// pointer off the face.
+		label := "Lock to a face…"
+		opts := ui.ButtonOpts{
+			Tooltip: "Then click a face: the camera turns to it and nothing else takes paint",
+		}
+		if st.awaitingLock {
+			label = "Click a face…"
+			opts.Style = ui.ButtonPrimary
+			opts.Tooltip = "Click the face to lock to, or press again to cancel"
+		}
+		if a.UI.Button(ui.MakeID("paint.lock"), row(a.px(26)), label, opts) {
+			if !a.CancelLockPick() {
+				a.BeginLockPick()
+			}
 		}
 		return
 	}

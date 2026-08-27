@@ -3,9 +3,38 @@
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
 **Current state:** **M7 COMPLETE**, plus the user-requested paint tools and face
-lock, plus a fix for two input-routing bugs the user found in them. `build`,
+lock, plus fixes for three input-routing bugs the user found in them. `build`,
 `vet` and the full suite are green. Next up: **M8** (save/load, autosave,
 export).
+
+---
+
+## 2026-08-26 — Fix: the lock is now armed first and the face picked second
+
+**The user again, on the same control:** "I want to be able to click the button
+'Lock to this face', then select the face I want to lock to, and the camera
+moves towards that face. It's not working because it grays out and locks when I
+try to click it."
+
+The previous fix made the button *reachable*; it did not make it right. It still
+acted on the face under the pointer when it was pressed, and that dependency is
+the bug: moving the pointer to a button is exactly what takes it off the face.
+So it arms a pick now. Press **Lock to a face…** — always live, never greyed —
+and it reads **Click a face…**; the next click chooses the face, turns the
+camera to it and locks. That click is spent on the choice and paints nothing.
+Pressing the button again cancels, and so does Esc. It is the same shape as
+pressing S with no plane selected (SPEC-UX §8.1), which was already in the
+program.
+
+The sticky hover from the previous fix stays, because **Face view** and the
+resolution mismatch prompt genuinely are about the face you were last pointing
+at — there is nothing to arm there.
+
+**Verified.** `TestLockIsArmedFirstAndPickedSecond` drives it with nothing
+hovered at all — the case the old version could not handle — and asserts the
+arm, the hint copy, the camera turning square-on, and that the click left no
+paint. Every M7 golden was regenerated: the button's label and enabled state
+changed, 194 max delta at x≈1165, y≈638–669, nowhere else.
 
 ---
 

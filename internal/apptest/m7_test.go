@@ -47,6 +47,8 @@ type paintDump struct {
 	// target is the face the panel's controls would act on: the live hover, or
 	// the last one, so a button can be reached without the journey disarming it.
 	target int
+	// awaiting is the Lock button armed and waiting for a face to be clicked.
+	awaiting bool
 
 	hovering  bool
 	hoverBody int
@@ -65,7 +67,7 @@ var (
 	m7ModeLine = regexp.MustCompile(
 		`^paint mode=(\d) tool="(\w+)" size=(\d+) res=(\d+) color="(\w+)" color2="(\w+)" ` +
 			`dither="(\w+)" fill=(\d) slot=(\d) textures=(\d) locked=(\d) lockface=(\d+) ` +
-			`target=(\d+)$`)
+			`target=(\d+) awaitlock=(\d)$`)
 	m7HoverLine = regexp.MustCompile(
 		`^painthover body=(\d+) face=(\d+) texel=(-?\d+),(-?\d+) res=(\d+) ` +
 			`allocated=(\d) oblique=([\d.]+)$`)
@@ -110,6 +112,7 @@ func parseM7Dumps(t *testing.T, stdout string) []paintDump {
 			cur.locked = m[11] == "1"
 			cur.lockFace = atoi(t, m[12])
 			cur.target = atoi(t, m[13])
+			cur.awaiting = m[14] == "1"
 		case strings.HasPrefix(line, "painthover "):
 			m := m7HoverLine.FindStringSubmatch(line)
 			if m == nil {
@@ -697,22 +700,62 @@ func TestGoldenPanelReach(t *testing.T) {
 	checkGolden(t, "m7_panelreach", outDir)
 }
 
-// TestThePanelsControlsCanActuallyBeReached is a bug the user found: the Lock
-// and Face view buttons could not be clicked.
+// TestLockIsArmedFirstAndPickedSecond is the flow the user asked for after the
+// first attempt got it backwards: press Lock, then click the face.
 //
-// Both act on "the face you are pointing at", and the pointer stops being on a
-// face the instant it leaves the viewport for the panel. So the button was live
-// while you looked at it and disabled by the time you arrived — and Face view,
-// which only appears at an oblique angle, vanished on the way there. The panel
-// reads the last face the pointer resolved rather than the live one, and this
-// drives the whole journey: hover a face, move onto the panel, click.
-func TestThePanelsControlsCanActuallyBeReached(t *testing.T) {
+// The first version acted on whatever was under the pointer when the button was
+// pressed, which cannot work — reaching for the button is exactly what takes the
+// pointer off the face, so it greyed out on the way there. Arming first makes
+// the button live whatever the pointer is doing, and the click that follows is
+// spent on the choice rather than on paint. It is the same shape as pressing S
+// with no plane selected (SPEC-UX §8.1).
+func TestLockIsArmedFirstAndPickedSecond(t *testing.T) {
 	stdout, _ := runScript(t, "m7_panelreach")
 	dumps := parseM7Dumps(t, stdout)
-	if len(dumps) != 3 {
-		t.Fatalf("expected 3 dumps, got %d:\n%s", len(dumps), stdout)
+	if len(dumps) != 5 {
+		t.Fatalf("expected 5 dumps, got %d:\n%s", len(dumps), stdout)
 	}
-	onFace, onPanel, clicked := dumps[0], dumps[1], dumps[2]
+	idle, armed, locked := dumps[0], dumps[1], dumps[2]
+
+	// Nothing is hovered when the button is pressed. That is the case the old
+	// version could not handle at all.
+	if idle.hovering || idle.target != 0 {
+		t.Fatal("the pointer was already on a face, so this proves nothing")
+	}
+	if !armed.awaiting {
+		t.Fatalf("clicking Lock did not arm the pick; toasts were %q", armed.toasts)
+	}
+	if armed.locked {
+		t.Error("clicking Lock locked something before a face had been chosen")
+	}
+	if !strings.Contains(armed.hint, "Click the face") {
+		t.Errorf("the hint bar said %q, which does not say what to do next", armed.hint)
+	}
+
+	// The click that follows chooses the face, turns the camera to it, and
+	// paints nothing.
+	if !locked.locked || locked.awaiting {
+		t.Fatalf("clicking a face did not finish the lock; toasts were %q", locked.toasts)
+	}
+	if locked.lockFace == 0 {
+		t.Error("locked to no face in particular")
+	}
+	if locked.oblique > 1 {
+		t.Errorf("the camera is %v° off square-on to the face it locked to", locked.oblique)
+	}
+	if len(locked.pictures) != 0 {
+		t.Errorf("the click that chose the face also painted it: %+v", locked.pictures)
+	}
+}
+
+// TestThePanelStillKnowsWhatItWasPointedAt covers the other half of the same
+// report, which the arming flow does not remove: the Face view button and the
+// resolution mismatch prompt still act on the face under the pointer, and the
+// pointer stops being on one the moment it leaves the viewport for the panel.
+func TestThePanelStillKnowsWhatItWasPointedAt(t *testing.T) {
+	stdout, _ := runScript(t, "m7_panelreach")
+	dumps := parseM7Dumps(t, stdout)
+	onFace, onPanel := dumps[3], dumps[4]
 
 	if !onFace.hovering || onFace.target == 0 {
 		t.Fatal("the pointer never resolved a face to begin with")
@@ -724,16 +767,8 @@ func TestThePanelsControlsCanActuallyBeReached(t *testing.T) {
 	}
 	if onPanel.target != onFace.target {
 		t.Errorf("moving onto the panel changed the target from face %d to %d, "+
-			"which is what made the button impossible to click",
+			"which is what made the buttons impossible to click",
 			onFace.target, onPanel.target)
-	}
-	// And the click lands.
-	if !clicked.locked {
-		t.Fatalf("clicking Lock to this face did nothing; toasts were %q", clicked.toasts)
-	}
-	if clicked.lockFace != onFace.target {
-		t.Errorf("locked to face %d, want the face that was hovered, %d",
-			clicked.lockFace, onFace.target)
 	}
 }
 
@@ -745,10 +780,10 @@ func TestThePanelsControlsCanActuallyBeReached(t *testing.T) {
 func TestClickingThePanelDoesNotPaintThroughIt(t *testing.T) {
 	stdout, _ := runScript(t, "m7_panelreach")
 	dumps := parseM7Dumps(t, stdout)
-	clicked := dumps[2]
+	armed := dumps[1]
 
-	if len(clicked.pictures) != 0 {
+	if len(armed.pictures) != 0 {
 		t.Errorf("clicking a panel button painted %d face(s) behind it: %+v",
-			len(clicked.pictures), clicked.pictures)
+			len(armed.pictures), armed.pictures)
 	}
 }

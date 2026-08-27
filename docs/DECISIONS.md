@@ -635,6 +635,18 @@ before regenerating (TESTING §5).
 
 ### 2026-08-26 — Fix: panel controls that disarmed themselves on the way to being clicked
 
+**V-63a · The lock is armed first and the face picked second.**
+The user's second report on the same control: "I want to be able to click the
+button, then select the face I want to lock to". The first version acted on the
+face under the pointer when the button was pressed, which cannot work — moving
+the pointer to the button is exactly what takes it off the face — so the button
+greyed out as you reached for it. It now arms a pick and the next click on a
+face chooses it, the same shape as pressing S with no plane selected
+(SPEC-UX §8.1). The button is live whatever the pointer is doing, which is the
+point: a control whose availability depends on where the pointer is cannot be
+reached by moving the pointer. The click that chooses is spent on the choice and
+paints nothing. Evidence: `TestLockIsArmedFirstAndPickedSecond`.
+
 **V-63 · The panel acts on the last face the pointer resolved, not the live one.**
 Reported by the user: Lock to this face and Face view were impossible to click.
 Both act on "the face you are pointing at", and the pointer stops being on a
@@ -644,7 +656,10 @@ which only shows at an oblique angle, vanished en route. The live hover still
 governs the cursor and the stroke, because there is no texel under a button;
 the panel reads a sticky hover that outlives the journey. The resolution
 mismatch prompt had the same bug and the same fix: its own buttons were in the
-panel it was disappearing from.
+panel it was disappearing from. The lock went further and dropped the
+dependency altogether (V-63a); the sticky hover is what still carries Face view
+and the mismatch prompt, which genuinely are about the face you were pointing
+at.
 
 **V-64 · A floating card owns the pointer over it.**
 The other half of the same report. `chromeOwnsPointer` treated the toolbar, the

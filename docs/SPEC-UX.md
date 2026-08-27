@@ -288,13 +288,18 @@ G fill · I pick · L line · R rect · C circle · N gradient · X swap colours
 
 ### 13.5 Face lock (added 2026-08-26 at the user's request)
 
-**Lock to this face** points the camera squarely at the face under the cursor
-and confines every stroke to it until you unlock. It exists because the brush
-has the widest hit area in the program: run the pointer over an edge while
-painting a hull side and the next dab lands on the neighbouring face.
+**Lock to a face…** arms the pick; the click that follows chooses the face,
+points the camera squarely at it and confines every stroke to it until you
+unlock. It exists because the brush has the widest hit area in the program: run
+the pointer over an edge while painting a hull side and the next dab lands on
+the neighbouring face.
 
-- The button is in the panel, disabled until something is under the cursor. It
-  is one action, not two: the camera move is what makes a lock worth taking.
+- **Armed first, picked second**, the way pressing S with no plane selected
+  waits for one (§8.1). A button that acted on the face already under the
+  pointer could not be reached — moving the pointer to the button is exactly
+  what takes it off the face — so it is live whatever the pointer is doing. The
+  button reads **Click a face…** while armed; pressing it again, or Esc,
+  cancels. The click is spent on the choice and paints nothing.
 - The camera frames the face itself rather than a sphere around it, and offsets
   it clear of the palette panel, so a hull side fills the space it is worked in.
 - While locked the panel names the face and offers **Recentre** (point the

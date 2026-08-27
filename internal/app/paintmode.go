@@ -88,6 +88,15 @@ type paintState struct {
 	locked   bool
 	lockBody uint32
 	lockFace mesh.FaceUID
+	// awaitingLock means the Lock button has been pressed and the next click on
+	// a face is what chooses it.
+	//
+	// Arming first and picking second, rather than acting on whatever was under
+	// the cursor when the button was pressed: the button is then live whatever
+	// the pointer is doing, which is the whole point — a control that depends on
+	// where the pointer is cannot be reached by moving the pointer to it. It is
+	// the same shape as pressing S with no plane selected (SPEC-UX §8.1).
+	awaitingLock bool
 
 	// hover is what the pointer is over this frame.
 	hover paintHover
@@ -199,6 +208,7 @@ func (a *App) ExitPaint() {
 	a.clearPaintHover(true)
 	a.paint.prov = nil
 	a.paint.locked = false
+	a.paint.awaitingLock = false
 }
 
 // paintPanelReachPx is how far in from the viewport's right edge the palette
@@ -210,24 +220,36 @@ func (a *App) paintPanelReachPx() float64 {
 	return float64(a.px(paintPanelWidth + ui.Spacing*3))
 }
 
-// LockToFace confines painting to the face under the cursor and turns the
-// camera square-on to it (the user's request, 2026-08-26; SPEC-UX §13.5).
+// BeginLockPick arms the lock: the next click on a face chooses it.
+func (a *App) BeginLockPick() {
+	a.finishStroke()
+	a.paint.awaitingLock = true
+}
+
+// CancelLockPick disarms it, and reports whether there was anything to disarm.
+func (a *App) CancelLockPick() bool {
+	if !a.paint.awaitingLock {
+		return false
+	}
+	a.paint.awaitingLock = false
+	return true
+}
+
+// LockToFace confines painting to a face and turns the camera square-on to it
+// (the user's request, 2026-08-26; SPEC-UX §13.5).
 //
 // Fixing what can be painted is the point; the camera move is what makes it
 // worth doing, because a face you are locked to is a face you want to be
 // looking at. Both are one action rather than two, so there is one thing to
 // press and one thing to undo.
-func (a *App) LockToFace() bool {
-	h, hok := a.stickyFace()
-	f, ok := a.resolveFace(h.body, h.face)
-	if !hok || !ok {
-		a.Toast(ui.Toast{
-			Text: "Hover the face you want to lock to first",
-			Kind: ui.ToastWarn,
-		})
+func (a *App) LockToFace(bodyID uint32, uid mesh.FaceUID) bool {
+	f, ok := a.resolveFace(bodyID, uid)
+	if !ok {
+		a.Toast(ui.Toast{Text: "That face is no longer there", Kind: ui.ToastWarn})
 		return false
 	}
 	a.finishStroke()
+	a.paint.awaitingLock = false
 	a.paint.locked = true
 	a.paint.lockBody, a.paint.lockFace = f.body.ID, f.uid
 	a.FaceView()
@@ -333,6 +355,12 @@ func (a *App) updatePaint(in InputFrame, vp render.Viewport) {
 	a.refreshPaintHover(in, vp)
 
 	if !in.Pressed[MouseLeft] || !a.paint.hover.ok {
+		return
+	}
+	// A click while the lock is armed chooses the face and paints nothing. The
+	// click is spent on the choice.
+	if a.paint.awaitingLock {
+		a.LockToFace(a.paint.hover.body, a.paint.hover.face)
 		return
 	}
 	// Alt is the eyedropper everywhere, held or armed (SPEC-UX §16).
@@ -741,6 +769,12 @@ func (a *App) FaceView() bool {
 
 // paintCursorOverlay is the texel cursor for this frame, or nil.
 func (a *App) paintCursorOverlay() *render.Overlay {
+	if a.paint.awaitingLock {
+		// Choosing a face is not painting one. The face under the cursor already
+		// pre-highlights; a texel cursor on top of it would say the next click
+		// puts paint down, and it does not.
+		return nil
+	}
 	h := a.paint.hover
 	// Mid-stroke the cursor follows the stroke rather than the hover, which
 	// stopped being refreshed the moment the button went down.
@@ -816,6 +850,7 @@ func (a *App) handlePaintKeys(in InputFrame) {
 		// the mode.
 		switch {
 		case a.CancelStroke():
+		case a.CancelLockPick():
 		case a.paint.locked:
 			a.UnlockFace()
 		default:
@@ -827,6 +862,12 @@ func (a *App) handlePaintKeys(in InputFrame) {
 // paintHint is what the hint bar says in paint mode.
 func (a *App) paintHint() string {
 	st := &a.paint
+	if st.awaitingLock {
+		if st.hover.ok {
+			return "Click this face to lock to it · Esc to cancel"
+		}
+		return "Click the face you want to lock to · Esc to cancel"
+	}
 	if st.stroking {
 		return st.tool.String() + " · release to finish the stroke"
 	}

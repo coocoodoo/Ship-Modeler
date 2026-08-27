@@ -972,17 +972,18 @@ func (r *ScriptRunner) paintOp(op io.Op) error {
 		}
 
 	case "paint.lock":
-		// A script names the face rather than hovering it, which is the same
-		// entry point with the hover already resolved.
-		if op.Body != "" {
-			f, err := r.faceByIndex(op)
-			if err != nil {
-				return err
-			}
-			a.paint.hover = paintHover{ok: true, body: f.body.ID, face: f.uid, index: f.face}
-			a.paint.hover.paint, a.paint.hover.allocated = a.mappingFor(f)
+		// A script names the face rather than arming the pick and clicking it,
+		// which is the same entry point with the choice already made. Naming no
+		// body arms it instead, so the two-step flow can be driven as well.
+		if op.Body == "" {
+			a.BeginLockPick()
+			break
 		}
-		if !a.LockToFace() {
+		f, err := r.faceByIndex(op)
+		if err != nil {
+			return err
+		}
+		if !a.LockToFace(f.body.ID, f.uid) {
 			return op.Errorf("there was no face to lock to")
 		}
 
@@ -1176,11 +1177,13 @@ func (r *ScriptRunner) dumpPaint() {
 	a := r.App
 	st := &a.paint
 	fmt.Printf("paint mode=%d tool=%q size=%d res=%d color=%q color2=%q "+
-		"dither=%q fill=%d slot=%d textures=%d locked=%d lockface=%d target=%d\n",
+		"dither=%q fill=%d slot=%d textures=%d locked=%d lockface=%d target=%d "+
+		"awaitlock=%d\n",
 		boolBit(a.InPaint()), st.tool.String(), st.size, st.res,
 		paint.Hex(st.color), paint.Hex(st.colorB), st.dither.String(),
 		boolBit(st.fillShape), st.slot, boolBit(!st.hideTextures),
-		boolBit(st.locked), st.lockFace.Seq(), stickyTargetSeq(a))
+		boolBit(st.locked), st.lockFace.Seq(), stickyTargetSeq(a),
+		boolBit(st.awaitingLock))
 
 	if h := st.hover; h.ok && h.paint != nil {
 		fmt.Printf("painthover body=%d face=%d texel=%d,%d res=%d allocated=%d oblique=%.1f\n",
