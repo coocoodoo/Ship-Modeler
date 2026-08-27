@@ -357,6 +357,10 @@ func (a *App) handleViewportClick(in InputFrame, vp render.Viewport) {
 	if !vp.Contains(int(in.MouseX), int(in.MouseY)) {
 		return
 	}
+	// Starting work in the viewport is an answer to the welcome card too: a
+	// click that reached here missed the card, and whatever it was aiming at —
+	// a plane, a body, empty space — the user has begun.
+	a.dismissWelcome()
 	// Pick right before acting on a click, never trusting the throttled hover
 	// result (SPEC-RENDER §6.1).
 	s := a.BuildScene()
@@ -536,6 +540,10 @@ func (a *App) escape() {
 		a.sketch.awaitingPlane = false
 	case !a.Sel.Empty():
 		a.Sel.Clear()
+	case a.showWelcome():
+		// Escape waves the welcome card away; the hint bar says the same
+		// things from then on.
+		a.dismissWelcome()
 	}
 }
 

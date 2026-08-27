@@ -26,13 +26,23 @@ const (
 )
 
 // showWelcome reports whether the centre card should be up: an untouched, empty
-// document that has never been saved.
+// document that has never been saved — and that the user has not yet answered.
+//
+// The dismissed flag is the part that makes "New ship" work. A new document is
+// an empty, clean, unnamed one, which is exactly the state this card shows
+// for: without the flag the button replaced the empty document with another
+// empty document and the card concluded it should still be up. Any answer —
+// a button, Escape, or starting work in the viewport — puts it away for the
+// session; from there the hint bar carries the same guidance.
 func (a *App) showWelcome() bool {
-	if a.files.path != "" || a.InSketch() || a.InPaint() {
+	if a.files.welcomeDismissed || a.files.path != "" || a.Mode != ModeIdle {
 		return false
 	}
 	return a.Doc().IsEmpty() && !a.Doc().DirtySinceSave
 }
+
+// dismissWelcome puts the card away for the rest of the session.
+func (a *App) dismissWelcome() { a.files.welcomeDismissed = true }
 
 // buildWelcome draws the centre card, or the recovery offer that outranks it.
 func (a *App) buildWelcome(viewport rl.Rectangle) {

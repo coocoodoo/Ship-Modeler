@@ -2,10 +2,21 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Post-audit polish round two: the sketch grid got a step
-control, the view cube stopped leaking clicks into the tools, and the whole
-chrome got the elevation pass it was missing. Suite green (15 packages),
-every golden regenerated once for the restyle, exe rebuilt.
+**Current state:** Post-audit polish: grid step control, cube click guard,
+the elevation pass — and the welcome card's New ship button actually answers
+now (V-91). Suite green (15 packages), exe rebuilt.
+
+---
+
+## 2026-08-27 (later still) — The welcome card answered its own button with itself
+
+"I click new ship and message wont go away." It could not go away: the card
+shows for an empty, clean, unnamed document, and New ship produces exactly
+that, so the show condition was true again the same frame (V-91). The card
+now carries a dismissed flag set by any answer — a button, Escape, or a click
+that starts work in the viewport — and welcome_test.go pins the state machine.
+The hole is older than it looks: until V-84 the app never started empty, so
+nobody had ever actually clicked this button.
 
 ---
 

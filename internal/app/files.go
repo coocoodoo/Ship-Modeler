@@ -61,6 +61,9 @@ type fileState struct {
 	// the "discard unsaved changes?" modal until it is answered.
 	confirm     fileAction
 	confirmPath string
+	// welcomeDismissed marks that the welcome card has been answered or waved
+	// away this session, so it stays down even while the document is empty.
+	welcomeDismissed bool
 	// exportOpen is the options card; exportFormat indexes io.ExportFormats,
 	// and exportScale and exportAlpha apply to the PNG one.
 	exportOpen   bool
@@ -194,6 +197,11 @@ func (a *App) NewDocument() {
 	a.Sel.Clear()
 	a.files.path = ""
 	a.files.readOnly = false
+	// Asking for a new ship answers the welcome card, whether the ask came
+	// from the card's own button or from Ctrl+N. An empty document is the
+	// card's show condition, so without this the button appeared to do
+	// nothing: it replaced empty with empty and the card stayed up.
+	a.dismissWelcome()
 	a.clearAutosave()
 	a.Toast(ui.Toast{Text: "New ship"})
 }

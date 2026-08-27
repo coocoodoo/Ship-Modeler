@@ -885,3 +885,15 @@ mode has known this since M1 (handleViewportClick always checked the cube);
 every later tool had to learn it separately, so it now has a name —
 cubeOwnsPointer — and sketch, boolean, both arrow gizmos and the transform
 gizmo all ask it before taking a press.
+
+**V-91 · Answering the welcome card puts it away.** "I click new ship and
+message wont go away" — and it could not: the card shows for an empty, clean,
+unnamed document, and New ship replaces the empty document with another empty
+document, so the show condition was true again the same frame. The card was in
+a loop with its own primary button. It now carries a session-scoped dismissed
+flag, set by any answer: a button (New ship via NewDocument, so Ctrl+N counts
+too), Escape, or a click that starts work in the viewport. The hole never
+surfaced before because until V-84 the interactive app never started empty, so
+the card had never actually been clicked. The state machine is pinned in
+welcome_test.go, GPU-free; there was no golden of the card and the layout was
+never the problem.
