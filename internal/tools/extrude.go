@@ -113,6 +113,16 @@ type ExtrudeTool struct {
 	ThroughAll   bool
 	ThroughDepth float64
 
+	// Straddles records that the scene has material on both sides of the sketch
+	// plane along this axis.
+	//
+	// It exists because of what "past everything" has to mean there. The three
+	// default planes all pass through the origin, and so through the middle of
+	// most ships; running one direction from a plane inside the material starts
+	// the cut in the middle of it and leaves a blind pocket where a hole was
+	// asked for. So turning Through all on in that case reaches both ways.
+	Straddles bool
+
 	// AchievedDraft and Clamped mirror the last build, so the card can turn the
 	// draft field warn-orange when the profile could not take the angle.
 	AchievedDraft float64
@@ -157,6 +167,34 @@ func (t *ExtrudeTool) EffectiveDepth() float64 {
 		return 2 * t.ThroughDepth
 	}
 	return t.ThroughDepth
+}
+
+// SetThroughAll turns the toggle on or off, choosing a direction that makes
+// "past everything" true when the sketch plane sits inside the model.
+//
+// The direction stays the user's to change afterwards: picking Normal with
+// Through all on then means "past everything ahead of the plane", which is a
+// real thing to want and is one chip away.
+func (t *ExtrudeTool) SetThroughAll(on bool) {
+	t.ThroughAll = on
+	if on && t.Straddles && t.Dir != extrude.Symmetric {
+		t.Dir = extrude.Symmetric
+	}
+}
+
+// ThroughAllNote is what the card says the toggle resolved to, so the choice is
+// visible rather than inferred from a number.
+func (t *ExtrudeTool) ThroughAllNote() string {
+	if !t.ThroughAll {
+		return ""
+	}
+	if t.Dir == extrude.Symmetric {
+		return "both ways"
+	}
+	if t.Straddles {
+		return "one way only"
+	}
+	return "past everything"
 }
 
 // ArrowDirection is the way the gizmo points right now, which follows the sign

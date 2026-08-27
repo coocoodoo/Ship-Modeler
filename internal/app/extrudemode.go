@@ -94,7 +94,8 @@ func (a *App) BeginExtrude() bool {
 	frame := s.Frame()
 	origin := regionCentroid(arr, regions, frame)
 	a.extrude.tool = tools.NewExtrudeTool(s.ID, regions, origin, frame.N)
-	a.extrude.tool.ThroughDepth = a.throughAllDepth(origin, frame.N)
+	a.extrude.tool.ThroughDepth, a.extrude.tool.Straddles =
+		a.throughAllReach(origin, frame.N)
 	// A sketch drawn on a face is nearly always meant to grow that body, not to
 	// start a new one beside it (SPEC-UX §10). Subtract is one chip away, which
 	// is the "cut a hole here" path.
@@ -119,16 +120,34 @@ func (a *App) BeginExtrude() bool {
 //
 // It is measured once, when the tool opens: the scene it must clear is the one
 // that was there before this extrude, not one that includes its own preview.
-func (a *App) throughAllDepth(origin, axis geom.Vec3) float64 {
+// throughAllReach measures how far the scene extends along the extrude axis,
+// and whether it extends both ways from the sketch plane.
+//
+// The distance is the furthest corner either side, so one number clears the
+// scene whichever direction it is spent in. The straddle flag is the part that
+// matters: it is what tells the tool that running one way from this plane would
+// start the cut inside the material (SPEC-UX §9.3).
+func (a *App) throughAllReach(origin, axis geom.Vec3) (float64, bool) {
 	s := a.BuildScene()
 	box := scene.FrameAll(&s)
-	var reach float64
+	var reach, ahead, behind float64
 	for _, c := range box.Corners() {
-		if d := math.Abs(c.Sub(origin).Dot(axis)); d > reach {
-			reach = d
+		d := c.Sub(origin).Dot(axis)
+		if math.Abs(d) > reach {
+			reach = math.Abs(d)
+		}
+		if d > ahead {
+			ahead = d
+		}
+		if d < behind {
+			behind = d
 		}
 	}
-	return geom.SnapWithStep(reach+tools.ThroughAllMarginUnits, geom.SnapGrid)
+	// A hair of slack, so a plane resting exactly on a face is not called a
+	// straddle by a rounding error.
+	const inside = 1e-6
+	straddles := ahead > inside && -behind > inside
+	return geom.SnapWithStep(reach+tools.ThroughAllMarginUnits, geom.SnapGrid), straddles
 }
 
 // tiltOffAxis swings the camera away from an axis it is looking straight down.

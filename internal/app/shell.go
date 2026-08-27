@@ -920,11 +920,19 @@ func (a *App) buildExtrudeCard(viewport rl.Rectangle) {
 
 	// Through all: the depth stops being something you drag and becomes
 	// whatever clears the scene.
-	if a.UI.Toggle(ui.MakeID("extrude.through"), row(a.px(22)), "Through all",
+	throughRow := row(a.px(22))
+	// The note says what the toggle resolved to. Past everything from a plane
+	// inside the model has to mean both ways, and a user who asked for a hole
+	// and got a pocket has no way to tell why without being told.
+	if note := t.ThroughAllNote(); note != "" {
+		noteBox, _ := ui.SplitRight(throughRow, a.px(110))
+		a.UI.Text(noteBox, note, ui.FontSizeSmall, ui.Fade(ui.ColorTextDim, 0.9))
+	}
+	if a.UI.Toggle(ui.MakeID("extrude.through"), throughRow, "Through all",
 		t.ThroughAll, ui.ButtonOpts{
 			Tooltip: "Run past everything in the scene instead of a set depth",
 		}) {
-		t.ThroughAll = !t.ThroughAll
+		t.SetThroughAll(!t.ThroughAll)
 		a.rebuildExtrudePreview()
 	}
 

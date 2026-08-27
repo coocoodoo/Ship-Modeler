@@ -745,3 +745,22 @@ crashed last week.
 **V-75 · Goldens regenerated for the toolbar.** The disabled settings gear became
 three live file buttons (open, save, export), changing 245 pixels of every shot
 in the suite, all inside the toolbar. Measured before regenerating (TESTING §5).
+
+### 2026-08-26 — M9, first fix
+
+**V-76 · Through all reaches both ways when the sketch plane is inside the model.**
+Reported by the user as "the subtract function when extruding a sketch is
+buggy, not working", and it was: a Through-all Subtract on one of the three
+default planes cut exactly half a hole. Those planes all pass through the
+origin, and so through the middle of most ships; "past everything" was measured
+as the distance to the furthest corner of the scene and then spent in one
+direction, which starts the cut *inside* the material and leaves a blind
+pocket. Turning Through all on now selects Symmetric when the scene straddles
+the plane along the extrude axis. Direction stays the user's to change — Normal
+with Through all then means "past everything ahead of the plane", which is a
+real thing to want — and the toggle says which it resolved to, because a user
+who asked for a hole and got a pocket has no other way to tell why.
+
+The bug survived M3 because the only Through-all test used `dir: "symmetric"`
+explicitly, which is the one case that already worked. `m9_throughcut` uses the
+default direction and measures the hole: 24 units of hull, not 12.

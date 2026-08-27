@@ -164,7 +164,7 @@ Result     (• New)(Add)(Subtract)(Intersect)
 ```
 - **Symmetric** (R7): total depth split ± around the sketch plane; draft applies outward from the plane both ways (widest at the sketch plane).
 - **Draft** (R6): degrees; positive tapers the far cap smaller. Live preview. If the requested angle would break the profile (GEOM §5.3), the field clamps to the max valid value and turns warn-orange with tooltip *"Clamped — profile too tight for more draft"*.
-- **Through all**: replaces depth with "past everything" (scene bbox + margin); pairs naturally with Subtract for cutting windows.
+- **Through all**: replaces depth with "past everything" (scene bbox + margin); pairs naturally with Subtract for cutting windows. **When the sketch plane has material on both sides of it, turning Through all on selects Symmetric**, because past everything from a plane inside the model means both ways — the three default planes all pass through the origin, so a one-directional cut there starts inside the material and leaves a blind pocket where a hole was asked for. Direction stays free to change afterwards, and the toggle says which it resolved to ("both ways" / "one way only").
 - **Result** (R8): **New** = independent body. **Add** = union into target. **Subtract** = cut from target(s). **Intersect** = keep common volume with target. Target rules: sketch-on-face → that face's body; sketch-on-plane → the body the preview intersects (topmost if several for Add/Intersect; **all intersected** for Subtract). If Add/Intersect finds no target: falls back to New with toast *"Nothing to combine with — created a new body"*. Chips disable with tooltip when no target applies.
 - Confirm: ✓ or Enter. Cancel: ✕ or Esc (sketch untouched, still in Sketch mode).
 

@@ -1,0 +1,18 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"dump"},
+
+  {"op":"sketch.begin","plane":"Front"},
+  {"op":"sketch.rect","a":[-1,-1],"b":[1,1]},
+  {"op":"extrude.begin","depth":1,"result":"subtract","through":true},
+  {"op":"dump"},
+  {"op":"extrude.commit"},
+  {"op":"settle"},
+  {"op":"dump"},
+
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"shot","name":"m9_throughcut"}
+]

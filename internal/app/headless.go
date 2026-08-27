@@ -705,7 +705,7 @@ func (r *ScriptRunner) extrudeOp(op io.Op, commit bool) error {
 	default:
 		return op.Errorf("unknown direction %q", op.Dir)
 	}
-	t.ThroughAll = op.Through
+	t.SetThroughAll(op.Through)
 	// An unspecified result leaves whatever the tool chose for itself, which is
 	// how a face sketch keeps its Add default (SPEC-UX §10).
 	switch op.Result {
@@ -1192,10 +1192,14 @@ func (r *ScriptRunner) dump() {
 	}
 	if t := a.extrude.tool; t != nil {
 		fmt.Printf("extrude depth=%.4f draft=%.2f achieved=%.2f clamped=%d dir=%q "+
-			"through=%d regions=%d result=%q targets=%d\n",
+			"through=%d regions=%d result=%q targets=%d reach=%d\n",
 			t.EffectiveDepth(), t.Draft, t.AchievedDraft, boolBit(t.Clamped),
 			t.Dir.String(), boolBit(t.ThroughAll), len(t.Regions),
-			t.Result.String(), len(a.extrudeTargets(t.Result)))
+			t.Result.String(), len(a.extrudeTargets(t.Result)),
+			// reach is what the Result chips are enabled from: the bodies the
+			// pending solid runs into, whatever result is armed. targets is
+			// narrower — it is empty for New, which says nothing about reach.
+			len(a.extrude.targets))
 	}
 	if t := a.boolean.tool; t != nil {
 		fmt.Printf("boolean op=%q target=%d tools=%d keep=%d\n",
