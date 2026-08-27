@@ -73,6 +73,13 @@ func (a *App) buildShell(l Layout) {
 	case a.InTransform():
 		a.buildTransformCard(l.Viewport)
 	}
+	if a.InExport() {
+		a.buildExportCard(l.Viewport)
+	}
+	// The welcome and recovery cards sit above the tool cards: a recovery offer
+	// that could be buried under a panel is an offer that gets missed.
+	a.buildWelcome(l.Viewport)
+
 	// The box-select rectangle is drawn over everything, including the cards,
 	// because a drag that started under one still has to be visible.
 	if a.BoxSelecting() {
@@ -216,13 +223,35 @@ func (a *App) buildToolbar(r rl.Rectangle) {
 		a.Redo()
 	}
 
-	// Settings gear, right-aligned.
-	gear, _ := ui.SplitRight(rest, sq)
-	gear.Height = btnH
-	a.UI.IconButton(ui.MakeID("tool.settings"), gear, ui.DrawSettingsIcon, ui.IconOpts{
-		Disabled:    true,
-		DisabledWhy: "Settings arrive with milestone M8",
-	})
+	// The file actions live at the right end, in the order they are reached
+	// for: open, save, export. Each takes its slot off the right and hands the
+	// rest along, with a gap so they read as three buttons and not one strip.
+	gap := a.px(4)
+	files := []struct {
+		id, tip, key string
+		icon         ui.IconFunc
+		act          fileAction
+	}{
+		{"tool.export", "Export the ship", "Ctrl+E", ui.DrawImportIcon, fileExport},
+		{"tool.save", "Save " + a.DocumentName(), "Ctrl+S", ui.DrawSaveIcon, fileSave},
+		{"tool.open", "Open a ship", "Ctrl+O", ui.DrawOpenIcon, fileOpen},
+	}
+	for _, f := range files {
+		var box rl.Rectangle
+		box, rest = ui.SplitRight(rest, sq)
+		box.Height = btnH
+		if a.UI.IconButton(ui.MakeID(f.id), box, f.icon, ui.IconOpts{
+			Tooltip:  f.tip,
+			Shortcut: f.key,
+		}) {
+			if f.act == fileExport {
+				a.BeginExport()
+			} else {
+				a.RequestFile(f.act)
+			}
+		}
+		rest.Width -= gap
+	}
 }
 
 func undoTooltip(verb, name string) string {

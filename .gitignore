@@ -20,3 +20,4 @@ modeler.exe
 *.swp
 
 # Keep docs/shots (visual diary) — do not ignore
+modeler-release.exe

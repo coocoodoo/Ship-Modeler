@@ -82,6 +82,7 @@ type App struct {
 	transform transformState
 	box       boxSelectState
 	paint     paintState
+	files     fileState
 
 	// hoverSketch is the visible sketch under the pointer, which the ID buffer
 	// cannot report because an overlay is not geometry.
@@ -136,6 +137,8 @@ func New(headless bool) *App {
 	}
 	a.tree.init(settings)
 	a.initPaint()
+	a.restorePaint()
+	a.initFiles()
 	a.Bus.Events.Listen(a.onDocumentEvent)
 
 	if settingsErr != nil && !headless {
@@ -176,6 +179,7 @@ func (a *App) saveSettings() {
 	}
 	a.Settings.TreePanelWidth = int(a.tree.width)
 	a.Settings.TreeCollapsed = a.tree.collapsed
+	a.gatherPaintSettings()
 	_ = a.Settings.Save()
 }
 
@@ -283,6 +287,7 @@ func (a *App) update(in InputFrame) {
 		a.Camera = cam
 	}
 
+	a.stepAutosave(in.DeltaMillis)
 	a.Cube.Layout(a.Camera, vp, a.Scale)
 	a.Triad.Layout(vp, a.Scale)
 	a.Cube.Update(in.MouseX, in.MouseY)

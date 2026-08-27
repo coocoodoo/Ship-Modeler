@@ -218,3 +218,54 @@ func (c *Context) TextWidth(s string, size float64) float32 {
 func (c *Context) Overlay(r rl.Rectangle) {
 	FillRect(r, color.RGBA{R: 0, G: 0, B: 0, A: 0x9A})
 }
+
+// TextWrapped draws text broken across as many lines of r as it needs, up to
+// as many as fit.
+//
+// The kit had no wrapping until something had a sentence to say rather than a
+// label: the export card's caveat about a format is the sort of thing that has
+// to be readable in the panel rather than truncated with an ellipsis.
+func (c *Context) TextWrapped(r rl.Rectangle, s string, size float64, col color.RGBA) {
+	if s == "" || r.Width <= 0 {
+		return
+	}
+	lineH := c.Fonts.LineHeight(size)
+	if lineH <= 0 {
+		return
+	}
+	maxLines := int(r.Height / lineH)
+	if maxLines < 1 {
+		maxLines = 1
+	}
+
+	words := strings.Fields(s)
+	var lines []string
+	current := ""
+	for _, w := range words {
+		try := w
+		if current != "" {
+			try = current + " " + w
+		}
+		if c.TextWidth(try, size) <= r.Width || current == "" {
+			current = try
+			continue
+		}
+		lines = append(lines, current)
+		current = w
+		if len(lines) == maxLines {
+			break
+		}
+	}
+	if current != "" && len(lines) < maxLines {
+		lines = append(lines, current)
+	}
+
+	y := r.Y
+	for i, line := range lines {
+		if i == maxLines-1 && i < len(lines)-1 {
+			line = c.Truncate(line+" …", size, r.Width)
+		}
+		c.Text(Rect(r.X, y, r.Width, lineH), line, size, col)
+		y += lineH
+	}
+}

@@ -95,8 +95,19 @@ func DefaultSettings() *Settings {
 	}
 }
 
+// ConfigDirEnv overrides where settings, autosaves and crash logs live.
+//
+// It exists for two callers. Tests must not write into the real profile — an
+// autosave test that recovers the user's actual work would be worse than no
+// test at all. And a portable install can point the whole lot at a folder
+// beside the executable.
+const ConfigDirEnv = "MODELER_CONFIG_DIR"
+
 // SettingsDir is %APPDATA%\Modeler, or a sensible equivalent elsewhere.
 func SettingsDir() (string, error) {
+	if dir := strings.TrimSpace(os.Getenv(ConfigDirEnv)); dir != "" {
+		return dir, nil
+	}
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("locate the settings directory: %w", err)

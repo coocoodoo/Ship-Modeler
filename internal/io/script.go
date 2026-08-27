@@ -65,6 +65,11 @@ type Op struct {
 	Ctrl  bool `json:"ctrl,omitempty"`
 	Alt   bool `json:"alt,omitempty"`
 
+	// File ops. Path is explicit rather than dialog-driven: a headless run has
+	// nobody to answer a dialog, and a test that named its own file is clearer
+	// than one that guessed where a dialog would have put it.
+	Path string `json:"path,omitempty"`
+
 	// Visibility, camera and capture ops.
 	Visible *bool  `json:"visible,omitempty"`
 	View    string `json:"view,omitempty"`
@@ -157,6 +162,10 @@ var knownOps = map[string]bool{
 	"paint.textures": true, "paint.faceview": true,
 	"paint.color2": true, "paint.swap": true, "paint.dither": true,
 	"paint.shapefill": true, "paint.lock": true, "paint.unlock": true,
+	"file.new": true, "file.save": true, "file.open": true,
+	"file.export": true, "file.autosave": true, "file.recover": true,
+	"file.discard": true, "export.begin": true, "export.format": true,
+	"export.cancel": true, "export.scale": true, "export.alpha": true,
 	"body.visible": true, "plane.visible": true, "sketch.visible": true,
 	"deselect": true, "delete": true, "undo": true, "redo": true,
 	"hover": true, "click": true, "drag": true, "drag.release": true,
@@ -239,6 +248,18 @@ func (o Op) validate() error {
 			return o.Errorf("needs a mode: None, 2x2, 4x4 or 8x8")
 		}
 	case "paint.shapefill":
+		if o.Visible == nil {
+			return o.Errorf("needs visible")
+		}
+	case "file.save", "file.open", "file.export":
+		if o.Path == "" {
+			return o.Errorf("needs a path")
+		}
+	case "export.format":
+		if o.Kind == "" {
+			return o.Errorf("needs a format extension, without the dot")
+		}
+	case "export.alpha":
 		if o.Visible == nil {
 			return o.Errorf("needs visible")
 		}

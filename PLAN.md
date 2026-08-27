@@ -216,11 +216,11 @@ Specs: UX §13, GEOM §8.
 
 ### M8 — Files: save/load, autosave, export (M)
 Specs: DATA §4–6.
-- [ ] `.ship` zip save/load/save-as via zenity dialogs; round-trip tests incl. paint + view state; format version 1 with tolerant reader
-- [ ] Autosave every 120 s when dirty + crash-save on panic; recovery prompt on next launch; recent files on a welcome/empty state screen (UX §14)
-- [ ] Export: OBJ+MTL+PNGs (nearest-note in README), binary STL, PNG screenshot current-view at 1×/2×/4× with transparent-background option
-- [ ] Release build documented & tested: `-H windowsgui`, exe runs on a machine without Go (static mingw runtime: `-extldflags=-static` if needed)
-**Accept:** kill the process mid-edit → relaunch recovers; OBJ verified structurally in tests (counts, materials, UVs) and opens in an external viewer.
+- [x] `.ship` zip save/load/save-as via zenity dialogs; round-trip tests incl. paint + view state; format version 1 with tolerant reader
+- [x] Autosave every 120 s when dirty + crash-save on panic; recovery prompt on next launch; recent files on a welcome/empty state screen (UX §14)
+- [x] Export: **glTF (.glb/.gltf, added at the user's request)**, OBJ+MTL+PNGs, binary STL, PNG screenshot current-view at 1×/2×/4× with transparent-background option — options in an in-app card, path via zenity (DECISIONS V-70)
+- [x] Release build documented & tested: `go build -ldflags "-s -w -H windowsgui -extldflags=-static"` — the static flag is required, not optional: without it the exe imports libgcc/libstdc++/libwinpthread, which no machine without mingw has (V-72)
+**Accept:** kill the process mid-edit → relaunch recovers; OBJ verified structurally in tests (counts, materials, UVs) and opens in an external viewer. — **MET** for recovery (`TestAutosaveIsRecoveredByTheNextRun` uses two processes, because one ignores its own recovery files) and for the structural checks (OBJ, STL and glTF each have their own). Opening in an external viewer is the one thing the executor cannot do and is left for the user's sign-off.
 
 ### M9 — Polish pass to v1.0 (L)
 Specs: UX §15 checklist is the work list. Highlights:

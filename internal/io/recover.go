@@ -180,16 +180,31 @@ func DiscardAutosave(shipPath string) {
 	os.Remove(sidecarPath(shipPath))
 }
 
-// ClearOwnAutosaves removes the recovery files this process wrote, which is
+// ClearOwnAutosaves removes every recovery file this process wrote, which is
 // what a clean save or a clean exit does: there is nothing left to recover.
-func ClearOwnAutosaves(origin string) {
+//
+// They are found by process rather than by name. A recovery file is named after
+// the document it was made from, and a save is exactly the moment that name
+// changes — clearing by the new name would leave the file written under the old
+// one behind, to be offered back as work that was in fact saved.
+func ClearOwnAutosaves() {
 	dir, err := AutosaveDir()
 	if err != nil {
 		return
 	}
-	for _, crash := range []bool{false, true} {
-		p := filepath.Join(dir, autosaveName(origin, os.Getpid(), crash))
-		DiscardAutosave(p)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	me := os.Getpid()
+	for _, e := range entries {
+		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ShipExtension) {
+			continue
+		}
+		full := filepath.Join(dir, e.Name())
+		if side, err := readSidecar(sidecarPath(full)); err == nil && side.PID == me {
+			DiscardAutosave(full)
+		}
 	}
 }
 

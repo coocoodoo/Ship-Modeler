@@ -368,6 +368,14 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		}
 		a.sketch.session.SetTool(t)
 
+	case "file.new", "file.save", "file.open", "file.export",
+		"file.autosave", "file.recover", "file.discard",
+		"export.begin", "export.format", "export.cancel",
+		"export.scale", "export.alpha":
+		if err := r.fileOp(op); err != nil {
+			return err
+		}
+
 	case "paint.begin", "paint.exit", "paint.res", "paint.color", "paint.tool",
 		"paint.size", "paint.pixel", "paint.stroke", "paint.resample",
 		"paint.textures", "paint.faceview", "paint.color2", "paint.swap",
@@ -900,6 +908,77 @@ func (r *ScriptRunner) booleanOp(op io.Op, commit bool) error {
 	return nil
 }
 
+// fileOp drives the file layer. The paths are explicit because a headless run
+// has nobody to answer a dialog; everything below the dialog is the same code
+// the buttons reach.
+func (r *ScriptRunner) fileOp(op io.Op) error {
+	a := r.App
+	switch op.Op {
+	case "file.new":
+		a.NewDocument()
+
+	case "file.save":
+		if !a.saveTo(op.Path) {
+			return op.Errorf("the save was refused")
+		}
+
+	case "file.open":
+		if !a.OpenPath(op.Path) {
+			return op.Errorf("the file would not open")
+		}
+
+	case "file.export":
+		if err := a.ExportTo(op.Path, op.Res, op.Visible != nil && *op.Visible); err != nil {
+			return op.Wrap(err)
+		}
+
+	case "file.autosave":
+		a.writeAutosave(op.Kind == "crash")
+
+	case "file.recover":
+		a.files.recovery = nil
+		if found, err := ioFindRecoverable(); err == nil {
+			a.files.recovery = found
+		}
+		if !a.RecoverNewest() {
+			return op.Errorf("there was nothing to recover")
+		}
+
+	case "file.discard":
+		a.DiscardRecovery()
+
+	case "export.begin":
+		a.BeginExport()
+		if !a.InExport() {
+			return op.Errorf("the export card would not open")
+		}
+
+	case "export.cancel":
+		a.CancelExport()
+
+	case "export.format":
+		found := false
+		for i, f := range io.ExportFormats() {
+			if strings.EqualFold(f.Extension, "."+op.Kind) {
+				a.files.exportFormat, found = i, true
+			}
+		}
+		if !found {
+			return op.Errorf("no export format writes .%s", op.Kind)
+		}
+
+	case "export.scale":
+		a.files.exportScale = op.Res
+
+	case "export.alpha":
+		a.files.exportAlpha = *op.Visible
+	}
+	return nil
+}
+
+// ioFindRecoverable is split out so the op reads the same list the app does.
+func ioFindRecoverable() ([]io.Autosave, error) { return io.FindRecoverable() }
+
 // paintOp runs the paint ops through the same brush, palette and command the
 // pointer drives, so a scripted ship and a painted one are the same code path.
 func (r *ScriptRunner) paintOp(op io.Op) error {
@@ -1130,6 +1209,14 @@ func (r *ScriptRunner) dump() {
 	// was reported on the gizmo's line until a face selection stopped arming
 	// one and took the filter with it.
 	fmt.Printf("boxselect filter=%q\n", BoxFilterLabel(a.box.Filter))
+	if a.InExport() {
+		f := io.ExportFormats()[a.files.exportFormat]
+		fmt.Printf("export format=%q scale=%d alpha=%d\n",
+			f.Extension, a.files.exportScale, boolBit(a.files.exportAlpha))
+	}
+	fmt.Printf("file name=%q saved=%d readonly=%d recovery=%d recents=%d\n",
+		a.DocumentName(), boolBit(a.files.path != ""), boolBit(a.files.readOnly),
+		len(a.files.recovery), len(a.Settings.RecentFiles))
 	if t := a.pushPull.tool; t != nil {
 		// The arrow's screen ends are reported so a scripted drag can aim at the
 		// same pixels a person would. Without them a drag test has to guess,

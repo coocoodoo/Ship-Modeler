@@ -490,14 +490,11 @@ func (a *App) paintFooterRow(r rl.Rectangle) {
 	rest.X += a.px(6)
 	rest.Width -= a.px(6)
 
-	// The dialog itself belongs to M8 (SPEC-DATA §5). Until then the import is
-	// real and reachable — drop the file on the window — and the button says so
-	// rather than pretending nothing exists (SPEC-UX §15).
-	a.UI.Button(ui.MakeID("paint.import"), importBox, "Import .hex", ui.ButtonOpts{
-		Disabled: true,
-		DisabledWhy: "File dialogs arrive with M8 — for now, " +
-			"drop a .hex palette onto the window",
-	})
+	if a.UI.Button(ui.MakeID("paint.import"), importBox, "Import .hex", ui.ButtonOpts{
+		Tooltip: "Load a Lospec palette — or just drop a .hex file on the window",
+	}) {
+		a.RequestFile(fileImportPalette)
+	}
 
 	label := "Textures"
 	if a.UI.Toggle(ui.MakeID("paint.textures"), rest, label, !a.paint.hideTextures,

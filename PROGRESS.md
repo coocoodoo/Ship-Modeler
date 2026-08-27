@@ -2,10 +2,106 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **M7 COMPLETE**, plus the user-requested paint tools and face
-lock, plus fixes for three input-routing bugs the user found in them. `build`,
-`vet` and the full suite are green. Next up: **M8** (save/load, autosave,
-export).
+**Current state:** **M8 COMPLETE.** Ships save and load, autosave recovers work
+from a crash, and the program exports glTF, OBJ, STL and PNG. `build`, `vet` and
+the full suite are green. Next up: **M9** — the polish pass to v1.0.
+
+---
+
+## 2026-08-26 — M8: files, autosave, recovery and export
+
+The file layer, built bottom-up: everything in `internal/io` first, with its own
+tests, then wired into the app. That order was not tidiness — this is the layer
+that loses people's work when it is wrong, and the parts that lose it are the
+parts with no UI.
+
+**What shipped.**
+
+| Piece | Where |
+|---|---|
+| `.ship` container: zip of manifest, document, one PNG per picture, thumbnail | `internal/io/ship.go` |
+| Mesh and vector serialisation | `internal/geom/mesh/serial.go`, `internal/geom/json.go` |
+| Autosave, crash-save, recovery discovery | `internal/io/recover.go` |
+| Exports: **glTF (.glb and .gltf)**, OBJ+MTL+PNGs, binary STL, PNG at 1×/2×/4× | `internal/io/gltf.go`, `internal/io/export.go` |
+| Native dialogs (`ncruces/zenity`, D-10) | `internal/io/dialogs.go` |
+| App wiring: New/Open/Save/Save As, autosave timer, crash handler, recents | `internal/app/files.go` |
+| Welcome and recovery cards (SPEC-UX §14) | `internal/app/welcome.go` |
+| Export options card | `internal/app/exportcard.go` |
+| Off-screen capture for thumbnails and PNG export | `internal/render/capture.go` |
+
+**glTF was the user's, mid-milestone.** It was M10 backlog item 4; they asked
+during M8 and it belongs with the rest of the export work. Both spellings are
+written. Every sampler says NEAREST — glTF is the only format here that can put
+that instruction *in the file* rather than in a README, which for a pixel-art
+tool is most of the point of supporting it at all.
+
+**Three things that had to be got right and were not obvious.**
+
+1. *The mesh has to serialise itself.* Fragments of a cut face share one
+   `FacePaint` by pointer. A face-at-a-time marshaller writes that picture once
+   per fragment and reads back a copy each — and from then on painting one
+   fragment stops showing on its siblings. The contract would have been broken
+   by the act of saving. The pictures go in a table and the faces index into it.
+2. *Recovery files are cleared by process, not by name.* An autosave is named
+   after the document it came from, and **a save is exactly the moment that name
+   changes**. Clearing by the new name left the file written under the old one
+   sitting there, to be offered back next launch as work that had in fact been
+   saved. A test caught it.
+3. *The release build needs `-extldflags=-static`.* PLAN called it an "if
+   needed". It is needed: without it the exe imports `libgcc_s_seh-1.dll`,
+   `libstdc++-6.dll` and `libwinpthread-1.dll` — the last two from Manifold's
+   C++ — and no machine without mingw has them. `objdump -p` before and after;
+   with the flag the only imports left are Windows system DLLs and the UCRT.
+
+**Verified.**
+
+- `go build ./...`, `go vet ./...`, `go test ./...` — green; goldens twice.
+- **The acceptance clause, honestly**: `TestAutosaveIsRecoveredByTheNextRun`
+  paints something, never saves it, writes a crash file, and then starts a
+  **second process** which finds it and takes it back with the paint intact. Two
+  processes because one deliberately ignores its own recovery files — a test
+  that recovered from itself would prove nothing about the case the feature
+  exists for. A third run confirms the file was consumed.
+- **Round-trip**: a save of a document that was just loaded is byte-identical,
+  so a save never shows as a change to whatever the user keeps their ships in.
+- **The reader survives rubbish**: empty, truncated, garbage, a valid zip with a
+  broken document inside — each an error, none a crash. A missing paint PNG
+  costs its face the paint and a warning, not the ship.
+- **Exports are checked structurally**, because nothing reads them back: every
+  glTF index resolves, every accessor fits its buffer, the POSITION bounds are
+  the real bounds (viewers frame the camera from those), the OBJ's every
+  `usemtl` exists in the MTL, and the STL header does not start with "solid".
+- 25 new tests in `internal/io` (39 there now), 7 new app tests, 2 new goldens.
+- The statically-linked release exe (9.3 MB) runs the M7 script and produces
+  identical output.
+
+**Open.**
+
+- **The user's sign-off on an external viewer.** The OBJ and glTF are checked
+  structurally here; whether Blender or an engine likes them is something only
+  you can tell me. That is the one part of M8's accept clause I cannot close.
+- **The sample ship** on the welcome card is disabled and says it arrives with
+  M9, which is where PLAN puts it.
+- **No "you have unsaved work" prompt on close.** Closing the window discards
+  unsaved work with only the autosave to fall back on. That belongs with M9's
+  polish pass, and it is written down here so it is not forgotten.
+- The recovery card offers back the **newest** file and discards the rest; a
+  list to choose from is more than the case warrants.
+
+**Try it** (`go run ./cmd/modeler`):
+
+1. Start it: the welcome card offers **New ship** and **Open…**.
+2. Build something, **Ctrl+S**, name it. The title bar shows the name, and the
+   dot beside it appears whenever there is unsaved work.
+3. **Ctrl+E**: pick **glb** and export. Drop the file into any glTF viewer — the
+   pixels should be crisp, because the file says so.
+4. Pick **png** instead: the scale chips and **Transparent background** appear.
+5. Paint something, do *not* save, and kill the process from Task Manager. Start
+   it again — the work is offered back.
+
+**Next:** M9 — the polish pass: hover/pressed/disabled audit, per-tool cursors,
+the `?` overlay, empty states, the embedded sample ship, a perf profile, the
+README with credits, and the full-app end-to-end script.
 
 ---
 

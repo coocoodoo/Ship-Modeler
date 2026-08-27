@@ -676,3 +676,72 @@ Making a card chrome outright would also have stopped orbiting from starting on
 top of one, and navigation works from wherever the pointer is in every mode
 (SPEC-UX §1). `cardOnlyOwnsPointer` separates the two: over a card the camera
 still moves and the tools do not. Over real chrome, neither does.
+
+### 2026-08-26 — M8
+
+**V-66 · The mesh serialises itself, because only it knows about shared paint.**
+SPEC-DATA §4 describes `document.json` as the whole document, which suggests
+package io mirroring the types. It cannot: fragments of a cut face share one
+`FacePaint` by pointer (SPEC-GEOMETRY §8.4), and a face-at-a-time marshaller
+would write that picture once per fragment and read back a copy each — painting
+one fragment would stop showing on its siblings, a contract broken by having
+been saved. The pictures go in a per-mesh table and the faces hold an index into
+it. Evidence: `TestSharedPaintIsStillSharedAfterALoad`.
+
+**V-67 · Paint PNGs are named after the face that introduced the picture.**
+SPEC-DATA §4 says `paint/<faceUID>.png`, which reads as one file per painted
+face and would duplicate a shared picture. The name is kept and the meaning
+narrowed: the file is named for the *owning* face, the first one that referenced
+it, which is stable because identities are never reused (SPEC-DATA §1).
+
+**V-68 · Vectors serialise as arrays.** A saved ship is mostly vertices, and
+`[0,1,2]` against `{"X":0,"Y":1,"Z":2}` is a third of the bytes and easier to
+read in a diff. The reader still accepts the object form, so a file written
+before this does not become unreadable.
+
+**V-69 · An autosave is a whole .ship, not a journal.** Recovery is then the
+ordinary load path, already covered by its own tests, rather than a second
+reader that only ever runs on somebody's worst day. Recovery files are found and
+cleared by process id rather than by name: a save is exactly the moment the
+document's name changes, and clearing by the new name would leave the file
+written under the old one to be offered back as work that was in fact saved.
+Evidence: `TestASavedDocumentIsNotOfferedBack`.
+
+**V-70 · Export options live in a card; the dialog decides only the path.**
+SPEC-DATA §5 calls it a "Ctrl+E dialog: format, path via zenity". A native file
+dialog has nowhere sensible to put a scale chip, and the format has to be chosen
+*before* the dialog opens because it decides what the dialog filters for. So the
+card picks the format and its options, and then the dialog picks the place.
+
+**V-71 · glTF export, in both spellings, added at the user's request.**
+It was M10 backlog item 4; the user asked for it during M8 and it slots into the
+same export work. `.glb` packs everything into one file and `.gltf` writes JSON
+with a `.bin` and the PNGs beside it. Every sampler is NEAREST — glTF is the
+only format here that can carry that instruction in the file rather than in a
+README, and a pixel-art texture filtered smooth is not this program's output.
+Vertices are emitted per face rather than shared, because these are flat-shaded
+solids and a shared vertex shares its normal.
+
+**V-72 · The release build must be statically linked.** PLAN listed
+`-extldflags=-static` as an "if needed". It is needed: without it the exe
+imports `libgcc_s_seh-1.dll`, `libstdc++-6.dll` and `libwinpthread-1.dll` —
+the last two from Manifold's C++ — and no machine without mingw has them.
+Measured with `objdump -p`; with the flag the only imports left are Windows
+system DLLs and the Universal CRT.
+
+**V-73 · Dialogs run between frames, never inside one.** A native file dialog is
+modal and pumps its own message loop, and running one between BeginDrawing and
+EndDrawing means running somebody else's loop with a frame half submitted. Every
+dialog-driven action is queued during the frame and performed by
+`RunPendingFile` after it.
+
+**V-74 · `MODELER_CONFIG_DIR` overrides where settings and autosaves live.**
+Tests must not write into the profile of whoever is running them — an autosave
+test that recovered the user's actual work would be worse than no test. A
+headless run only looks for recovery files when that variable is set, so a
+golden shot can never grow a recovery card because the machine it ran on
+crashed last week.
+
+**V-75 · Goldens regenerated for the toolbar.** The disabled settings gear became
+three live file buttons (open, save, export), changing 245 pixels of every shot
+in the suite, all inside the toolbar. Measured before regenerating (TESTING §5).

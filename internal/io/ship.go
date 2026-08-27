@@ -444,3 +444,8 @@ func unmarshalJSON(data []byte, v any) error {
 	}
 	return nil
 }
+
+// WriteTextFile writes a text file atomically, for the crash log.
+func WriteTextFile(path, text string) error {
+	return writeFileAtomic(path, []byte(text))
+}

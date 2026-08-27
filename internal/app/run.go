@@ -44,6 +44,18 @@ func Run() {
 	a.layout = a.Layout(rl.GetRenderWidth(), rl.GetRenderHeight())
 	a.FrameSelection(a.layout.RenderViewport())
 
+	// A crash must not take the user's work with it (SPEC-DATA §6). The
+	// recovery copy is written first, before anything else is attempted,
+	// because everything else can fail too.
+	defer func() {
+		if p := recover(); p != nil {
+			path := a.CrashSave()
+			WriteCrashLog(p, path)
+			panic(p)
+		}
+	}()
+
+	title := ""
 	for !rl.WindowShouldClose() {
 		dt := float64(rl.GetFrameTime()) * 1000
 		if dt <= 0 || dt > 250 {
@@ -54,5 +66,22 @@ func Run() {
 		rl.BeginDrawing()
 		a.Frame(in)
 		rl.EndDrawing()
+
+		// Dialogs run out here. A native one is modal and pumps its own message
+		// loop, and doing that between BeginDrawing and EndDrawing would mean
+		// running somebody else's loop with a frame half submitted.
+		a.RunPendingFile()
+
+		if want := a.WindowTitle(); want != title {
+			rl.SetWindowTitle(want)
+			title = want
+		}
 	}
+	// Leaving on purpose is not a crash: there is nothing to recover.
+	a.clearAutosave()
+}
+
+// WindowTitle is what the OS window is called: the document, then the program.
+func (a *App) WindowTitle() string {
+	return a.DocumentTitle() + " — " + WindowTitle
 }

@@ -416,6 +416,22 @@ func (a *App) handleGlobalKeys(in InputFrame, vp render.Viewport) {
 	case in.Ctrl && in.KeyPressed(rl.KeyY):
 		a.Redo()
 	}
+	// The file map of SPEC-UX §16. Each one only queues: the dialog runs after
+	// the frame has finished drawing.
+	if in.Ctrl {
+		switch {
+		case in.KeyPressed(rl.KeyN):
+			a.RequestFile(fileNew)
+		case in.KeyPressed(rl.KeyO):
+			a.RequestFile(fileOpen)
+		case in.KeyPressed(rl.KeyS) && in.Shift:
+			a.RequestFile(fileSaveAs)
+		case in.KeyPressed(rl.KeyS):
+			a.RequestFile(fileSave)
+		case in.KeyPressed(rl.KeyE):
+			a.BeginExport()
+		}
+	}
 	if in.Ctrl {
 		return
 	}
@@ -484,6 +500,8 @@ func (a *App) escape() {
 	case a.CancelTransform():
 		// A live drag is the innermost thing there is: Escape puts the model
 		// back where it started and records nothing (SPEC-DATA §2).
+	case a.InExport():
+		a.CancelExport()
 	case a.showShortcuts:
 		a.showShortcuts = false
 	case a.UI.ModalOpen():

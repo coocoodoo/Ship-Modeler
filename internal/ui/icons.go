@@ -397,3 +397,28 @@ func DrawSwapIcon(cx, cy, size float64, col color.RGBA) {
 	line(v2(cx-h*0.7, cy+h*0.35), v2(cx+h*0.7, cy+h*0.35), w, col)
 	poly(w, col, v2(cx-h*0.3, cy), v2(cx-h*0.75, cy+h*0.35), v2(cx-h*0.3, cy+h*0.7))
 }
+
+// DrawSaveIcon is the floppy every program still uses, because everyone still
+// reads it.
+func DrawSaveIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	closedPoly(w, col, v2(cx-h*0.8, cy-h*0.8), v2(cx+h*0.5, cy-h*0.8),
+		v2(cx+h*0.8, cy-h*0.5), v2(cx+h*0.8, cy+h*0.8), v2(cx-h*0.8, cy+h*0.8))
+	// The shutter at the top and the label at the bottom.
+	closedPoly(w, col, v2(cx-h*0.4, cy-h*0.8), v2(cx+h*0.3, cy-h*0.8),
+		v2(cx+h*0.3, cy-h*0.25), v2(cx-h*0.4, cy-h*0.25))
+	closedPoly(w, col, v2(cx-h*0.5, cy+h*0.15), v2(cx+h*0.5, cy+h*0.15),
+		v2(cx+h*0.5, cy+h*0.8), v2(cx-h*0.5, cy+h*0.8))
+}
+
+// DrawOpenIcon is a folder with its lid lifted.
+func DrawOpenIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	poly(w, col, v2(cx-h*0.85, cy+h*0.6), v2(cx-h*0.85, cy-h*0.6),
+		v2(cx-h*0.2, cy-h*0.6), v2(cx+h*0.05, cy-h*0.25), v2(cx+h*0.6, cy-h*0.25))
+	// The front flap, tilted, which is what says "open".
+	poly(w, col, v2(cx-h*0.85, cy+h*0.6), v2(cx+h*0.85, cy+h*0.6),
+		v2(cx+h*0.6, cy-h*0.05), v2(cx-h*0.6, cy-h*0.05))
+}
