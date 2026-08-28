@@ -378,17 +378,23 @@ func (a *App) paintResRow(label, chips rl.Rectangle) {
 		a.UI.Text(note, text, ui.FontSizeSmall, ui.Fade(col, 0.9))
 	}
 
+	// The highlighted chip is the model's actual pixel size once anything is
+	// painted — the truth, not the last thing clicked (V-140).
+	shown := st.res
+	if r, ok := a.documentPaintRes(); ok {
+		shown = r
+	}
 	labels := make([]string, len(paint.Resolutions))
 	sel := -1
 	for i, res := range paint.Resolutions {
 		labels[i] = itoa(res)
-		if res == st.res {
+		if res == shown {
 			sel = i
 		}
 	}
 	if pick, changed := a.UI.ChipGroup(ui.MakeID("paint.res"), chips, labels, sel,
 		ui.ChipGroupOpts{
-			Tooltip: "Texels per unit — the same pixel size on every face, fixed when a face is first painted",
+			Tooltip: "The model's pixel size — changing it resamples every painted face, one undoable step",
 		}); changed {
 		a.SetPaintRes(paint.Resolutions[pick])
 	}
@@ -404,24 +410,16 @@ func (a *App) paintResMismatch() (bool, int) {
 	if !ok || h.paint == nil {
 		return false, 0
 	}
-	if h.allocated {
-		if sameDensity(h.paint.Texel, a.paint.res) {
-			return false, 0
-		}
-		return true, nearestRes(paint.Density(h.paint))
-	}
-	// The face is bare, so the first stroke will allocate at the armed chip —
-	// and if the rest of the body paints at some other density, that stroke
-	// lands at a foreign pixel size with nothing having said so. This is the
-	// hole the user's giant stamp fell through (V-139): the slope carried
-	// 8 px/u from its edge bands, the chip sat on 1, and a 32 px tile on the
-	// bare top face came out 32 units wide. Painted faces already prompted;
-	// bare ones on a painted body now do too.
-	bodyRes, has := a.bodyPaintedRes(h.body)
-	if !has || bodyRes == a.paint.res {
+	if !h.allocated {
+		// A bare face cannot mismatch any more: new paint always lands at the
+		// body's own density (V-140), so there is nothing to warn about. The
+		// prompt survives only for painted faces of legacy mixed documents.
 		return false, 0
 	}
-	return true, bodyRes
+	if sameDensity(h.paint.Texel, a.allocResFor(h.body)) {
+		return false, 0
+	}
+	return true, nearestRes(paint.Density(h.paint))
 }
 
 // bodyPaintedRes is the density the body's painted faces use, as a chip, or
@@ -465,24 +463,6 @@ func (a *App) paintMismatchPrompt(text, buttons rl.Rectangle, faceRes int) {
 	// be cut off rather than wrapped.
 	first, second := ui.SplitTop(text, text.Height/2)
 	h, _ := a.stickyFace()
-	if !h.allocated {
-		// The bare-face variant: nothing to resample, one honest offer. The
-		// first stroke will land at the chip's density; the body's painted
-		// faces sit at another. Saying it here is what stops a 32 px tile
-		// arriving 32 units wide because the chip drifted to 1 (V-139).
-		a.UI.Text(first, fmt.Sprintf("New paint here lands at %d px/u —", a.paint.res),
-			ui.FontSizeSmall, ui.ColorWarn)
-		a.UI.Text(second, fmt.Sprintf("the rest of this body is %d px/u.", faceRes),
-			ui.FontSizeSmall, ui.ColorWarn)
-		if a.UI.Button(ui.MakeID("paint.matchbody"), buttons, fmt.Sprintf("Use %d px/u", faceRes),
-			ui.ButtonOpts{
-				Style:   ui.ButtonPrimary,
-				Tooltip: "Set the brush to match the body's painted faces",
-			}) {
-			a.SetPaintRes(faceRes)
-		}
-		return
-	}
 	shown := float64(faceRes)
 	if h.paint != nil {
 		shown = paint.Density(h.paint)

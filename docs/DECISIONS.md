@@ -1571,3 +1571,30 @@ first paint still allocates at the chip (SPEC-UX §13.2) — the change is
 that the chip and the body disagreeing is now said out loud where the user
 is looking. A mixed-density body answers with its first painted face's
 density; documents rarely mix, and one honest offer beats a survey.
+
+**V-140 · One model, one pixel size** (the user, 2026-08-28: "I don't want to
+scale the pixels, I want them to be just 1px... the tile set division is what
+I'd like. Not SCALE."). V-128 made the res chip a density so a pixel would be
+the same physical size everywhere — but it left the leak: the chip only
+governed NEW faces, each face pinned its own density at first paint, and a
+chip that drifted between paints put two pixel sizes on one model. The user
+hit the leak twice in one day. This closes it.
+
+Two rules. **New paint always matches the paint that exists**: allocation
+takes the body's painted density, else the document's, else the chip —
+`allocResFor` — on every path (brush, shapes, fill, edge bands, tile stamps,
+and the ghost's provisional mapping). The chip decides only while nothing is
+painted, and a stale chip restored from settings cannot diverge a model.
+**The chips mean "the model's pixel size"**: with paint present, the
+highlighted chip is the model's actual density, and choosing another runs
+ResampleModel — every picture in the document rebuilt at the new density,
+nearest-sampled, world positions preserved, sharing between fragment faces
+preserved, one undoable step, announced with an Undo toast.
+
+Casualties, all deliberate: the bare-face mismatch prompt (V-139) is
+unreachable — a bare face cannot mismatch any more — and was removed; the
+per-face mismatch prompt and paint.resample survive for legacy mixed
+documents only; m7_painted's two-density ship became a one-density ship that
+resamples mid-flight, and its test now asserts the user's own sentence — a
+pixel is the same size everywhere — unconditionally. SPEC-UX §13.2's "first
+stroke allocates at the selected Res chip" is superseded by this entry.

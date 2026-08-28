@@ -83,32 +83,40 @@ func TestGoldenTilePanel(t *testing.T) {
 	checkGolden(t, "tile_panel", outDir)
 }
 
-// The giant-stamp trap (the user's report, 2026-08-28, with their .pxm and
-// settings attached): the res chip had drifted to 1, painted faces kept
-// their own 8 px/u, and the first stamp on a BARE face silently allocated at
-// the chip — a 32 px tile, 32 units wide. Painted faces already prompted on a
-// density mismatch; bare faces on a painted body now do too, and the tile
-// hint names the trap at the moment it matters.
-func TestABareFaceOnAPaintedBodyWarnsBeforeTheFirstStamp(t *testing.T) {
+// One model, one pixel size (V-140, the user's demand: "I want them to be
+// just 1 size, 1px... Not SCALE"). The flow drives the whole contract: the
+// chips resample the entire model as one undoable step, and a stale chip —
+// here deliberately desynced by undoing a resample — cannot make a bare
+// face paint at a foreign density, because new paint always matches the
+// paint that exists.
+func TestOneModelOnePixelSize(t *testing.T) {
 	stdout, _ := runScript(t, "tile_resguard")
-	if !strings.Contains(stdout, "resprompt offer=8 armed=1") {
-		t.Error("hovering a bare face with the chip at 1 raised no prompt for the body's 8")
+
+	if !strings.Contains(stdout, `toast "Model resampled to 1 px/u"`) {
+		t.Error("changing the chip with paint present did not resample the model")
 	}
-	if !strings.Contains(stdout,
-		`hint "Stamps here land at 1 px/u but the body is 8 — the panel offers the switch"`) {
-		t.Error("the tile hint does not name the density trap")
+	// The resample really happened, wholesale, and the undo was exact.
+	if !regexp.MustCompile(`facepaint body=1 face=3 faces=1 res=1 texel=1\.0+ `).MatchString(stdout) {
+		t.Error("the painted face did not rebuild at 1 px/u")
 	}
-	// The second report, same day: "No matter what Res I choose, is not
-	// changing size." The face WAS painted — pinned at its first density —
-	// and nothing at the cursor said so, which made the Res chips read as a
-	// dead control. The hint now names the pin and points at Resample, and
-	// the painted-face prompt fires alongside it.
-	if !strings.Contains(stdout,
-		`hint "This face is pinned at 1 px/u — Resample in the panel changes it"`) {
-		t.Error("hovering a pinned face with a different chip does not explain the pin")
+	sums := regexp.MustCompile(`facepaint body=1 face=3 .* sum=([0-9a-f]+)`).FindAllStringSubmatch(stdout, -1)
+	if len(sums) < 3 || sums[0][1] != sums[2][1] {
+		t.Error("undoing the resample did not restore the exact picture")
 	}
-	if !strings.Contains(stdout, "resprompt offer=1 armed=8") {
-		t.Error("the painted-face prompt did not fire for the pinned face")
+
+	// The chip is now stale at 1 (the undo desynced it) — and the bare top
+	// face still previews AND stamps at the model's 8, which is the whole
+	// point: the chip cannot diverge the model's pixel size.
+	hovers := regexp.MustCompile(`painthover body=1 face=2 [^
+]*`).FindAllString(stdout, -1)
+	if len(hovers) != 2 {
+		t.Fatalf("want 2 hover lines, got %d", len(hovers))
+	}
+	if !strings.Contains(hovers[0], "res=8 allocated=0") {
+		t.Errorf("the bare face previews as %q, want res=8 with the chip stale at 1", hovers[0])
+	}
+	if !strings.Contains(hovers[1], "res=8 allocated=1") {
+		t.Errorf("the stamp landed as %q, want res=8", hovers[1])
 	}
 }
 

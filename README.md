@@ -71,7 +71,9 @@ plating lines, an outlined hull. **All corners** takes every sharp edge of a
 body at once. The width slider is in pixels, 1 to 16, and the panel shows what
 that comes to in units beside it — at Res 8 a one-pixel line is 0.125 u, and it
 is that same 0.125 u on every face it touches. If one pixel is still thicker
-than you want, raise the Res. The band is laid inside each face and meets its
+than you want, raise the Res — with paint on the model, choosing a Res chip
+resamples every painted face to the new density in one undoable step, so the
+model always has exactly one pixel size. The band is laid inside each face and meets its
 other half at the corner, so it reads as one line rather than two that nearly
 line up, and it is baked into the faces own pictures: it saves, exports and can
 be painted over like anything else you drew.

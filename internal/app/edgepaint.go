@@ -170,7 +170,7 @@ func (a *App) PaintSelectedEdges() bool {
 			Edges: byBody[id],
 			Color: a.paint.color,
 			Size:  a.paint.edgeWidth,
-			Res:   a.paint.res,
+			Res:   a.allocResFor(id),
 		}
 		if !a.Run(cmd) {
 			return false

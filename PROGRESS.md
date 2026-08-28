@@ -2,8 +2,8 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Bare faces on painted bodies warn before first paint
-(V-139). Tile stamping shipped end to end — TP1-TP3 of Tile_paint.md
+**Current state:** One model, one pixel size — allocation follows existing
+paint and the Res chips resample the whole model (V-140). Tile stamping shipped end to end — TP1-TP3 of Tile_paint.md
 (V-138). Edge bands land on the face side of their edge, decided by
 winding (V-137); edge picks follow the whole line through seam vertices
 (V-136); edge paint bands reach their edges gap-free (V-135); fold
@@ -16,6 +16,51 @@ Iron Drift. Both suites green. Repo now pushes to
 github.com/coocoodoo/Iron-Drift-Modeler by the owner's instruction.
 
 ---
+
+## 2026-08-28 — One model, one pixel size (V-140)
+
+**The user, after the res chip bit them a second time:** "Why is the scale
+tile sets a thing? I don't want to scale the pixels, I want them to be just
+1px... the tile set division is what I'd like. Not SCALE."
+
+They are right. V-128 made the chip a density so pixels would be uniform —
+and left the leak: the chip only governed new faces, so a drifted chip put
+two pixel sizes on one model. Closed in both directions:
+
+- **New paint always matches existing paint.** `allocResFor` (body density,
+  else document, else chip) feeds every allocation: strokes, shapes, fill,
+  edge bands, tile stamps, and the ghost's provisional mapping. A stale chip
+  from settings cannot diverge a model.
+- **The Res chips are the model's pixel size.** With paint present the
+  highlighted chip is the actual density, and choosing another runs the new
+  `paint.ResampleModel`: every picture rebuilt at the new density in one
+  undoable step — world positions preserved, fragment-face sharing
+  preserved — announced with an Undo toast.
+
+**Verified:** 4 new command tests (uniformity, shared pictures surviving as
+one, exact-pointer undo, no-op and empty refusals); `tile_resguard`
+rewritten to drive the whole contract including the stale-chip case
+(desynced by undoing a resample — the bare face still previews and stamps at
+the model's density); `m7_resample` rewritten to wholesale semantics;
+`m7_painted`'s two-density ship is now a one-density ship and its test
+asserts the user's own sentence unconditionally. Golden diffs read: the ship
+shot's changes are the resample toast; the dead mismatch baseline deleted.
+Full suite green.
+
+**Superseded:** V-139's bare-face prompt (unreachable now, removed) and
+SPEC-UX §13.2's "first stroke allocates at the selected chip".
+
+**Next:** nothing outstanding.
+
+**Try it (user):**
+```bash
+C:\Modeler\modeler.exe
+```
+1. Paint or stamp anywhere — every face, painted or bare, uses one pixel
+   size. The chips cannot diverge it.
+2. Want finer or chunkier pixels? Click a Res chip: the whole model
+   resamples together, one Ctrl+Z brings it back.
+
 
 ## 2026-08-28 — The giant stamp, and the warning that was missing (V-139)
 

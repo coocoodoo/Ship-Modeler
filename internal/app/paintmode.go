@@ -544,6 +544,32 @@ func (a *App) pickPaintFace(in InputFrame, vp render.Viewport) {
 	a.paint.hover = paintHover{ok: true, body: hit.BodyID, face: hit.FaceUID}
 }
 
+// allocResFor is the density a first paint on this body's bare faces uses:
+// the body's own painted density, else the document's, else the chip. One
+// model, one pixel size (V-140) — the chip decides only while nothing is
+// painted yet, and after that new paint always matches what exists. This is
+// also the load-time guard: a settings file carrying a stale chip cannot make
+// one face of an 8 px/u model come out at 1.
+func (a *App) allocResFor(bodyID uint32) int {
+	if r, ok := a.bodyPaintedRes(bodyID); ok {
+		return r
+	}
+	if r, ok := a.documentPaintRes(); ok {
+		return r
+	}
+	return a.paint.res
+}
+
+// documentPaintRes is the density of the document's first painted face.
+func (a *App) documentPaintRes() (int, bool) {
+	for _, b := range a.Doc().Bodies {
+		if r, ok := a.bodyPaintedRes(b.ID); ok {
+			return r, true
+		}
+	}
+	return 0, false
+}
+
 // mappingFor is the face's texture, or the one a first stroke would create.
 //
 // Showing the provisional grid is what makes the resolution chips mean
@@ -554,15 +580,16 @@ func (a *App) mappingFor(f faceRef) (*mesh.FacePaint, bool) {
 		return p, true
 	}
 	st := &a.paint
-	if st.prov != nil && st.provBody == f.body.ID && st.provFace == f.uid && st.provRes == st.res {
+	res := a.allocResFor(f.body.ID)
+	if st.prov != nil && st.provBody == f.body.ID && st.provFace == f.uid && st.provRes == res {
 		return st.prov, false
 	}
-	p, err := paint.Allocate(f.body.Mesh, f.face, st.res)
+	p, err := paint.Allocate(f.body.Mesh, f.face, res)
 	if err != nil {
 		st.prov, st.provFace = nil, 0
 		return nil, false
 	}
-	st.prov, st.provBody, st.provFace, st.provRes = p, f.body.ID, f.uid, st.res
+	st.prov, st.provBody, st.provFace, st.provRes = p, f.body.ID, f.uid, res
 	return p, false
 }
 
@@ -700,7 +727,7 @@ func (a *App) applyStroke() {
 		Color:  a.paint.color,
 		ColorB: a.paint.colorB,
 		Size:   a.paint.size,
-		Res:    a.paint.res,
+		Res:    a.allocResFor(a.paint.strokeBody),
 		Dither: a.paint.dither,
 		Fill:   a.paint.fillShape,
 		// The command reruns the whole stroke from its points each frame, so it
@@ -764,7 +791,7 @@ func (a *App) PaintFace(bodyID uint32, uid mesh.FaceUID, pts []image.Point) bool
 	return a.Run(&paint.StrokeFace{
 		Body: bodyID, Face: uid,
 		Tool: a.paint.tool, Color: a.paint.color, ColorB: a.paint.colorB,
-		Size: a.paint.size, Res: a.paint.res,
+		Size: a.paint.size, Res: a.allocResFor(bodyID),
 		Dither: a.paint.dither, Fill: a.paint.fillShape,
 		Points: pts,
 	})
@@ -800,6 +827,22 @@ func (a *App) SetPaintRes(res int) bool {
 	if !paint.ValidRes(res) {
 		a.Toast(ui.Toast{Text: fmt.Sprintf("%d is not a paint resolution", res), Kind: ui.ToastWarn})
 		return false
+	}
+	// One model, one pixel size (V-140): once anything is painted, the chips
+	// mean "the model's pixel size", and choosing one rebuilds every picture
+	// at it — one undoable step, said out loud. While nothing is painted the
+	// chip is simply the starting density, as it always was.
+	if cur, ok := a.documentPaintRes(); ok && cur != res {
+		if !a.Run(&paint.ResampleModel{Res: res}) {
+			return false
+		}
+		a.paint.res = res
+		a.Toast(ui.Toast{
+			Text:     fmt.Sprintf("Model resampled to %d px/u", res),
+			Action:   "Undo",
+			OnAction: func() { a.Undo() },
+		})
+		return true
 	}
 	a.paint.res = res
 	return true
@@ -989,17 +1032,10 @@ func (a *App) paintHint() string {
 		if !a.TileReady() {
 			return "Import a tileset in the panel, then click a tile to arm it"
 		}
-		if h := st.hover; h.ok && !h.allocated {
-			if bodyRes, has := a.bodyPaintedRes(h.body); has && bodyRes != st.res {
-				return fmt.Sprintf(
-					"Stamps here land at %d px/u but the body is %d — the panel offers the switch",
-					st.res, bodyRes)
-			}
-		} else if h.ok && h.allocated && !sameDensity(h.paint.Texel, st.res) {
-			// The chips look like they should resize the stamp here, and they
-			// never will: a painted face keeps its first density for good
-			// (SPEC-GEOMETRY §8.2). Saying so at the cursor is what stops the
-			// Res row reading as a dead control (V-139, second report).
+		if h := st.hover; h.ok && h.allocated && !sameDensity(h.paint.Texel, a.allocResFor(h.body)) {
+			// Only a legacy document with mixed densities can get here now
+			// (V-140 keeps new paint uniform); the way out is still the
+			// panel's per-face resample.
 			return fmt.Sprintf(
 				"This face is pinned at %.3g px/u — Resample in the panel changes it",
 				paint.Density(h.paint))

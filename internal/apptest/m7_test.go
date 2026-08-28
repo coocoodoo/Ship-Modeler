@@ -200,11 +200,11 @@ func TestGoldenPaintedShip(t *testing.T) {
 // two chips is the case where getting that wrong shows up: a shared density
 // would make the same chip mean different things on different faces, and a
 // recomputed one would make a face's pixels resize when the face did.
-func TestPaintingAShipAtTwoChips(t *testing.T) {
+func TestPaintingAShipStaysOnePixelSize(t *testing.T) {
 	stdout, _ := runScript(t, "m7_painted")
 	dumps := parseM7Dumps(t, stdout)
 	if len(dumps) != 5 {
-		t.Fatalf("expected 5 dumps, got %d:\n%s", len(dumps), stdout)
+		t.Fatalf("expected 5 dumps, got %d", len(dumps))
 	}
 	before, plated, painted := dumps[0], dumps[1], dumps[2]
 
@@ -218,43 +218,37 @@ func TestPaintingAShipAtTwoChips(t *testing.T) {
 		t.Error("paint mode did not open")
 	}
 
-	// The hull's front is 12 u across and the cockpit block's top is 5 u, and
-	// both were painted at 4 px/u — so both have quarter-unit texels. That
-	// equality is the whole point of the chip being a density (V-128): before
-	// it, the same chip gave the front 0.375 u pixels and the cockpit 0.156,
-	// and nothing on screen admitted it.
-	front := painted.picture(t, 1, 7)
+	// Everything painted at the 4 chip is quarter-unit texels.
+	front := plated.picture(t, 1, 7)
 	if front.res != 4 || math.Abs(front.texel-1.0/4) > 1e-9 {
 		t.Errorf("the front face is %d px/u at %v u/texel, want 4 at %v",
 			front.res, front.texel, 1.0/4)
 	}
-	top := painted.picture(t, 1, 17)
-	if top.res != 4 || math.Abs(top.texel-1.0/4) > 1e-9 {
-		t.Errorf("the cockpit face is %d px/u at %v u/texel, want 4 at %v",
-			top.res, top.texel, 1.0/4)
-	}
-	if front.texel != top.texel {
-		t.Errorf("two faces painted at the same chip have %v and %v u texels — "+
-			"a pixel has to be the same size everywhere", front.texel, top.texel)
-	}
-	// A different chip is still a different density: the end cap was painted at
-	// 16 px/u, so its texels are a sixteenth of a unit.
-	end := painted.picture(t, 1, 9)
-	if end.res != 16 || math.Abs(end.texel-1.0/16) > 1e-9 {
-		t.Errorf("the end face is %d px/u at %v u/texel, want 16 at %v",
-			end.res, end.texel, 1.0/16)
-	}
 
-	// Painting one face leaves the others alone: the plating shot has one
-	// picture on it, and it is the same picture at the end of the run.
-	if len(plated.pictures) != 1 {
-		t.Errorf("plating the front painted %d faces, want 1", len(plated.pictures))
+	// Switching the chip to 16 mid-ship resamples the MODEL (V-140): one
+	// pixel size, everywhere, always — the user's own words made a rule. The
+	// earlier faces rebuild finer in place, and the new faces paint at the
+	// same density.
+	if !strings.Contains(stdout, `toast "Model resampled to 16 px/u"`) {
+		t.Error("the chip change did not resample the model")
 	}
-	if plated.pictures[0].sum != front.sum {
-		t.Error("painting other faces changed the front's picture")
+	for _, probe := range []struct {
+		face int
+		name string
+	}{{7, "front"}, {17, "cockpit top"}, {9, "end cap"}} {
+		pic := painted.picture(t, 1, probe.face)
+		if pic.res != 16 || math.Abs(pic.texel-1.0/16) > 1e-9 {
+			t.Errorf("the %s is %d px/u at %v u/texel after the resample, want 16",
+				probe.name, pic.res, pic.texel)
+		}
+		if pic.opaque == 0 {
+			t.Errorf("the %s came out with no painted texels", probe.name)
+		}
 	}
-	if front.opaque == 0 || top.opaque == 0 || end.opaque == 0 {
-		t.Errorf("a face came out with no painted texels: %+v", painted.pictures)
+	// The front's picture was rebuilt by the resample — a different image
+	// holding the same pixels at the same world positions.
+	if painted.picture(t, 1, 7).sum == front.sum {
+		t.Error("the resample left the front's picture untouched")
 	}
 }
 
@@ -356,16 +350,18 @@ func TestGoldenResample(t *testing.T) {
 	checkGolden(t, "m7_resample", outDir)
 }
 
-// TestResampleRebuildsTheFaceAtTheNewChip covers the second half of the
-// mismatch prompt (SPEC-UX §13.2), including the part that matters most: a
-// resample is an ordinary undoable command, not a quiet rebuild.
-func TestResampleRebuildsTheFaceAtTheNewChip(t *testing.T) {
+// TestTheChipsResampleTheWholeModel covers V-140: once anything is painted,
+// the Res chips mean "the model's pixel size", and choosing one rebuilds
+// every picture at it — an ordinary undoable command, not a quiet rebuild.
+// The pixels keep their world positions, so the ship LOOKS the same and
+// carries more texels.
+func TestTheChipsResampleTheWholeModel(t *testing.T) {
 	stdout, _ := runScript(t, "m7_resample")
 	dumps := parseM7Dumps(t, stdout)
 	if len(dumps) != 4 {
-		t.Fatalf("expected 4 dumps, got %d:\n%s", len(dumps), stdout)
+		t.Fatalf("expected 4 dumps, got %d: \n%s", len(dumps), stdout)
 	}
-	small, mismatch, big, undone := dumps[0], dumps[1], dumps[2], dumps[3]
+	small, resampled, settled, undone := dumps[0], dumps[1], dumps[2], dumps[3]
 
 	before := small.picture(t, 1, 7)
 	if before.res != 2 || math.Abs(before.texel-1.0/2) > 1e-9 {
@@ -373,27 +369,21 @@ func TestResampleRebuildsTheFaceAtTheNewChip(t *testing.T) {
 			before.res, before.texel)
 	}
 
-	// The prompt is an offer, not a gate: the brush is at 16 and the face is
-	// still 2, and the app says so rather than silently doing either.
-	if mismatch.res != 16 || mismatch.hoverRes != 2 {
-		t.Errorf("brush at %d px/u over a %d px/u face, want 16 over 2",
-			mismatch.res, mismatch.hoverRes)
+	// Choosing the 16 chip resampled the model then and there, one step.
+	if !strings.Contains(stdout, `toast "Model resampled to 16 px/u"`) {
+		t.Error("the chip change did not announce the model resample")
 	}
-	if !strings.Contains(mismatch.hint, "2 px") {
-		t.Errorf("the hint bar said %q, which does not mention the face's own density",
-			mismatch.hint)
-	}
-	if mismatch.picture(t, 1, 7).texel != before.texel {
-		t.Error("arming a different chip resized an existing face's texels")
-	}
-
-	after := big.picture(t, 1, 7)
+	after := resampled.picture(t, 1, 7)
 	if after.res != 16 || math.Abs(after.texel-1.0/16) > 1e-9 {
 		t.Errorf("the resampled face is %d px/u at %v u/texel, want 16 at %v",
 			after.res, after.texel, 1.0/16)
 	}
-	// Eight times the density in each direction, so the picture covers eight
-	// times the texels along each axis and stays in the same place.
+	if resampled.res != 16 || settled.hoverRes != 16 {
+		t.Errorf("chip %d and hover %d after the resample, want both 16",
+			resampled.res, settled.hoverRes)
+	}
+	// Eight times the density in each direction: eight times the texels along
+	// each axis, same place in the world.
 	if got, want := after.rect[2]-after.rect[0], (before.rect[2]-before.rect[0]-2)*8+2; got != want {
 		t.Errorf("the resampled picture is %d texels wide, want %d", got, want)
 	}
@@ -401,9 +391,15 @@ func TestResampleRebuildsTheFaceAtTheNewChip(t *testing.T) {
 		t.Errorf("the resample kept %d painted texels, fewer than the %d it started with",
 			after.opaque, before.opaque)
 	}
+
+	// One undo, the exact old picture — and the hover reads the face's own
+	// density again, whatever the chip says.
 	if got := undone.picture(t, 1, 7); got.sum != before.sum || got.res != 2 {
 		t.Errorf("undoing the resample left a %d px/u picture with sum %s, want 2 px/u %s",
 			got.res, got.sum, before.sum)
+	}
+	if undone.hoverRes != 2 {
+		t.Errorf("after the undo the hover reads %d px/u, want the face's own 2", undone.hoverRes)
 	}
 }
 

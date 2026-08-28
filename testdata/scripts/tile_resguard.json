@@ -71,8 +71,20 @@
   ]
  },
  {
+  "op": "dump"
+ },
+ {
   "op": "paint.res",
   "res": 1
+ },
+ {
+  "op": "dump"
+ },
+ {
+  "op": "undo"
+ },
+ {
+  "op": "dump"
  },
  {
   "op": "tile.import",
@@ -114,17 +126,6 @@
   "uv": [
    0,
    0
-  ]
- },
- {
-  "op": "paint.res",
-  "res": 8
- },
- {
-  "op": "hover",
-  "at": [
-   640,
-   300
   ]
  },
  {

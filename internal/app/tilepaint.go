@@ -173,7 +173,7 @@ func (a *App) StampTileAt(body uint32, face mesh.FaceUID, texel image.Point, fre
 		return false
 	}
 	return a.Run(&paint.StampFace{
-		Body: body, Face: face, Res: a.paint.res,
+		Body: body, Face: face, Res: a.allocResFor(body),
 		Tile:  tile,
 		Cells: []image.Point{a.tileCellFor(texel, free)},
 	})
@@ -230,7 +230,7 @@ func (a *App) trackTileStamp(in InputFrame, vp render.Viewport) {
 func (a *App) applyTileStamp() {
 	st := &a.paint.tiles
 	cmd := &paint.StampFace{
-		Body: st.stampBody, Face: st.stampFace, Res: a.paint.res,
+		Body: st.stampBody, Face: st.stampFace, Res: a.allocResFor(st.stampBody),
 		Tile: a.armedTile(),
 		// The command reruns the trail from its cells each frame, so it needs
 		// its own copy.
