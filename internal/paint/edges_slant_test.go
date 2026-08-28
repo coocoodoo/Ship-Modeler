@@ -379,3 +379,82 @@ func TestEdgeChainStopsWhereTheLineBends(t *testing.T) {
 		t.Errorf("chain crossed a %d-edge kink the tolerance should refuse: %v", len(chain), chain)
 	}
 }
+
+// The user's file, verbatim (2026-08-28, "still, didnt paint that face
+// side"): the stepped shape's right wall, an L-shaped hexagon, with a band
+// asked along the ledge's end edge. That face's vertex-average centroid lands
+// exactly on the painted edge's line, so the centroid side-test read zero,
+// kept the unflipped normal, and laid the whole band on the off-face side —
+// into texels the renderer never shows. The face's own winding knows the
+// side; an average does not.
+func lWall(t *testing.T) (*mesh.Mesh, *mesh.FacePaint, geom.Vec3, geom.Vec3) {
+	t.Helper()
+	m := &mesh.Mesh{
+		Verts: []geom.Vec3{
+			{X: 5, Y: 0, Z: -4}, {X: 5, Y: 8, Z: -4}, {X: 5, Y: 8, Z: 0},
+			{X: 5, Y: 4, Z: 0}, {X: 5, Y: 4, Z: 2}, {X: 5, Y: 0, Z: 4},
+		},
+		Faces: []mesh.Face{{ID: mesh.MakeFaceUID(1, 10), Loops: [][]int{{0, 1, 2, 3, 4, 5}}}},
+	}
+	p, err := Allocate(m, 0, 8)
+	if err != nil {
+		t.Fatalf("allocate: %v", err)
+	}
+	m.Faces[0].Paint = p
+	// The painted edge: the ledge's end, (5,4,2) to (5,4,0).
+	return m, p, m.Verts[4], m.Verts[3]
+}
+
+func TestABandLandsOnTheFaceSideOfItsEdge(t *testing.T) {
+	m, p, wa, wb := lWall(t)
+	const width = 3
+	if EdgeBand(m, 0, p, Brush{Color: red, Size: width}, wa, wb).Empty() {
+		t.Fatal("the band painted nothing at all")
+	}
+
+	// The face lies below the edge (y < 4). Probes hugging the edge on the
+	// face side must be painted; the band being anywhere else is the bug.
+	in := geom.Vec3{Y: -1}
+	bare := 0
+	for i := 1; i < 100; i++ {
+		f := float64(i) / 100
+		q := wa.Lerp(wb, f).Add(in.Mul(0.1 * p.Texel))
+		if At(p, Texel(p, q)).A == 0 {
+			bare++
+		}
+	}
+	if bare > 0 {
+		t.Errorf("%d of 99 probes on the face side of the edge are bare — the band went to the wrong side", bare)
+	}
+	// And the band is not sitting above the edge, where there is no face.
+	painted := 0
+	for i := 1; i < 100; i++ {
+		f := float64(i) / 100
+		q := wa.Lerp(wb, f).Add(geom.Vec3{Y: 1}.Mul(1.5 * p.Texel))
+		if At(p, Texel(p, q)).A != 0 {
+			painted++
+		}
+	}
+	if painted > 0 {
+		t.Errorf("%d texels painted on the off-face side, where nothing renders", painted)
+	}
+}
+
+// Argument order must not decide the side: the edge handed A-to-B and B-to-A
+// is the same edge of the same face.
+func TestABandSideIgnoresArgumentOrder(t *testing.T) {
+	ma, pa, wa, wb := lWall(t)
+	mb, pb, _, _ := lWall(t)
+	const width = 3
+	EdgeBand(ma, 0, pa, Brush{Color: red, Size: width}, wa, wb)
+	EdgeBand(mb, 0, pb, Brush{Color: red, Size: width}, wb, wa)
+	r := FaceRect(ma, 0, pa)
+	for y := r.Min.Y - 2; y < r.Max.Y+2; y++ {
+		for x := r.Min.X - 2; x < r.Max.X+2; x++ {
+			tx := image.Point{X: x, Y: y}
+			if (At(pa, tx).A != 0) != (At(pb, tx).A != 0) {
+				t.Fatalf("texel %v differs between A-to-B and B-to-A", tx)
+			}
+		}
+	}
+}

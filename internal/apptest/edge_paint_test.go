@@ -1,6 +1,7 @@
 package apptest
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -66,4 +67,27 @@ func TestPickedgeRoutesThroughTheClickPath(t *testing.T) {
 func TestGoldenEdgeChain(t *testing.T) {
 	_, outDir := runScript(t, "edge_chain")
 	checkGolden(t, "edge_chain", outDir)
+}
+
+// The user's file, rebuilt from its own feature history (2026-08-28, "still,
+// didnt paint that face side"): the stepped shape, the ledge-end edge picked,
+// and the band due on BOTH its faces — the ledge and the L-shaped right wall.
+// The wall's vertex-average centroid sits exactly on that edge's line, which
+// is what sent its band to the invisible side (V-137). The edge is 2 u at
+// 8 px/u and 3 wide: 48 texels on each face, exactly.
+func TestTheBandLandsOnBothFacesOfTheLedgeEndEdge(t *testing.T) {
+	stdout, _ := runScript(t, "edge_lwall")
+	for _, want := range []string{
+		`facepaint body=1 face=8 faces=1 res=8 .* opaque=48`,  // the ledge
+		`facepaint body=1 face=10 faces=1 res=8 .* opaque=48`, // the L-shaped wall
+	} {
+		if !regexp.MustCompile(want).MatchString(stdout) {
+			t.Errorf("no match for %q in the paint dump — one side of the edge took no band", want)
+		}
+	}
+}
+
+func TestGoldenLWallBand(t *testing.T) {
+	_, outDir := runScript(t, "edge_lwall")
+	checkGolden(t, "edge_lwall", outDir)
 }

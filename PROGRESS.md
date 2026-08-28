@@ -2,7 +2,8 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Edge picks follow the whole line through seam vertices
+**Current state:** Edge bands land on the face side of their edge, decided by
+winding (V-137); edge picks follow the whole line through seam vertices
 (V-136); edge paint bands reach their edges gap-free (V-135); fold
 creases draw and pick at any angle (V-134); bent faces
 fold into flat pieces along real creases (V-133), and the whole-corpus validity invariant is back from the dead. Placed
@@ -13,6 +14,50 @@ Iron Drift. Both suites green. Repo now pushes to
 github.com/coocoodoo/Iron-Drift-Modeler by the owner's instruction.
 
 ---
+
+## 2026-08-28 — The band lands on the face's side of its edge (V-137)
+
+**Reported by the user, with their .pxm attached:** "still, didnt paint that
+face side" — the ledge-end band showing on the ledge but not on the L-shaped
+right wall below it.
+
+**Diagnosed from the file by hand:** the wall is a hexagon whose vertex
+average lands exactly on the painted edge's line. EdgeBand picked the band's
+side by asking which side the centroid was on; the answer was neither, the
+normal kept its default, and the band painted into texels the renderer never
+shows. The unit recreation (the wall verbatim from the file) failed with 99
+of 99 probes bare on the face side and 99 texels painted on the invisible
+one — and argument order flipped the result, since the degenerate dot broke
+the symmetry.
+
+**Fix:** the winding decides. The outer loop projected into the paint frame
+is counter-clockwise, so the interior is to the left of the loop's own
+traversal of the edge; hole loops wind the other way and keep the material on
+their left too. `loopWalksEdge` reads the traversal direction by exact vertex
+match; the centroid survives only as the fallback for an edge not on the
+face's boundary.
+
+**Verified:**
+- 2 unit tests on the wall from the file: band on the face side and nowhere
+  else; identical texels whichever end of the edge is listed first.
+- Flow test `edge_lwall` rebuilds the user's model from its own feature
+  history (the .pxm feature list is the recipe: rect, extrude, face sketch,
+  extrude union, move edge) and asserts both faces take exactly 48 opaque
+  texels — 2 u of edge at 8 px/u, 3 wide. A probe sweep confirmed every edge
+  of the shape now paints both its faces.
+- Golden read: the orange band at the ledge end wraps onto both the ledge and
+  the wall — the user's arrow spot, painted.
+- Full suite green; no existing golden moved.
+
+**Next:** nothing outstanding on this report.
+
+**Try it (user):**
+```bash
+C:\Modeler\modeler.exe
+```
+1. Open your ship and repaint that ledge-end edge.
+2. The band now lands on both faces — the ledge and the wall side.
+
 
 ## 2026-08-28 — A picked edge is a line, not a segment (V-136)
 

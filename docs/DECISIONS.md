@@ -1511,3 +1511,28 @@ the user's model carries one from its longer history. The seam-prism unit
 tests pin the chain exactly; the app wiring is a thin pass-through
 (toggleEdge, SelectBodyCreases), and paint.pickedge drives the real click
 path headlessly.
+
+**V-137 · The band's side comes from the face's winding, not its centroid**
+(the user's report, 2026-08-28, with their .pxm attached: "still, didnt paint
+that face side"). The file made the diagnosis computable by hand: the unpainted
+face is the stepped shape's right wall, an L-shaped hexagon, and the mean of
+its vertices lands exactly on the painted edge's line. EdgeBand decided which
+side of the edge the face was on by asking whether the centroid was left or
+right; the answer was "neither", the normal kept its unflipped default, and
+the whole band went to the side the renderer never shows. A vertex average
+was never a side witness — on a concave face it can land on the line, or
+clean across it.
+
+The face already knows the side: its outer loop, projected into the paint
+frame, runs counter-clockwise, so the interior is to the LEFT of the loop's
+own traversal of the edge — and a hole loop, winding the other way, also
+keeps the face's material on its left. loopWalksEdge finds the edge in the
+face's loops by exact vertex position and reads the traversal direction;
+argument order stops mattering because the winding does not care which end
+the caller listed first. The centroid test survives only as the fallback for
+an edge that is not on the face's boundary at all, where it was never wrong.
+
+The flow test rebuilds the user's model from its own feature history — the
+.pxm's feature list is the recipe — and pins the exact numbers: the ledge-end
+edge is 2 u at 8 px/u, 3 wide, so each of its two faces takes exactly 48
+texels. Before the fix the wall side took 0.

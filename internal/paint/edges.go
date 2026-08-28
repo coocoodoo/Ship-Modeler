@@ -95,9 +95,22 @@ func edgeBandGeom(m *mesh.Mesh, fi int, p *mesh.FacePaint, size int, worldA, wor
 		return bandGeom{}, false
 	}
 	dir := d.Mul(1 / length)
-	// Inward is square to the edge, toward the face's centre.
+	// Inward is square to the edge, on the face's side of it — decided by the
+	// face's own winding, never by its centroid (V-137). The outer loop
+	// projected into the paint frame runs counter-clockwise, so the interior
+	// is to the LEFT of the loop's own traversal of the edge. A vertex-average
+	// centroid is not a side witness: on the user's L-shaped wall it landed
+	// exactly on the painted edge's line, the dot read zero, and the whole
+	// band went to the side nothing renders on.
 	nrm := geom.Vec2{X: -dir.Y, Y: dir.X}
-	if UV(p, m.FaceCentroid(fi)).Sub(ua).Dot(nrm) < 0 {
+	if fwd, found := loopWalksEdge(m, fi, worldA, worldB); found {
+		if !fwd {
+			nrm = nrm.Mul(-1)
+		}
+	} else if UV(p, m.FaceCentroid(fi)).Sub(ua).Dot(nrm) < 0 {
+		// The edge is not part of this face's boundary — a caller painting
+		// free-hand. The centroid is the only witness left; it was the old
+		// rule, and it keeps working where it always worked.
 		nrm = nrm.Mul(-1)
 	}
 	g := bandGeom{a: ua, dir: dir, nrm: nrm, s0: 0, s1: length, w: float64(size)}
@@ -133,6 +146,27 @@ func edgeBandGeom(m *mesh.Mesh, fi int, p *mesh.FacePaint, size int, worldA, wor
 		int(math.Floor(lo.X)), int(math.Floor(lo.Y)),
 		int(math.Ceil(hi.X)), int(math.Ceil(hi.Y)))
 	return g, true
+}
+
+// loopWalksEdge reports whether face fi's boundary traverses the edge from
+// worldA to worldB (true) or from worldB to worldA (false), and whether the
+// edge belongs to the boundary at all. Positions are compared exactly: every
+// caller hands back the mesh's own vertex values.
+func loopWalksEdge(m *mesh.Mesh, fi int, worldA, worldB geom.Vec3) (forward, found bool) {
+	for _, loop := range m.Faces[fi].Loops {
+		n := len(loop)
+		for i := 0; i < n; i++ {
+			va := m.Verts[loop[i]]
+			vb := m.Verts[loop[(i+1)%n]]
+			if va == worldA && vb == worldB {
+				return true, true
+			}
+			if va == worldB && vb == worldA {
+				return false, true
+			}
+		}
+	}
+	return false, false
 }
 
 // corners is the band rectangle's four corners in texel space.
