@@ -59,6 +59,11 @@ out, its tooltip says how to turn it on.
 | **Held** | `Alt` no snapping, or eyedropper in paint · `Ctrl` fine snap · `Shift` add to selection, constrain a shape |
 | `Esc` | Back one level · `?` the shortcut sheet |
 
+The viewport bakes a **simple ambient occlusion**: inside corners, pockets
+and the feet of raised blocks sit in soft shadow, recomputed whenever the
+geometry changes. It is viewport shading, not paint and not exported - set
+`"ao"` in settings.json between 0 (off) and 1 to taste.
+
 ## Painting, and why the exports look right
 
 Face paint is anchored to a frame that belongs to the face, not to the

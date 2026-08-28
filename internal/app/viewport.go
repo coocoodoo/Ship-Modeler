@@ -22,6 +22,7 @@ func (a *App) BuildScene() render.Scene {
 	s := render.Scene{
 		Camera:    a.Camera,
 		DimFactor: 1,
+		AO:        a.Settings.AO,
 		// A brush paints faces. Letting an edge or a vertex win the pixel under
 		// the cursor would be a stroke that lands on nothing, on exactly the
 		// meshes where the wires are densest — except for the edge tool, whose

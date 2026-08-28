@@ -235,6 +235,12 @@ func (a *App) bodyGPU(b *model.Body) *render.BodyGPU {
 		return g
 	}
 	g := render.BuildBodyGPU(b.Mesh)
+	// The AO bake is skipped mid-drag: a drag rebuilds the body every frame,
+	// and a ray bake per frame would turn it into a slideshow. The commit's
+	// rebuild bakes, so the shading pops in on release — the honest trade.
+	if !a.Bus.Dragging() {
+		render.BakeAO(g, b.Mesh)
+	}
 	g.Upload()
 	a.gpu[b.ID] = g
 	return g

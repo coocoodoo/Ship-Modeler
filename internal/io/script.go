@@ -76,13 +76,15 @@ type Op struct {
 	// Tile ops (Tile_paint.md TP2). Path is shared with the file ops below;
 	// Tile is the selected tile's index in the sheet, named so because the
 	// parser owns the field called Index.
-	TileW       int  `json:"tileW,omitempty"`
-	TileH       int  `json:"tileH,omitempty"`
-	TileMargin  int  `json:"tileMargin,omitempty"`
-	TileSpacing int  `json:"tileSpacing,omitempty"`
-	Tile        int  `json:"tile,omitempty"`
-	Rot         int  `json:"rot,omitempty"`
-	FlipTile    bool `json:"flip,omitempty"`
+	TileW       int `json:"tileW,omitempty"`
+	TileH       int `json:"tileH,omitempty"`
+	TileMargin  int `json:"tileMargin,omitempty"`
+	TileSpacing int `json:"tileSpacing,omitempty"`
+	Tile        int `json:"tile,omitempty"`
+	Rot         int `json:"rot,omitempty"`
+	// Strength is view.ao's 0..1 ambient-occlusion scale.
+	Strength *float64 `json:"strength,omitempty"`
+	FlipTile bool     `json:"flip,omitempty"`
 
 	// Modifier keys held for the next pointer op. They matter as much as the
 	// position does: Shift adds to a selection, Ctrl snaps fine, Alt is free.
@@ -212,6 +214,7 @@ var knownOps = map[string]bool{
 	"camera.view": true, "camera.frame": true, "camera.orbit": true,
 	"camera.zoom": true, "camera.project": true,
 	"settle": true, "shot": true, "pick": true, "dump": true,
+	"view.ao": true,
 }
 
 func (o Op) validate() error {
@@ -257,6 +260,10 @@ func (o Op) validate() error {
 	case "drag":
 		if o.From == nil || o.To == nil {
 			return o.Errorf("needs from [x,y] and to [x,y] in window pixels")
+		}
+	case "view.ao":
+		if o.Strength == nil || *o.Strength < 0 || *o.Strength > 1 {
+			return o.Errorf("needs strength between 0 and 1")
 		}
 	case "tile.import":
 		if o.Path == "" {

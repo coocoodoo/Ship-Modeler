@@ -104,8 +104,11 @@ func BuildBodyGPU(m *mesh.Mesh) *BodyGPU {
 				g.texcoords = append(g.texcoords, 0, 0)
 			}
 			g.normals = append(g.normals, float32(nrm.X), float32(nrm.Y), float32(nrm.Z))
+			// Blue is the baked AO openness, fully open until BakeAO runs —
+			// previews and mid-drag rebuilds skip the bake and must not
+			// render darkened.
 			g.colors = append(g.colors,
-				uint8(local&0xFF), uint8((local>>8)&0xFF), 0, 255)
+				uint8(local&0xFF), uint8((local>>8)&0xFF), 255, 255)
 		}
 	}
 

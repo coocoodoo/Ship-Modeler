@@ -22,12 +22,17 @@ uniform mat4 matNormal;
 uniform mat4 matView;
 
 out vec2 fragTexCoord;
+out float fragAO;
 flat out vec3 fragNormalView;
 flat out vec4 fragFaceKey;
 
 void main()
 {
     fragTexCoord = vertexTexCoord;
+    // The baked openness rides the spare blue byte of the pick key and
+    // interpolates across the face, which is what turns per-corner bakes
+    // into a corner gradient.
+    fragAO = vertexColor.b;
     // Light in view space so the model reads the same while orbiting.
     vec3 worldNormal = normalize(vec3(matNormal * vec4(vertexNormal, 0.0)));
     fragNormalView = normalize(vec3(matView * vec4(worldNormal, 0.0)));
@@ -44,6 +49,7 @@ void main()
 const shadedFS = `#version 330
 
 in vec2 fragTexCoord;
+in float fragAO;
 flat in vec3 fragNormalView;
 
 uniform sampler2D texture0;
@@ -51,6 +57,7 @@ uniform vec4 colDiffuse;
 uniform vec4 tint;
 uniform float alphaScale;
 uniform float useTexture;
+uniform float aoStrength;
 
 out vec4 finalColor;
 
@@ -69,6 +76,7 @@ void main()
     }
 
     vec3 rgb = base * lit;
+    rgb *= 1.0 - aoStrength * (1.0 - fragAO);
     rgb = mix(rgb, tint.rgb, tint.a);
     finalColor = vec4(rgb, colDiffuse.a * alphaScale);
 }

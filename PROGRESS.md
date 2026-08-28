@@ -2,7 +2,8 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** One model, one pixel size — allocation follows existing
+**Current state:** Baked ambient occlusion in the viewport (V-141). One
+model, one pixel size — allocation follows existing
 paint and the Res chips resample the whole model (V-140). Tile stamping shipped end to end — TP1-TP3 of Tile_paint.md
 (V-138). Edge bands land on the face side of their edge, decided by
 winding (V-137); edge picks follow the whole line through seam vertices
@@ -16,6 +17,40 @@ Iron Drift. Both suites green. Repo now pushes to
 github.com/coocoodoo/Iron-Drift-Modeler by the owner's instruction.
 
 ---
+
+## 2026-08-28 — Simple ambient occlusion (V-141)
+
+**Asked for:** "Can you do a simple ambient occlusion?"
+
+**Done:** a per-corner CPU bake at mesh-build time — sixteen fixed hemisphere
+rays per rendered corner against nearby triangles (2.5 u radius), the
+weighted hit fraction packed into the vertex colour's spare blue byte,
+interpolated across faces, multiplied into the lighting by a settings-owned
+strength (`"ao": 0.5`, 0 disables, changing it needs no rebuild). The sample
+point insets a third of a unit toward the face interior — an exact corner
+sees an abutting wall edge-on and would sample brightest where it should be
+darkest. Bakes skip while a drag is live (per-frame rebuilds), landing on
+release. New `view.ao` op for scripts.
+
+**Verified:** 5 render unit tests — lone convex plate fully open, the step's
+inside corner darker than its open edge (and the wall base darker than the
+wall top), geometry beyond the radius contributing nothing, byte-exact
+determinism; the `ao_step` golden pair (default strength vs zero) pins the
+look. Corpus: 62 body-bearing goldens regenerated after spot-reviewing three
+diffs — the raised hull block grounds itself with soft contact darkening,
+convex bodies stay clean; five 0-2 px jitter files reverted rather than
+committed. Full fresh suite green.
+
+**Next:** nothing outstanding.
+
+**Try it (user):**
+```bash
+C:\Modeler\modeler.exe
+```
+1. Look at any inside corner - a step, a pocket, where a block meets a
+   plate: it now sits in soft shadow.
+2. Too strong or unwanted? Set `"ao"` in settings.json (0 to 1, 0 = off).
+
 
 ## 2026-08-28 — One model, one pixel size (V-140)
 

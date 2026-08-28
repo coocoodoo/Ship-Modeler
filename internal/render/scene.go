@@ -98,6 +98,11 @@ type Scene struct {
 	// sketch mode dims the rest of the model to 30% (SPEC-UX §8.1).
 	DimFactor float64
 
+	// AO is the baked ambient occlusion's strength, 0 to 1. The bake lives in
+	// the vertex data; this only scales how dark it reads, so the setting can
+	// change without rebuilding anything.
+	AO float64
+
 	// PickFacesOnly keeps edges and vertices out of the ID pass. A mode that
 	// can only act on surfaces must not have its cursor captured by the wire
 	// running across one: the pick ribbons are five pixels wide and sit in

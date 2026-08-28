@@ -1598,3 +1598,27 @@ documents only; m7_painted's two-density ship became a one-density ship that
 resamples mid-flight, and its test now asserts the user's own sentence — a
 pixel is the same size everywhere — unconditionally. SPEC-UX §13.2's "first
 stroke allocates at the selected Res chip" is superseded by this entry.
+
+**V-141 · Simple ambient occlusion, baked per corner** (the user's request,
+2026-08-28). At mesh-build time every rendered corner casts a fixed fan of
+sixteen rays — two rings of eight, 30 and 60 degrees above its face — into
+the hemisphere, against the triangles within 2.5 units; the weighted hit
+fraction becomes an openness byte in the vertex colour's spare blue channel
+(red and green belong to the pick pass), interpolated across the face and
+multiplied into the lighting, scaled by a strength the settings own
+("ao": 0.5 by default, 0 disables, no rebuild to change it). No screen-space
+pass, no noise: a fixed pattern is what lets the goldens pin it.
+
+Two wrinkles worth their comments. The sample point is pulled a third of a
+unit toward the face's interior before casting — from an exact corner an
+abutting wall is edge-on, a zero-thickness plane subtending nothing from
+inside its own plane, so the mathematically darkest point would sample
+brightest. And the bake is skipped while a bus drag is live: a drag rebuilds
+its body every frame, a ray bake per frame would turn vertex drags into a
+slideshow, so shading pops in on release instead.
+
+The bake changed every body-bearing baseline: 62 goldens regenerated after
+spot-reviewing three representative diffs (concave junctions darken, convex
+bodies untouched); five more the update pass grazed showed 0-2 pixels of
+encoder jitter and were reverted. Viewport shading only — the glTF export
+carries textures and materials, not the bake.

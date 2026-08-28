@@ -87,8 +87,11 @@ type Settings struct {
 	TreePanelWidth int  `json:"treePanelWidth"`
 	TreeCollapsed  bool `json:"treeCollapsed"`
 
-	GridStep        float64       `json:"gridStep"`
-	MSAA            bool          `json:"msaa"`
+	GridStep float64 `json:"gridStep"`
+	MSAA     bool    `json:"msaa"`
+	// AO scales the baked ambient occlusion, 0 (off) to 1. It is a setting
+	// like MSAA: how the viewport reads, not what the document holds.
+	AO              float64       `json:"ao"`
 	AutosaveSeconds int           `json:"autosaveSeconds"`
 	RecentFiles     []string      `json:"recentFiles"`
 	CustomPalette   []color.RGBA  `json:"customPalette"`
@@ -110,9 +113,15 @@ func DefaultSettings() *Settings {
 	return &Settings{
 		GridStep:        DefaultGridStep,
 		MSAA:            true,
+		AO:              DefaultAO,
 		AutosaveSeconds: DefaultAutosaveSeconds,
 	}
 }
+
+// DefaultAO is the ambient occlusion strength a first run uses: present
+// enough that corners read, gentle enough that the palette stays the
+// palette.
+const DefaultAO = 0.5
 
 // ConfigDirEnv overrides where settings, autosaves and crash logs live.
 //
