@@ -2,9 +2,58 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Suite green (15 packages), exe rebuilt, post-audit fixes
-all landed (V-81..V-92). **Next up: the sketch toolset — planned in
-Sketch_func.md as SK1–SK6, awaiting the user's word to start SK1.**
+**Current state:** **SK1 done.** Tool groups, construction geometry, points,
+midpoint line, centre and aligned rectangles, and the ReplaceEntities command
+the modify tools will be built on. Suite green (15 packages), exe rebuilt.
+**Next: SK2 — arcs, ellipses, 3-point circle.**
+
+---
+
+## 2026-08-27 (SK1) — Foundations: groups, guides, points, variants
+
+First milestone of Sketch_func.md. The plan called it "the milestone that
+makes the rest mechanical", and it was: almost everything landed at the seams
+the plan named, in the order it named them.
+
+**Shipped.** Tool groups in the sketch toolbar — one button per group showing
+the variant last used, a chevron opening the rest, and the group's key cycling
+its members (V-93; two new widgets, `ChevronButton` and `Menu`, logged against
+the frozen widget set). Construction geometry: `Q` converts a selection or
+arms the mode, guides draw dashed and dimmed, and they are skipped at exactly
+one seam — `Sketch.Segments()` — so the region engine never sees them while
+drawing, snapping, picking and saving are untouched (V-94). `EntPoint`, the
+entity that makes no segments (V-96). Midpoint line and centre rectangle,
+both session-only arithmetic. Aligned rectangle: three clicks, four lines,
+committed as one undo step (V-95), with Esc stepping back a point at a time
+(V-97). And `ReplaceEntities`, the atomic swap every SK5 modify tool will be
+(V-98) — the aligned rectangle is its first user.
+
+**The acceptance number.** `sk1_tools` draws all six things and extrudes every
+region 2 units deep: **68.0000** exactly. That is 12 (centre rectangle) + 10
+(aligned rectangle — √20 × √5, and the perpendicular offset lands exactly on
+the lattice, so it is not 9.98) + 12 (ordinary rectangle), doubled. The
+construction rectangle is 80 more units of area; if guides ever start closing
+regions the number becomes 228 and the test says which mistake was made.
+
+**Two things the plan did not predict.**
+
+*`Entity` stopped being comparable.* Adding `Pts []geom.Vec2i` for SK4's
+splines made `==` a compile error. No production code compared whole entities,
+only a new test did, so the fix was an explicit `Equal` method — which SK5's
+modify tools want anyway, since "did this entity change" is their whole
+question.
+
+*The dump line I extended had two parsers, not one.* §1.2's trap says one
+parser per line; I grepped for `sketch id=` and found one. There is a second,
+richer line — `sketch active=` — with its own parser in m2, already carrying
+entities/regions/openends. That was the right place for the construction
+count, and it is now there. The trap holds; my grep was too narrow.
+
+Five sketch goldens changed for the regrouped toolbar (chevrons on Line and
+Rectangle, plus Point and the construction toggle), eyeballed as a crop
+before regenerating.
+
+**Next:** SK2 — 3-point circle, `EntArc` with three gestures, `EntEllipse`.
 
 ---
 

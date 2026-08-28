@@ -601,37 +601,41 @@ func (a *App) buildSketchToolbar(r rl.Rectangle) {
 	a.UI.Panel(r)
 	a.UI.HairlineH(r.X, r.Y+r.Height-a.px(1), r.Width, ui.ColorStroke)
 
-	sess := a.sketch.session
 	inner := ui.InsetXY(r, a.px(ui.Spacing), a.px(4))
 	btnH := inner.Height
 	rest := inner
 
-	tools := []struct {
-		tool sketch.Tool
-		icon ui.IconFunc
-	}{
-		{sketch.ToolSelect, ui.DrawCursorIcon},
-		{sketch.ToolLine, ui.DrawLineToolIcon},
-		{sketch.ToolRect, ui.DrawRectToolIcon},
-		{sketch.ToolCircle, ui.DrawCircleToolIcon},
-	}
-	for _, t := range tools {
-		label := t.tool.String()
-		w := a.px(ui.IconSize+ui.Spacing) + a.UI.TextWidth(label, ui.FontSizeUI) + a.px(ui.Spacing)
+	// One button per group, with a chevron on the groups that have variants
+	// (Sketch_func.md §4.1). Labels are dropped when the toolbar would not fit
+	// them, which is measured rather than guessed.
+	groups := sketch.Groups()
+	labelled := a.sketchToolbarFitsLabels(rest.Width, groups)
+	for _, g := range groups {
 		var box rl.Rectangle
-		box, rest = ui.SplitLeft(rest, w)
+		box, rest = ui.SplitLeft(rest, a.sketchGroupWidth(g, labelled))
 		box.Height = btnH
-		if a.UI.IconButton(ui.MakeID("sketchtool."+label), box, t.icon, ui.IconOpts{
-			Label:    label,
-			Active:   sess.Tool == t.tool,
-			Tooltip:  label,
-			Shortcut: t.tool.Shortcut(),
-		}) {
-			sess.SetTool(t.tool)
-		}
+		a.buildToolGroup(box, g, labelled)
 		var gap rl.Rectangle
 		gap, rest = ui.SplitLeft(rest, a.px(2))
 		_ = gap
+	}
+
+	// Construction is a mode, not a tool: it changes what the next thing drawn
+	// counts as, so it sits apart from the tools with its own toggle look.
+	var cxBox rl.Rectangle
+	cxBox, rest = ui.SplitLeft(rest, a.px(ui.IconSize+ui.Spacing*2))
+	cxBox.Height = btnH
+	cxTip := "Draw guides that close no region — with a selection, converts it"
+	if a.sketch.construction {
+		cxTip = "Back to drawing ordinary geometry"
+	}
+	if a.UI.IconButton(ui.MakeID("sketchtool.construction"), cxBox, ui.DrawConstructionIcon,
+		ui.IconOpts{
+			Active:   a.sketch.construction,
+			Tooltip:  cxTip,
+			Shortcut: "Q",
+		}) {
+		a.toggleConstruction()
 	}
 
 	// Extrude sits after a separator: it is not a drawing tool, it is what you

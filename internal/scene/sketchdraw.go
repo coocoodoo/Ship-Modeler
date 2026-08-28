@@ -179,7 +179,23 @@ func appendEntityStrokes(d *render.Overlay, v SketchView) {
 		if selected[i] {
 			col, width = ui.ColorAccent, SelectedWidthPx
 		}
+		// A guide has to be unmistakably not part of the shape, at a glance and
+		// without reading anything: dashed, thinner and dimmer than geometry.
+		dashed := e.Construction
+		if dashed && !selected[i] {
+			col = ui.Fade(col, 0.65)
+			width = GuideWidthPx
+		}
 		pts := e.Points()
+		// A point has no segment to stroke; it is drawn as its own marker so
+		// something you placed is something you can see.
+		if len(pts) == 1 {
+			d.Markers = append(d.Markers, render.OverlayMarker{
+				P: d.Lift(pts[0]), Kind: render.MarkerEndpoint,
+				Color: col, SizePx: SnapGlyphSizePx,
+			})
+			continue
+		}
 		n := len(pts)
 		if !e.Closed() {
 			n--
@@ -187,7 +203,7 @@ func appendEntityStrokes(d *render.Overlay, v SketchView) {
 		for j := 0; j < n; j++ {
 			d.Lines = append(d.Lines, render.OverlayLine{
 				A: d.Lift(pts[j]), B: d.Lift(pts[(j+1)%len(pts)]),
-				Color: col, WidthPx: width,
+				Color: col, WidthPx: width, Dashed: dashed,
 			})
 		}
 		// Endpoints of open entities get a dot, so a line's ends are visible
@@ -210,10 +226,20 @@ func appendPreview(d *render.Overlay, v SketchView) {
 		return
 	}
 	p := v.Session.PreviewAt(v.Cursor)
-	if p.Show {
-		pts := p.Entity.Points()
+	// The rubber band shows every shape the click would commit — all four
+	// edges of an aligned rectangle, not a stand-in for them — so what is
+	// previewed and what lands are the same thing.
+	for _, e := range p.Shapes() {
+		pts := e.Points()
+		if len(pts) == 1 {
+			d.Markers = append(d.Markers, render.OverlayMarker{
+				P: d.Lift(pts[0]), Kind: render.MarkerEndpoint,
+				Color: ui.Fade(ui.ColorAccent, 0.85), SizePx: SnapGlyphSizePx,
+			})
+			continue
+		}
 		n := len(pts)
-		if !p.Entity.Closed() {
+		if !e.Closed() {
 			n--
 		}
 		for j := 0; j < n; j++ {

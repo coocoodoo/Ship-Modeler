@@ -912,3 +912,51 @@ events after the new one's Do succeeds, so both regions re-upload. Pinned by
 TestRubberBandReplaceKeepsAMirrorTrue, which rebuilds a texel mirror from the
 event stream and demands it match the document exactly — the honest statement
 of what a dirty rect is for.
+
+**V-93 · Tool groups and a flyout, added to the frozen widget set.** SPEC-UX §4
+freezes the widget list; SK1 adds two — `ChevronButton` and `Menu` — because
+the sketch toolbar grew from four tools to a dozen with more coming
+(Sketch_func.md). Without grouping either the toolbar overflows the minimum
+window or every variant competes for its own letter. The group button shows
+the variant last used and its key cycles the group, so the flyout is discovery
+and the key is speed; neither is the only way in. The `Menu` is deliberately
+not a general menu system — no submenus, no separators, no traversal. It lists
+a handful of siblings and closes.
+
+**V-94 · Construction geometry is absent from `Segments()` and nowhere else.**
+A guide must not close a region or ring as an open end, and it must still be
+drawn, snapped to and selectable. One skip, at the single seam where entities
+become segments, buys all of that: the region engine simply never sees them,
+and every other consumer — drawing, snapping, picking, saving — is unchanged.
+`Q` converts a selection or, with none, arms the mode for what is drawn next.
+
+**V-95 · The aligned rectangle commits four lines, not a new entity kind.**
+`EntRect` is axis-aligned by definition — two corners cannot express a
+rotation — and a rotated rectangle is exactly its four edges. The tradeoff is
+real and accepted: it cannot later be selected or dragged as one unit the way
+a rectangle can. Adding a kind to avoid that would mean a fifth set of
+Points/Closed/Degenerate cases, a serialization change and a snapping case, to
+buy grouping that the Select tool's box-select already approximates.
+
+**V-96 · A point is an entity that makes no segments.** `EntPoint` returns a
+single position from `Points()`, so `AppendSegments` skips it for having
+nothing to join — the region engine needs no special case at all. It needed
+three: `Closed()` must exclude it, `Degenerate()` must not judge it by the
+line rule (a point at the origin has A == the unset B, and is a real place to
+put one), and the pick distance measures to the position rather than to a
+segment that is not there.
+
+**V-97 · `Escape` steps back one point only for staged gestures.** The aligned
+rectangle takes three clicks, and losing all of them to one reflex would be
+the same mistake the close prompt made (V-81). The line chain deliberately
+keeps its old behaviour: its hint promises "Esc to cancel the chain", and its
+placed points are already committed entities, so there is nothing but the
+pending point to lose.
+
+**V-98 · `ReplaceEntities` is the shape of every modify tool.** Fillet trims
+two lines and adds an arc; mirror adds copies; offset swaps a chain for a
+parallel one. As remove-then-add pairs each would be two history entries for
+one gesture and could strand a half-edited sketch if the second failed. One
+atomic command, validated before anything moves, undone by removing the
+additions from the end and reinserting the removals at their recorded indices.
+SK1 ships it with the aligned rectangle as its first user.

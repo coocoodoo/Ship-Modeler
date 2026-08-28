@@ -296,6 +296,45 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return err
 		}
 
+	case "sketch.point":
+		if op.At == nil {
+			return op.Errorf("sketch.point needs at [x,y] in sketch units")
+		}
+		if err := r.addEntity(op, model.NewPoint(vec(op.At))); err != nil {
+			return err
+		}
+
+	case "sketch.midline":
+		// The same arithmetic the tool does: from the midpoint, out to an end.
+		if op.C == nil || op.To == nil {
+			return op.Errorf("sketch.midline needs c (the midpoint) and to (one end)")
+		}
+		mid, end := vec(op.C), vec(op.To)
+		far := geom.Vec2i{X: 2*mid.X - end.X, Y: 2*mid.Y - end.Y}
+		if err := r.addEntity(op, model.NewLine(far, end)); err != nil {
+			return err
+		}
+
+	case "sketch.centerrect":
+		if op.C == nil || op.B == nil {
+			return op.Errorf("sketch.centerrect needs c (the centre) and b (a corner)")
+		}
+		c, corner := vec(op.C), vec(op.B)
+		opp := geom.Vec2i{X: 2*c.X - corner.X, Y: 2*c.Y - corner.Y}
+		if err := r.addEntity(op, model.NewRect(opp, corner)); err != nil {
+			return err
+		}
+
+	case "sketch.alignedrect":
+		if err := r.alignedRectOp(op); err != nil {
+			return err
+		}
+
+	case "sketch.construction":
+		if err := r.constructionOp(op); err != nil {
+			return err
+		}
+
 	case "sketch.rect":
 		if err := r.addEntity(op, model.NewRect(vec(op.A), vec(op.B))); err != nil {
 			return err
@@ -1156,7 +1195,61 @@ func (r *ScriptRunner) addEntity(op io.Op, e model.Entity) error {
 	if s == nil {
 		return op.Errorf("no sketch is being edited — call sketch.begin first")
 	}
+	// A script gets the armed construction mode too, so `sketch.construction`
+	// followed by a draw op does what the Q key followed by a click does.
+	e.Construction = r.App.sketch.construction
 	if err := r.App.Bus.Run(&model.AddEntity{Sketch: s.ID, Entity: e}); err != nil {
+		return op.Wrap(err)
+	}
+	return nil
+}
+
+// alignedRectOp draws a rectangle at an angle from a base edge and a height
+// point, through the same arithmetic the interactive tool uses.
+func (r *ScriptRunner) alignedRectOp(op io.Op) error {
+	s := r.App.ActiveSketch()
+	if s == nil {
+		return op.Errorf("no sketch is being edited — call sketch.begin first")
+	}
+	if op.A == nil || op.B == nil || op.C == nil {
+		return op.Errorf("sketch.alignedrect needs a and b (the base edge) and c (a height point)")
+	}
+	lines, ok := sketch.AlignedRectLines(vec(op.A), vec(op.B), vec(op.C))
+	if !ok {
+		return op.Errorf("that base edge and height make no rectangle")
+	}
+	if r.App.sketch.construction {
+		for i := range lines {
+			lines[i].Construction = true
+		}
+	}
+	if err := r.App.Bus.Run(&model.ReplaceEntities{
+		Sketch: s.ID, Add: lines, Label: "Draw aligned rectangle",
+	}); err != nil {
+		return op.Wrap(err)
+	}
+	return nil
+}
+
+// constructionOp arms the construction mode, or converts named entities.
+func (r *ScriptRunner) constructionOp(op io.Op) error {
+	s := r.App.ActiveSketch()
+	if s == nil {
+		return op.Errorf("no sketch is being edited — call sketch.begin first")
+	}
+	on := true
+	if op.On != nil {
+		on = *op.On
+	}
+	if len(op.Indices) == 0 {
+		// No indices: arm the mode for whatever is drawn next, which is what Q
+		// with nothing selected does.
+		r.App.sketch.construction = on
+		return nil
+	}
+	if err := r.App.Bus.Run(&model.SetConstruction{
+		Sketch: s.ID, Indices: op.Indices, On: on,
+	}); err != nil {
 		return op.Wrap(err)
 	}
 	return nil
@@ -1198,8 +1291,14 @@ func (r *ScriptRunner) dump() {
 	}
 	if sk := a.ActiveSketch(); sk != nil {
 		arr := sk.Arrangement()
-		fmt.Printf("sketch active=%q entities=%d regions=%d openends=%d tool=%q\n",
-			sk.Name, len(sk.Entities), len(arr.Regions), len(arr.OpenEnds),
+		cx := 0
+		for i := range sk.Entities {
+			if sk.Entities[i].Construction {
+				cx++
+			}
+		}
+		fmt.Printf("sketch active=%q entities=%d construction=%d regions=%d openends=%d tool=%q\n",
+			sk.Name, len(sk.Entities), cx, len(arr.Regions), len(arr.OpenEnds),
 			a.sketch.session.Tool.String())
 	}
 	if t := a.extrude.tool; t != nil {

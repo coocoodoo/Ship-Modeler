@@ -12,15 +12,20 @@ import (
 // and then assert on the arrangement the region engine produced.
 
 var sketchLine = regexp.MustCompile(
-	`^sketch active="([^"]*)" entities=(\d+) regions=(\d+) openends=(\d+) tool="(\w+)"$`)
+	`^sketch active="([^"]*)" entities=(\d+) construction=(\d+) ` +
+		`regions=(\d+) openends=(\d+) tool="([\w ]+)"$`)
 
 type sketchDump struct {
 	name     string
 	entities int
-	regions  int
-	openEnds int
-	tool     string
-	present  bool
+	// construction counts the entities marked as guides (SK1). They are part
+	// of the sketch and absent from the arrangement, which is the one thing
+	// about them worth asserting.
+	construction int
+	regions      int
+	openEnds     int
+	tool         string
+	present      bool
 }
 
 // parseSketchDumps pulls the active-sketch line out of each dump block. A dump
@@ -43,9 +48,10 @@ func parseSketchDumps(t *testing.T, stdout string) []sketchDump {
 			}
 			cur.name = m[1]
 			cur.entities = atoi(t, m[2])
-			cur.regions = atoi(t, m[3])
-			cur.openEnds = atoi(t, m[4])
-			cur.tool = m[5]
+			cur.construction = atoi(t, m[3])
+			cur.regions = atoi(t, m[4])
+			cur.openEnds = atoi(t, m[5])
+			cur.tool = m[6]
 			cur.present = true
 		}
 	}

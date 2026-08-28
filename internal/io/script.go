@@ -27,6 +27,11 @@ type Op struct {
 	R     float64     `json:"r,omitempty"`
 	Segs  int         `json:"segs,omitempty"`
 	Step  float64     `json:"step,omitempty"`
+	// Indices name entities within a sketch, for the ops that convert or
+	// modify what is already drawn.
+	Indices []int `json:"indices,omitempty"`
+	// On is a generic flag for ops that turn something on or off.
+	On *bool `json:"on,omitempty"`
 
 	// Extrude and boolean ops.
 	Sketch  string   `json:"sketch,omitempty"`
@@ -151,6 +156,8 @@ var knownOps = map[string]bool{
 	"sketch.begin": true, "sketch.line": true, "sketch.rect": true,
 	"sketch.circle": true, "sketch.finish": true, "sketch.tool": true,
 	"sketch.face": true, "sketch.project": true, "sketch.grid": true,
+	"sketch.point": true, "sketch.midline": true, "sketch.centerrect": true,
+	"sketch.alignedrect": true, "sketch.construction": true,
 	"pushpull": true,
 	"extrude": true, "extrude.begin": true, "extrude.commit": true,
 	"extrude.cancel": true,

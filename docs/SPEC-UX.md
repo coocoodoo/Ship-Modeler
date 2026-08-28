@@ -110,11 +110,27 @@ Row anatomy: `[eye] [type icon] [name] [color swatch (bodies)] […hover: rename
 
 ## 8. Sketch mode (R2, R3)
 
+> **Non-goal: no constraint or dimension solver.** Onshape's sketch power is
+> its solver; this program's is the pixel grid. We take the tools, not the
+> solver — snapping (§8.4), Shift constraints, and the grid step (§8.1) are the
+> whole inference story. Anything that would need to *solve* for a position is
+> out of scope by design (Sketch_func.md §2).
+
+
 ### 8.1 Entering
 From Idle: `S` then click a plane/flat face, or double-click a plane, or tree-row double-click. On enter: camera animates to look squarely at the plane (normal-on, 220 ms; nearest cardinal up), rest of scene dims to 30% + non-target geometry becomes non-pickable, sketch grid fades in (minor every grid step, major every 8th line, both fade by zoom so ~≥8 px spacing), origin cross + U/V axis lines in soft X/Y colors. The grid step is a Grid chip row on the contextual card — 0.25 / 0.5 / 1 / 2 u, default 1, persisted in settings — and the snap grid follows it, so the drawn lines and the landing points are always the same lines (V-89). Toolbar swaps to sketch tools; contextual card shows sketch info (entity count, region count, open ends count).
 
 ### 8.2 Sketch toolbar
-Select (V) · Line (L) · Rectangle (R) · Circle (C) · Delete (Del works on selection too). Active tool highlighted; hint bar per tool:
+Tools are grouped, one button per group, showing the variant last used with a chevron opening the rest (Sketch_func.md §4.1). A group's key cycles its members, so the flyout is discovery and the key is speed:
+
+- **Select** (V)
+- **Line** (L) — Line · Midpoint line
+- **Rectangle** (R) — Corner · Centre · Aligned
+- **Circle** (C)
+- **Point** (.) — places a position to snap to; makes no segment and closes no region
+- **Construction** (Q) — a mode, not a tool: with a selection it converts those entities, with none it arms whatever is drawn next
+
+Below a measured width the group labels drop and the toolbar goes icon-only rather than clipping; tooltips and the `?` sheet carry the names. Delete (Del) works on the selection. Active tool highlighted; hint bar per tool:
 - Line: *"Click to place points — click the first point or double-click to finish · Esc to cancel chain"*
 - Rectangle: *"Click two corners"* · Circle: *"Click center, then radius — segments: 16 (edit in card)"*
 
@@ -134,6 +150,9 @@ Select tool: click entity (3 px pick tolerance via sketch ID layer) or drag box;
 After every change the region engine (GEOM §4) recomputes:
 - **Closed regions fill** with accentSoft; hovering a region raises fill to 30% + outline; regions are click-selectable (for extrude).
 - **Open endpoints** (degree-1 nodes) render as 5 px **error-red rings**; contextual card shows "2 open ends" (clicking that message zooms to the nearest one). Extrude button disabled while selected regions is empty; tooltip explains: *"Select a closed region — close the red endpoints first"*.
+
+### 8.9 Construction geometry
+`Q` marks entities as guides: things to snap to and measure against that are deliberately not part of the shape. Construction entities draw dashed and dimmed, are skipped when the sketch expands to segments — so they never close a region and never ring as an open end — and are still drawn, snapped to and selectable. With a selection, `Q` converts it (all-to-construction if any of it is still geometry, else back); with nothing selected, `Q` arms the mode so everything drawn next is a guide.
 
 ### 8.7 Leaving
 ✓ green button (or `E` with a region selected → straight into Extrude, the golden path) · ✕ / Esc exits keeping the sketch as drawn (sketches are never lost by exiting). Camera animates back to prior view unless extrude continues.

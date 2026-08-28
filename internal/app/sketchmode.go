@@ -37,6 +37,15 @@ type sketchState struct {
 	// pendingPlane is set when S was pressed and the app is waiting for a plane
 	// click (SPEC-UX §8.1).
 	awaitingPlane bool
+	// construction arms the construction flag on everything drawn next, which
+	// is what Q toggles with nothing selected (SPEC-UX §8.9).
+	construction bool
+	// groupPick remembers which variant each toolbar group last used, so the
+	// group button re-arms what you chose rather than resetting to the first.
+	groupPick map[sketch.ToolGroup]sketch.Tool
+	// flyoutOpen is the group whose variant list is showing, if any.
+	flyoutOpen sketch.ToolGroup
+	flyoutUp   bool
 }
 
 // InSketch reports whether sketch mode is active.
@@ -77,6 +86,9 @@ func (a *App) enterSketch(s *model.Sketch) {
 	a.ExitPaint()
 	a.sketch.session = sketch.NewSession(s.ID)
 	a.sketch.selectedRegions = map[int]bool{}
+	a.sketch.groupPick = map[sketch.ToolGroup]sketch.Tool{}
+	a.sketch.construction = false
+	a.sketch.flyoutUp = false
 	a.sketch.hoverRegion = -1
 	a.sketch.returnCamera = a.targetCamera()
 	a.sketch.awaitingPlane = false
@@ -282,11 +294,15 @@ func (a *App) handleSketchKeys(in InputFrame) {
 	case in.KeyPressed(rl.KeyV):
 		sess.SetTool(sketch.ToolSelect)
 	case in.KeyPressed(rl.KeyL):
-		sess.SetTool(sketch.ToolLine)
+		a.cycleToolGroup(sketch.GroupLine)
 	case in.KeyPressed(rl.KeyR):
-		sess.SetTool(sketch.ToolRect)
+		a.cycleToolGroup(sketch.GroupRect)
 	case in.KeyPressed(rl.KeyC):
-		sess.SetTool(sketch.ToolCircle)
+		a.cycleToolGroup(sketch.GroupCircle)
+	case in.KeyPressed(rl.KeyPeriod):
+		a.cycleToolGroup(sketch.GroupPoint)
+	case in.KeyPressed(rl.KeyQ):
+		a.toggleConstruction()
 	}
 	if in.KeyPressed(rl.KeyE) {
 		// E from a sketch with a region selected goes straight into extrude,
@@ -307,7 +323,35 @@ func (a *App) handleSketchKeys(in InputFrame) {
 	}
 }
 
-// handleSketchClick routes a click to the active tool.
+// cycleToolGroup is what a group's key does: arm the group, and press it again
+// to step to the next tool in it.
+//
+// One key per group rather than per tool, because the groups already exist in
+// the toolbar and a user who wants the midpoint line reaches for "the line
+// key" — the variants are a refinement of one idea, not eight separate ones
+// competing for letters (Sketch_func.md §4.1).
+func (a *App) cycleToolGroup(g sketch.ToolGroup) {
+	sess := a.sketch.session
+	if sess == nil {
+		return
+	}
+	members := g.Tools()
+	if len(members) == 0 {
+		return
+	}
+	next := members[0]
+	for i, t := range members {
+		if t == sess.Tool {
+			next = members[(i+1)%len(members)]
+			break
+		}
+	}
+	sess.SetTool(next)
+	a.sketch.groupPick[g] = next
+	if len(members) > 1 {
+		a.SetHint(next.String() + " · " + g.Key() + " again for the next one")
+	}
+}
 func (a *App) handleSketchClick(in InputFrame, s *model.Sketch, sess *sketch.Session) {
 	p := a.sketch.snap.Point
 
@@ -321,15 +365,83 @@ func (a *App) handleSketchClick(in InputFrame, s *model.Sketch, sess *sketch.Ses
 		a.Toast(ui.Toast{Text: res.Rejected, Kind: ui.ToastWarn})
 		return
 	}
-	if !res.Commit {
+	ents := res.Committed()
+	if len(ents) == 0 {
 		return
 	}
-	if !a.Run(&model.AddEntity{Sketch: s.ID, Entity: res.Entity}) {
+	if !a.commitDrawn(s, ents) {
 		sess.CancelDraw()
 		return
 	}
 	if res.ClosedChain {
 		a.SetHint("Profile closed")
+	}
+}
+
+// commitDrawn runs a gesture's entities into the sketch as one undo step.
+//
+// One click, one history entry, however many entities the gesture produced:
+// undoing an aligned rectangle has to take the whole rectangle, not a quarter
+// of it. A single entity still goes through AddEntity so its undo name stays
+// "Draw rectangle" rather than a generic label.
+func (a *App) commitDrawn(s *model.Sketch, ents []model.Entity) bool {
+	if a.sketch.construction {
+		ents = append([]model.Entity(nil), ents...)
+		for i := range ents {
+			ents[i].Construction = true
+		}
+	}
+	if len(ents) == 1 {
+		return a.Run(&model.AddEntity{Sketch: s.ID, Entity: ents[0]})
+	}
+	return a.Run(&model.ReplaceEntities{
+		Sketch: s.ID,
+		Add:    ents,
+		Label:  "Draw " + a.sketch.session.Tool.String(),
+	})
+}
+
+// armedConstruction reports whether new entities are being drawn as guides.
+func (a *App) armedConstruction() bool { return a.sketch.construction }
+
+// toggleConstruction is what Q does: with a selection it converts those
+// entities, and with none it arms the mode for whatever is drawn next.
+//
+// Two jobs on one key because they are the same intent — "this is a guide, not
+// the shape" — and which one applies is never ambiguous: either you have
+// something selected or you do not (SPEC-UX §8.9).
+func (a *App) toggleConstruction() {
+	s := a.ActiveSketch()
+	sess := a.sketch.session
+	if s == nil || sess == nil {
+		return
+	}
+	if len(sess.Selected) > 0 {
+		// The selection decides the direction: if any of it is still real
+		// geometry, convert the lot to construction, else convert it back.
+		on := false
+		for _, i := range sess.Selected {
+			if i >= 0 && i < len(s.Entities) && !s.Entities[i].Construction {
+				on = true
+				break
+			}
+		}
+		idx := append([]int(nil), sess.Selected...)
+		if a.Run(&model.SetConstruction{Sketch: s.ID, Indices: idx, On: on}) {
+			word := "construction"
+			if !on {
+				word = "ordinary geometry"
+			}
+			a.Toast(ui.Toast{Text: fmt.Sprintf("%s is now %s",
+				plural(len(idx), "entity", "entities"), word)})
+		}
+		return
+	}
+	a.sketch.construction = !a.sketch.construction
+	if a.sketch.construction {
+		a.Toast(ui.Toast{Text: "Drawing construction geometry — guides that close no region"})
+	} else {
+		a.Toast(ui.Toast{Text: "Drawing ordinary geometry again"})
 	}
 }
 

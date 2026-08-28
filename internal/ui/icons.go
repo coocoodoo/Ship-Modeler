@@ -422,3 +422,63 @@ func DrawOpenIcon(cx, cy, size float64, col color.RGBA) {
 	poly(w, col, v2(cx-h*0.85, cy+h*0.6), v2(cx+h*0.85, cy+h*0.6),
 		v2(cx+h*0.6, cy-h*0.05), v2(cx-h*0.6, cy-h*0.05))
 }
+
+// --- Sketch tool variants (Sketch_func.md §4.2) ---------------------------
+
+// DrawMidLineIcon is a stroke with its node in the middle, which is where the
+// midpoint line is drawn from.
+func DrawMidLineIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	a := v2(cx-h*0.75, cy+h*0.7)
+	b := v2(cx+h*0.75, cy-h*0.7)
+	line(a, b, w, col)
+	rl.DrawCircleV(v2(cx, cy), float32(h*0.24), col)
+}
+
+// DrawCenterRectIcon is a rectangle with its centre marked.
+func DrawCenterRectIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	l, t := cx-h*0.8, cy-h*0.6
+	r, b := cx+h*0.8, cy+h*0.6
+	closedPoly(w, col, v2(l, t), v2(r, t), v2(r, b), v2(l, b))
+	rl.DrawCircleV(v2(cx, cy), float32(h*0.2), col)
+}
+
+// DrawAlignedRectIcon is a rectangle turned off axis, which is the one thing
+// this variant does that the others cannot.
+func DrawAlignedRectIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	const a = 0.42 // radians of tilt
+	corner := func(dx, dy float64) rl.Vector2 {
+		return v2(cx+dx*math.Cos(a)-dy*math.Sin(a), cy+dx*math.Sin(a)+dy*math.Cos(a))
+	}
+	closedPoly(w, col,
+		corner(-h*0.8, -h*0.5), corner(h*0.8, -h*0.5),
+		corner(h*0.8, h*0.5), corner(-h*0.8, h*0.5))
+}
+
+// DrawPointToolIcon is a dot in a ring: a position, marked.
+func DrawPointToolIcon(cx, cy, size float64, col color.RGBA) {
+	h := size / 2
+	rl.DrawCircleLinesV(v2(cx, cy), float32(h*0.72), col)
+	rl.DrawCircleV(v2(cx, cy), float32(h*0.22), col)
+}
+
+// DrawConstructionIcon is a dashed diagonal: geometry that guides without
+// being part of the shape.
+func DrawConstructionIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	const dashes = 3
+	for i := 0; i < dashes; i++ {
+		t0 := float64(i) / dashes
+		t1 := t0 + 0.62/dashes
+		lerp := func(t float64) rl.Vector2 {
+			return v2(cx-h*0.8+t*h*1.6, cy+h*0.8-t*h*1.6)
+		}
+		line(lerp(t0), lerp(t1), w, col)
+	}
+}
