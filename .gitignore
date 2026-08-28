@@ -21,3 +21,5 @@ modeler.exe
 
 # Keep docs/shots (visual diary) — do not ignore
 modeler-release.exe
+modeler.exe~
+*.exe~
