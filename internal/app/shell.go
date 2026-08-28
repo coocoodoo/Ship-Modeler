@@ -235,7 +235,7 @@ func (a *App) buildToolbar(r rl.Rectangle) {
 		icon         ui.IconFunc
 		act          fileAction
 	}{
-		{"tool.export", "Export the ship", "Ctrl+E", ui.DrawImportIcon, fileExport},
+		{"tool.export", "Export the ship", "Ctrl+E", ui.DrawExportIcon, fileExport},
 		{"tool.save", "Save " + a.DocumentName(), "Ctrl+S", ui.DrawSaveIcon, fileSave},
 		{"tool.open", "Open a ship", "Ctrl+O", ui.DrawOpenIcon, fileOpen},
 	}

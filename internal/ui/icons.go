@@ -43,6 +43,33 @@ func closedPoly(w float32, col color.RGBA, pts ...rl.Vector2) {
 	}
 }
 
+// ring draws a DPI-safe circular outline. raylib's DrawCircleLines has a
+// fixed one-pixel weight, which made the few icons that used it look faint
+// beside the rest of our vector icon set on high-density displays.
+func ring(cx, cy, radius float64, w float32, col color.RGBA) {
+	const steps = 20
+	pts := make([]rl.Vector2, steps)
+	for i := range pts {
+		a := 2 * math.Pi * float64(i) / steps
+		pts[i] = v2(cx+math.Cos(a)*radius, cy+math.Sin(a)*radius)
+	}
+	closedPoly(w, col, pts...)
+}
+
+// arrowHead is the small, consistent arrow tip used by the action icons.
+func arrowHead(tip rl.Vector2, dx, dy, size float64, w float32, col color.RGBA) {
+	length := math.Hypot(dx, dy)
+	if length == 0 {
+		return
+	}
+	ux, uy := dx/length, dy/length
+	px, py := -uy, ux
+	poly(w, col,
+		v2(float64(tip.X)-ux*size+px*size*0.58, float64(tip.Y)-uy*size+py*size*0.58),
+		tip,
+		v2(float64(tip.X)-ux*size-px*size*0.58, float64(tip.Y)-uy*size-py*size*0.58))
+}
+
 // DrawHomeIcon draws the house glyph used by the view cube's home button.
 func DrawHomeIcon(cx, cy, size float64, col color.RGBA) {
 	w := strokeWidth(size)
@@ -194,34 +221,40 @@ func DrawExtrudeIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawBooleanIcon is two overlapping circles.
 func DrawBooleanIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
 	h := size / 2
-	rl.DrawCircleLinesV(v2(cx-h*0.3, cy), float32(h*0.6), col)
-	rl.DrawCircleLinesV(v2(cx+h*0.3, cy), float32(h*0.6), col)
+	// Two intersecting solids, with their overlap called out by a filled lens.
+	// This reads as a boolean operation rather than two unrelated circles.
+	ring(cx-h*0.32, cy, h*0.62, w, col)
+	ring(cx+h*0.32, cy, h*0.62, w, col)
+	rl.DrawCircleV(v2(cx, cy), float32(h*0.18), col)
 }
 
 // DrawMoveIcon is the four-way arrow of the transform tool.
 func DrawMoveIcon(cx, cy, size float64, col color.RGBA) {
 	w := strokeWidth(size)
 	h := size / 2
-	line(v2(cx-h*0.9, cy), v2(cx+h*0.9, cy), w, col)
-	line(v2(cx, cy-h*0.9), v2(cx, cy+h*0.9), w, col)
-	for _, a := range []float64{0, math.Pi / 2, math.Pi, 3 * math.Pi / 2} {
-		tx, ty := cx+math.Cos(a)*h*0.9, cy+math.Sin(a)*h*0.9
-		nx, ny := math.Cos(a+2.5)*h*0.32, math.Sin(a+2.5)*h*0.32
-		mx, my := math.Cos(a-2.5)*h*0.32, math.Sin(a-2.5)*h*0.32
-		poly(w, col, v2(tx+nx, ty+ny), v2(tx, ty), v2(tx+mx, ty+my))
-	}
+	// A four-way move cursor, held back from the edge so the arrowheads stay
+	// distinct at the toolbar's small size.
+	line(v2(cx-h*0.78, cy), v2(cx+h*0.78, cy), w, col)
+	line(v2(cx, cy-h*0.78), v2(cx, cy+h*0.78), w, col)
+	arrowHead(v2(cx-h*0.9, cy), -1, 0, h*0.33, w, col)
+	arrowHead(v2(cx+h*0.9, cy), 1, 0, h*0.33, w, col)
+	arrowHead(v2(cx, cy-h*0.9), 0, -1, h*0.33, w, col)
+	arrowHead(v2(cx, cy+h*0.9), 0, 1, h*0.33, w, col)
+	rl.DrawCircleV(v2(cx, cy), float32(h*0.14), col)
 }
 
 // DrawPaintIcon is a brush.
 func DrawPaintIcon(cx, cy, size float64, col color.RGBA) {
 	w := strokeWidth(size)
 	h := size / 2
-	poly(w, col, v2(cx-h*0.75, cy+h*0.85), v2(cx-h*0.75, cy+h*0.2),
-		v2(cx+h*0.2, cy+h*0.2), v2(cx+h*0.2, cy+h*0.85))
-	line(v2(cx-h*0.75, cy+h*0.85), v2(cx+h*0.2, cy+h*0.85), w, col)
-	line(v2(cx-h*0.28, cy+h*0.2), v2(cx+h*0.72, cy-h*0.85), w, col)
-	line(v2(cx-h*0.02, cy+h*0.2), v2(cx+h*0.95, cy-h*0.62), w, col)
+	// A familiar round brush: bristles, ferrule and a single diagonal handle.
+	closedPoly(w, col, v2(cx-h*0.78, cy+h*0.78), v2(cx-h*0.78, cy+h*0.22),
+		v2(cx-h*0.1, cy+h*0.22), v2(cx-h*0.1, cy+h*0.78))
+	line(v2(cx-h*0.78, cy+h*0.78), v2(cx-h*0.1, cy+h*0.78), w, col)
+	line(v2(cx-h*0.58, cy+h*0.22), v2(cx+h*0.55, cy-h*0.86), w, col)
+	line(v2(cx-h*0.25, cy+h*0.22), v2(cx+h*0.86, cy-h*0.55), w, col)
 }
 
 // DrawUndoIcon and DrawRedoIcon are the curved history arrows.
@@ -366,9 +399,21 @@ func DrawImportIcon(cx, cy, size float64, col color.RGBA) {
 	w := strokeWidth(size)
 	h := size / 2
 	line(v2(cx, cy-h*0.85), v2(cx, cy+h*0.15), w, col)
-	poly(w, col, v2(cx-h*0.4, cy-h*0.25), v2(cx, cy+h*0.2), v2(cx+h*0.4, cy-h*0.25))
+	arrowHead(v2(cx, cy+h*0.25), 0, 1, h*0.42, w, col)
 	poly(w, col, v2(cx-h*0.8, cy+h*0.35), v2(cx-h*0.8, cy+h*0.8),
 		v2(cx+h*0.8, cy+h*0.8), v2(cx+h*0.8, cy+h*0.35))
+}
+
+// DrawExportIcon is the converse of import: an upward arrow leaving a tray.
+// Keeping the two as separate symbols prevents the file bar from advertising
+// the exact opposite action.
+func DrawExportIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	poly(w, col, v2(cx-h*0.8, cy+h*0.18), v2(cx-h*0.8, cy+h*0.78),
+		v2(cx+h*0.8, cy+h*0.78), v2(cx+h*0.8, cy+h*0.18))
+	line(v2(cx, cy+h*0.45), v2(cx, cy-h*0.72), w, col)
+	arrowHead(v2(cx, cy-h*0.85), 0, -1, h*0.42, w, col)
 }
 
 // DrawGradientIcon is a ramp: a box whose fill steps from dense to sparse,

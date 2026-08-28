@@ -2,6 +2,21 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
+## 2026-08-28 — Toolbar icon refresh
+
+**Asked for:** Better icons across the UI.
+
+**Done:** Reworked the high-frequency toolbar symbols so they share a clean,
+consistent stroke system: Boolean now reads as an intersection, Move as a
+balanced four-way cursor, and Paint as a recognisable brush. Circular artwork
+now honors DPI-scaled stroke widths instead of falling back to one-pixel rings.
+The file bar also has distinct import and export icons; Export finally shows an
+outward arrow instead of reusing the import glyph.
+
+**Verified:** `go test ./internal/ui ./internal/app`; refreshed and reviewed
+the complete scripted visual-baseline set (`go test ./internal/apptest` with
+baseline update enabled).
+
 **Current state:** Baked ambient occlusion in the viewport (V-141). One
 model, one pixel size — allocation follows existing
 paint and the Res chips resample the whole model (V-140). Tile stamping shipped end to end — TP1-TP3 of Tile_paint.md
