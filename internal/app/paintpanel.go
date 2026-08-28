@@ -44,6 +44,10 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	// tool might ever want would be a panel mostly full of greyed-out rows.
 	showDither := st.tool == paint.ToolBrush || st.tool == paint.ToolGradient
 	showFill := st.tool.Shape()
+	// The edge tool replaces the brush's own controls with its own: size and
+	// resolution mean nothing to it, and a panel offering them would be a
+	// panel mostly full of things that do not apply.
+	showEdges := st.tool == paint.ToolEdge
 
 	h := a.px(38) + // title
 		line + a.px(26)*2 + a.px(4) + a.px(6) + // two rows of tools
@@ -74,6 +78,9 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	}
 	if showFill {
 		h += a.px(24) + a.px(6)
+	}
+	if showEdges {
+		h += line + a.px(24) + a.px(6) + a.px(26) + a.px(6)
 	}
 
 	box := ui.Rect(
@@ -137,6 +144,11 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 
 	if showDither {
 		a.paintDitherRow(row(line), row(a.px(24)))
+		space(6)
+	}
+
+	if showEdges {
+		a.buildEdgeSection(row, space, line)
 		space(6)
 	}
 
@@ -260,6 +272,8 @@ func paintShapeTools() []paintTool {
 		{paint.ToolCircle, ui.DrawCircleToolIcon, "Drag an ellipse — Shift makes it a circle"},
 		{paint.ToolGradient, ui.DrawGradientIcon,
 			"Drag to ramp from the near colour to the far one"},
+		{paint.ToolEdge, ui.DrawEdgeLineIcon,
+			"Click edges, then bake a line along them onto both faces"},
 	}
 }
 

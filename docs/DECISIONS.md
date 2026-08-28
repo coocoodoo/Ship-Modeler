@@ -1189,3 +1189,36 @@ pocket really had been cut, and looked exactly like the face it was cut into.
 `holes_test.go` measures the *unsigned* area of the triangulation, because the
 fan's signed areas cancel to the right total while overlapping, and checks
 every triangle winds with its face.
+
+**V-122 · The edge line is baked paint, not a decoration the model carries.**
+"Paint on edges I select and bake it to the model" — so the band is written
+into the same per-face pictures the brush writes into, and from the moment it
+lands it is ordinary paint. It saves in the .ship, exports to glTF and OBJ,
+survives a boolean the way the rest of the paint does (SPEC-GEOMETRY §8.4),
+and can be painted over or erased. The alternative — a list of decorated edges
+the renderer draws separately — would have been a second kind of colour on the
+model, needing its own place in the file, its own export path, its own answer
+to what happens when the edge is cut in half. There is no such thing here.
+
+**V-123 · The band is laid inside each face, not centred on the edge.** An edge
+is the boundary between two faces, so a brush centred on it spends half its
+width on texels that belong to neither — invisible, and half the thickness the
+user asked for. Each face's band is offset inward by half the width, and every
+dab is clipped to the face's own rectangle. The two halves meet at the corner
+and read as one line, which is the entire point of the feature: a seam painted
+face by face never lines up.
+
+**V-124 · "All corners" picks by crease angle, at the renderer's threshold.**
+Clicking forty edges to outline a hull is a chore, not a tool, so one button
+takes them all. It takes only the *sharp* ones — 20°, the same threshold the
+renderer uses to decide what to draw as an edge — because a line along a flat
+join inside a plane is a line drawn across a face for no reason. What the tool
+picks is therefore what the model already shows you as an edge.
+
+**V-125 · The edge tool asks the renderer for edges, which paint mode
+otherwise forbids.** Paint mode sets `PickFacesOnly` (V-42) because a brush
+paints faces and letting an edge win the pixel under the cursor is a stroke
+that lands on nothing. This tool wants exactly the opposite, so it says so —
+`PickFacesOnly` is now "in paint mode, except the edge tool". One tool, one
+answer to what a click does (SPEC-UX §1); the flag stays honest instead of
+becoming a general escape hatch.

@@ -180,6 +180,7 @@ var knownOps = map[string]bool{
 	"paint.textures": true, "paint.faceview": true,
 	"paint.color2": true, "paint.swap": true, "paint.dither": true,
 	"paint.shapefill": true, "paint.lock": true, "paint.unlock": true,
+	"paint.edges": true, "paint.edgewidth": true, "paint.creases": true,
 	"file.new": true, "file.save": true, "file.open": true,
 	"file.export": true, "file.autosave": true, "file.recover": true,
 	"file.discard": true, "export.begin": true, "export.format": true,

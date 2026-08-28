@@ -646,3 +646,22 @@ func DrawBezierIcon(cx, cy, size float64, col color.RGBA) {
 	rl.DrawCircleV(p1, float32(h*0.16), faint)
 	rl.DrawCircleV(p2, float32(h*0.16), faint)
 }
+
+// DrawEdgeLineIcon is a corner with a stripe running along it: the edge-line
+// tool paints a band that turns the corner onto both faces.
+func DrawEdgeLineIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	// Two faces meeting at a vertical edge, drawn as a shallow V from above.
+	apexTop := v2(cx, cy-h*0.85)
+	apexBot := v2(cx, cy+h*0.6)
+	left := v2(cx-h*0.85, cy-h*0.35)
+	right := v2(cx+h*0.85, cy-h*0.35)
+	faint := Fade(col, 0.5)
+	line(left, apexTop, w, faint)
+	line(apexTop, right, w, faint)
+	line(left, rl.Vector2{X: left.X, Y: left.Y + float32(h*0.95)}, w, faint)
+	line(right, rl.Vector2{X: right.X, Y: right.Y + float32(h*0.95)}, w, faint)
+	// The band itself, down the shared edge.
+	line(apexTop, apexBot, w*2.2, col)
+}

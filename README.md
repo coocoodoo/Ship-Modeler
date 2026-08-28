@@ -52,6 +52,7 @@ out, its tooltip says how to turn it on.
 | | a group's key again steps to its next variant (Line → Midpoint line) |
 | **Paint** | `D` pencil · `B` soft brush · `E` eraser · `G` fill · `I` pick |
 | | `L` line · `R` rectangle · `C` circle · `N` gradient · `X` swap colours |
+| | `K` edge line — pick edges, set a width, bake a band along them |
 | **Files** | `Ctrl+N` new · `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Shift+S` save as · `Ctrl+E` export |
 | **Edit** | `Ctrl+Z` undo · `Ctrl+Y` redo · `Del` delete · `H` hide |
 | **Held** | `Alt` no snapping, or eyedropper in paint · `Ctrl` fine snap · `Shift` add to selection, constrain a shape |
@@ -63,6 +64,13 @@ Face paint is anchored to a frame that belongs to the face, not to the
 triangles under it, so pixels stay where you put them when the geometry
 underneath changes. Cut a window through a painted hull and the paint on both
 sides of the cut is still exactly where it was.
+
+The **Edge tool** (`K`) paints a band along edges you pick — panel seams,
+plating lines, an outlined hull. **All corners** takes every sharp edge of a
+body at once. The band is laid inside each face and meets its other half at the
+corner, so it reads as one line rather than two that nearly line up. It is
+baked into the faces own pictures, so it saves, exports and can be painted
+over like anything else you drew.
 
 The **dither modes** (2×2, 4×4, 8×8 Bayer) are how a gradient or a soft brush
 gets a middle without leaving the palette: the shading is spent on how many

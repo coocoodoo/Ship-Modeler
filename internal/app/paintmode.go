@@ -135,6 +135,13 @@ type paintState struct {
 
 	// pickCooldown throttles the hover pick.
 	pickCooldown float64
+
+	// The edge-line tool's state: which edges are picked, which one is under
+	// the pointer, and how thick the band is.
+	edges         []edgeRef
+	hoverEdge     int
+	hoverEdgeBody uint32
+	edgeWidth     int
 }
 
 // paintHover is the face and texel under the pointer.
@@ -169,6 +176,8 @@ func (a *App) initPaint() {
 	// The far end of a ramp defaults to the palette's near-black, so a gradient
 	// straight out of the box fades into shadow rather than into nothing.
 	a.paint.colorB = paint.DefaultPalette()[0]
+	a.paint.edgeWidth = 2
+	a.paint.hoverEdge = -1
 	a.paint.custom = append([]color.RGBA(nil), a.Settings.CustomPalette...)
 	a.paint.recents.Set(a.Settings.RecentColors)
 	if len(a.paint.custom) == 0 {
@@ -210,6 +219,8 @@ func (a *App) ExitPaint() {
 	a.paint.prov = nil
 	a.paint.locked = false
 	a.paint.awaitingLock = false
+	a.paint.edges = a.paint.edges[:0]
+	a.paint.hoverEdge = -1
 }
 
 // paintPanelReachPx is how far in from the viewport's right edge the palette
@@ -347,6 +358,14 @@ func (a *App) canPaint() (bool, string) {
 
 // updatePaint runs one frame of paint mode with the pointer in the viewport.
 func (a *App) updatePaint(in InputFrame, vp render.Viewport) {
+	// The edge tool picks edges rather than painting texels, so it takes the
+	// pointer before any of the brush machinery runs.
+	if a.paint.tool == paint.ToolEdge {
+		a.clearPaintHover(false)
+		a.pickPaintEdge(in, vp)
+		return
+	}
+
 	// The pick pass is the only thing that knows which face is in front at the
 	// cursor, but a stroke already knows: it stays on the face it started on.
 	if a.paint.stroking {
@@ -826,6 +845,7 @@ var paintToolKeys = []struct {
 	{rl.KeyR, paint.ToolRect},
 	{rl.KeyC, paint.ToolCircle},
 	{rl.KeyN, paint.ToolGradient},
+	{rl.KeyK, paint.ToolEdge},
 }
 
 // handlePaintKeys is the paint-mode keyboard map: the tools, the colour swap,
@@ -851,6 +871,7 @@ func (a *App) handlePaintKeys(in InputFrame) {
 		// the mode.
 		switch {
 		case a.CancelStroke():
+		case a.ClearEdgeSelection():
 		case a.CancelLockPick():
 		case a.paint.locked:
 			a.UnlockFace()
@@ -868,6 +889,13 @@ func (a *App) paintHint() string {
 			return "Click this face to lock to it · Esc to cancel"
 		}
 		return "Click the face you want to lock to · Esc to cancel"
+	}
+	if st.tool == paint.ToolEdge {
+		if n := len(st.edges); n > 0 {
+			return fmt.Sprintf("%s picked · press Paint to bake the line · Esc clears", 
+				plural(n, "edge", "edges"))
+		}
+		return "Click edges to draw a line along · All corners picks them for you"
 	}
 	if st.stroking {
 		return st.tool.String() + " · release to finish the stroke"

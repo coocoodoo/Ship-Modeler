@@ -30,13 +30,16 @@ const (
 	ToolRect
 	ToolCircle
 	ToolGradient
+	// ToolEdge selects edges of the model and bakes a line along them onto the
+	// faces that meet there, rather than painting where the pointer goes.
+	ToolEdge
 )
 
 // Tools lists them in the order the panel draws them: the ones that paint where
 // the pointer goes first, then the ones decided by two points.
 var Tools = []Tool{
 	ToolPencil, ToolBrush, ToolEraser, ToolFill, ToolPick,
-	ToolLine, ToolRect, ToolCircle, ToolGradient,
+	ToolLine, ToolRect, ToolCircle, ToolGradient, ToolEdge,
 }
 
 func (t Tool) String() string {
@@ -57,6 +60,8 @@ func (t Tool) String() string {
 		return "Circle"
 	case ToolGradient:
 		return "Gradient"
+	case ToolEdge:
+		return "Edge"
 	default:
 		return "Pencil"
 	}
@@ -103,6 +108,8 @@ func (t Tool) Shortcut() string {
 		return "C"
 	case ToolGradient:
 		return "N"
+	case ToolEdge:
+		return "K"
 	default:
 		return "D"
 	}

@@ -348,6 +348,11 @@ the neighbouring face.
   running off the face simply shows no cursor.
 - If the face is cut away by a later boolean, the lock releases with a toast.
 
+### 13.6 Edge lines
+The **Edge** tool (K) paints a band along edges you pick rather than where the pointer goes. Click edges to add or remove them from the selection — they highlight in the colour they will be painted — or press **All corners** to take every sharp edge of the body at once. The width chips set the band in texels *on each face*; press **Paint** and it is baked into the faces the edges meet.
+
+Baked means baked: it is ordinary paint from that moment, in the faces own pictures. It saves, exports, survives booleans and can be painted over. The band is laid inside each face rather than across the boundary, so the two halves meet at the corner and read as one line. Esc clears the picked edges before it leaves the tool. One press is one undo, however many edges it covered.
+
 ## 14. Welcome & empty states
 
 - First launch / Ctrl+N with nothing: viewport shows dim center card — **New ship** (starts empty doc + pulses the Sketch button subtly), **Open…**, **Sample ship** (loads embedded op-script-built model), recent files list. Dismisses on any action.

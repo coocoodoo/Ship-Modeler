@@ -615,7 +615,8 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 	case "paint.begin", "paint.exit", "paint.res", "paint.color", "paint.tool",
 		"paint.size", "paint.pixel", "paint.stroke", "paint.resample",
 		"paint.textures", "paint.faceview", "paint.color2", "paint.swap",
-		"paint.dither", "paint.shapefill", "paint.lock", "paint.unlock":
+		"paint.dither", "paint.shapefill", "paint.lock", "paint.unlock",
+		"paint.edges", "paint.edgewidth", "paint.creases":
 		if err := r.paintOp(op); err != nil {
 			return err
 		}
@@ -1290,6 +1291,42 @@ func (r *ScriptRunner) paintOp(op io.Op) error {
 	case "paint.faceview":
 		if !a.FaceView() {
 			return op.Errorf("nothing is under the cursor to look at")
+		}
+
+	case "paint.edgewidth":
+		if op.Size <= 0 {
+			return op.Errorf("paint.edgewidth needs a positive size")
+		}
+		a.paint.edgeWidth = op.Size
+
+	case "paint.creases":
+		// Every sharp edge of the named body, or of everything visible.
+		if op.Body != "" {
+			b := a.Doc().BodyByName(op.Body)
+			if b == nil {
+				return op.Errorf("no body named %q", op.Body)
+			}
+			a.Sel.Set(model.BodyRef(b.ID))
+		}
+		if !a.SelectBodyCreases() {
+			return op.Errorf("no sharp edges to pick")
+		}
+
+	case "paint.edges":
+		// Indices name edges of the body; with none, whatever is already
+		// picked is baked.
+		if op.Body != "" && len(op.Indices) > 0 {
+			b := a.Doc().BodyByName(op.Body)
+			if b == nil {
+				return op.Errorf("no body named %q", op.Body)
+			}
+			a.paint.edges = a.paint.edges[:0]
+			for _, e := range op.Indices {
+				a.paint.edges = append(a.paint.edges, edgeRef{body: b.ID, edge: e})
+			}
+		}
+		if !a.PaintSelectedEdges() {
+			return op.Errorf("the edge paint was refused")
 		}
 
 	case "paint.lock":

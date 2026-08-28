@@ -22,8 +22,9 @@ func (a *App) BuildScene() render.Scene {
 		DimFactor: 1,
 		// A brush paints faces. Letting an edge or a vertex win the pixel under
 		// the cursor would be a stroke that lands on nothing, on exactly the
-		// meshes where the wires are densest.
-		PickFacesOnly: a.InPaint(),
+		// meshes where the wires are densest — except for the edge tool, whose
+		// whole job is picking them.
+		PickFacesOnly: a.InPaint() && !a.InEdgePaint(),
 	}
 
 	for _, b := range doc.Bodies {
@@ -91,6 +92,8 @@ func (a *App) BuildScene() render.Scene {
 	switch {
 	case a.InExtrude():
 		s.Gizmo = a.buildExtrudeGizmo(vpr)
+	case a.InEdgePaint():
+		s.Gizmo = a.edgeOverlay()
 	case a.InPaint():
 		s.Gizmo = a.paintCursorOverlay()
 	case a.InPushPull():

@@ -2,10 +2,50 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **SK1-SK5 done.** Sixteen sketch tools in eight groups,
+**Current state:** **SK1-SK5 done, plus the edge-line paint tool.** Sixteen sketch tools in eight groups,
 construction geometry, and the modify tools: fillet, chamfer, offset, mirror
 and both patterns. Suite green (16 packages), exe rebuilt. Suite green (15 packages), exe
 rebuilt. **Next: SK6 (image underlay) needs your go-ahead per the plan.**
+
+---
+
+## 2026-08-27 (feature) — Edge lines
+
+"I want a way to paint on edges that I like to select and bake it to the model
+… choose how thick and with a press of a button it becomes the painted edge to
+the model itself."
+
+**Shipped.** A new paint tool (`K`): click edges to pick them — they highlight
+in the colour they are about to become — set a width in texels, press Paint. A
+band is baked along each edge onto *both* faces that meet there, as one undo
+step however many edges it covered. **All corners** takes every sharp edge of a
+body at once, because clicking forty of them to outline a hull is a chore
+rather than a tool (V-124).
+
+**Baked means baked** (V-122). The band goes into the same per-face pictures
+the brush writes into, so from the moment it lands it is ordinary paint: it
+saves in the .ship, exports to glTF and OBJ, survives a boolean the way the
+rest of the paint does, and can be painted over. The alternative — a list of
+decorated edges the renderer draws separately — would have been a second kind
+of colour on the model, with its own place in the file, its own export path,
+and its own answer to what happens when the edge is cut in half.
+
+**The one piece of real geometry** is where the band sits. An edge is the
+boundary between two faces, so a brush centred on it spends half its width on
+texels belonging to neither — invisible, and half the thickness asked for. Each
+face's band is offset inward by half the width and every dab is clipped to the
+face's own rectangle, so the two halves meet at the corner and read as one line
+(V-123). That is the whole reason the feature exists: a seam painted face by
+face never lines up.
+
+**How little was needed.** An edge already knows which faces use it (Topo), a
+face's paint already knows where a world position lands in its texels (Texel),
+and Stroke already draws a line in texel space. The new work was the inward
+offset, the clip, and a command that snapshots several faces at once.
+
+Found while looking at the user's zoomed screenshot of a painted crate — the
+pale line they pointed at along the corner turned out to be exactly the thing
+they were about to ask for.
 
 ---
 
