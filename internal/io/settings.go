@@ -57,6 +57,23 @@ type PaintSettings struct {
 	ColorB color.RGBA `json:"colorB"`
 }
 
+// TileSettings is the tile stamp's setup between sessions (Tile_paint.md §3):
+// which sheet, how it slices, which tile is armed and how it is turned. The
+// sheet itself is a PNG copied into the config dir at import, so the original
+// can move or vanish without taking the setup with it. Like the palette, none
+// of this is document state — the stamped pixels are, and they are already in
+// the faces' textures.
+type TileSettings struct {
+	Path     string `json:"path,omitempty"`
+	TileW    int    `json:"tileW,omitempty"`
+	TileH    int    `json:"tileH,omitempty"`
+	Margin   int    `json:"margin,omitempty"`
+	Spacing  int    `json:"spacing,omitempty"`
+	Selected int    `json:"selected,omitempty"`
+	Rot      uint8  `json:"rot,omitempty"`
+	FlipX    bool   `json:"flipX,omitempty"`
+}
+
 // Settings is the whole preferences file.
 type Settings struct {
 	Window WindowRect `json:"window"`
@@ -76,6 +93,7 @@ type Settings struct {
 	CustomPalette   []color.RGBA  `json:"customPalette"`
 	RecentColors    []color.RGBA  `json:"recentColors"`
 	Paint           PaintSettings `json:"paint"`
+	Tiles           TileSettings  `json:"tiles"`
 	Tips            TipCounters   `json:"tips"`
 
 	// LastDir is where the file dialogs open, so the second save starts where

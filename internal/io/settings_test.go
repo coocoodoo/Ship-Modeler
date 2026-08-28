@@ -236,3 +236,23 @@ func TestSettingsPathIsUnderTheAppName(t *testing.T) {
 		t.Errorf("settings file is named %q", filepath.Base(p))
 	}
 }
+
+func TestTileSettingsRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(ConfigDirEnv, dir)
+	s := DefaultSettings()
+	s.Tiles = TileSettings{
+		Path: "tilesets/hull.png", TileW: 16, TileH: 8,
+		Margin: 1, Spacing: 2, Selected: 5, Rot: 3, FlipX: true,
+	}
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	back, err := LoadSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back.Tiles != s.Tiles {
+		t.Errorf("tiles came back %+v, want %+v", back.Tiles, s.Tiles)
+	}
+}
