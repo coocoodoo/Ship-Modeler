@@ -560,3 +560,52 @@ func TestRoundnessStaysInRange(t *testing.T) {
 		t.Errorf("a collapsed box gave %v, want 0", got)
 	}
 }
+
+// TestClaimedPixelsStopReachingWidgetsUnderneath is the flyout bug of
+// 2026-08-27: the variant list was drawn over the tree and the viewport, and
+// both answered clicks aimed at it.
+//
+// lastCards could not fix it. That list is a frame old, so a panel that
+// appeared this frame is invisible to it — and the frame a menu opens is
+// exactly the frame someone clicks in it. A claim is taken during the frame
+// and applies immediately to everything drawn after it.
+func TestClaimedPixelsStopReachingWidgetsUnderneath(t *testing.T) {
+	c := &Context{Scale: 1}
+	c.Begin(Input{MouseX: 50, MouseY: 50})
+
+	under := Rect(0, 0, 200, 200)
+	if !c.hovering(under) {
+		t.Fatal("a plain widget under the cursor does not report hovered")
+	}
+
+	// A panel drawn over it claims the pointer.
+	c.ClaimPointer(Rect(20, 20, 100, 100))
+	if c.hovering(under) {
+		t.Error("a widget under a claimed panel still reports hovered")
+	}
+	if !c.WantMouse() {
+		t.Error("a claim over the cursor did not consume the pointer")
+	}
+	// Somewhere else on the same widget is still live: a claim is a rectangle,
+	// not a mode.
+	c.In.MouseX, c.In.MouseY = 160, 160
+	if !c.hovering(under) {
+		t.Error("the claim blocked a pixel it does not cover")
+	}
+}
+
+// A claim lasts exactly one frame: a menu that closed must not go on
+// swallowing the clicks meant for what was underneath it.
+func TestClaimsDoNotOutliveTheirFrame(t *testing.T) {
+	c := &Context{Scale: 1}
+	c.Begin(Input{MouseX: 50, MouseY: 50})
+	c.ClaimPointer(Rect(0, 0, 100, 100))
+	if c.hovering(Rect(0, 0, 200, 200)) {
+		t.Fatal("the claim did not take effect")
+	}
+
+	c.Begin(Input{MouseX: 50, MouseY: 50})
+	if !c.hovering(Rect(0, 0, 200, 200)) {
+		t.Error("last frame's claim is still blocking this frame")
+	}
+}

@@ -83,3 +83,44 @@ func TestAFilletDoesNotInventARegion(t *testing.T) {
 			"a fillet trims a corner, it does not close a shape", cutting.openEnds)
 	}
 }
+
+// The flyout bug the user reported, 2026-08-27: "dropdown menu is buggy, is
+// also clicking behind the drop down menu".
+//
+// The variant list hangs off the toolbar over both the tree panel and the
+// viewport, and everything under it went on answering clicks aimed at it. The
+// script clicks the Rectangle group's chevron, then clicks "Centre rectangle"
+// — a row that sits exactly over the Top plane's tree row.
+//
+// Three things have to be true afterwards, and only the first was:
+//   - the tool changed to Centre rectangle
+//   - the Top plane was NOT selected by the same click
+//   - no point was placed, with the Point tool armed to make one if it leaked
+func TestClickingTheToolFlyoutDoesNotReachWhatIsBehindIt(t *testing.T) {
+	stdout, _ := runScript(t, "sk5_flyout")
+
+	sketches := parseSketchDumps(t, stdout)
+	if len(sketches) < 3 {
+		t.Fatalf("expected 3 sketch dumps, got %d:\n%s", len(sketches), stdout)
+	}
+	final := sketches[len(sketches)-1]
+	if final.tool != "Centre rectangle" {
+		t.Errorf("the flyout row picked %q, want Centre rectangle", final.tool)
+	}
+	// The Point tool was armed throughout: a click that leaked into the
+	// viewport would have committed one.
+	if final.entities != 0 {
+		t.Errorf("%d entities were drawn — a flyout click reached the viewport",
+			final.entities)
+	}
+
+	docs := parseDumps(t, stdout)
+	if len(docs) == 0 {
+		t.Fatalf("no doc dumps:\n%s", stdout)
+	}
+	last := docs[len(docs)-1]
+	if last.sel != 0 {
+		t.Errorf("the selection is %q after clicking a flyout row — "+
+			"the click reached the tree row underneath it", last.selDesc)
+	}
+}

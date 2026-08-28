@@ -1109,3 +1109,31 @@ inside sketch mode, which is a new pointer mode against geometry the sketch
 overlay currently hides; the face-sketch case it exists for already has
 `ProjectFaceOutline` on the card since M5. Both left as their own work rather
 than half-built.
+
+**V-117 · A panel claims its pixels during the frame it is drawn, not the frame
+after.** The tool flyout was drawn over the tree and the viewport and both went
+on answering clicks aimed at it: picking "Centre rectangle" also selected the
+Top plane behind it. `registerCard`/`lastCards`, the mechanism M7 built for the
+paint panel, is a frame old by design — it is read during update, before
+anything has been drawn — so it cannot cover a panel that appeared this frame,
+and it cannot cover widgets drawn *after* the panel in the same frame at all.
+The tree is one of those: `buildShell` draws the toolbar, then the tree, so the
+tree's rows hit-tested a pointer the menu had already taken.
+
+`Context.ClaimPointer` takes a rectangle for the rest of the frame; `hovering`
+consults the claims, so every widget drawn after a claim stops responding
+underneath it. The menu claims *after* hit-testing its own rows, or it would
+block itself. Claims are cleared each frame, so a closed menu stops swallowing
+anything immediately.
+
+The app also computes the open flyout's rectangle during update, from the same
+layout the toolbar draws from, rather than remembering where it drew one. That
+covers the viewport on the single frame a menu first appears, and it means the
+draw pass and the hit test cannot disagree about where the menu is.
+
+**V-118 · `parseSketchTool` is built from `AllTools`, not a hand-kept switch.**
+It named exactly the four tools M2 shipped while a dozen more went past it, so
+no script could arm a point, an arc or a slot by name. It now folds each tool's
+own `String()` — lowercased, spaces removed — and matches that, which means a
+new tool needs nothing here at all. The two short names older scripts use
+("rect", "point") are kept working explicitly.

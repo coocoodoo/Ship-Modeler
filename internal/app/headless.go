@@ -1366,18 +1366,45 @@ func vec(p *[2]float64) geom.Vec2i {
 	return geom.Vec2i{X: geom.ToSubunits(p[0]), Y: geom.ToSubunits(p[1])}
 }
 
-func parseSketchTool(s string) (sketch.Tool, bool) {
-	switch s {
-	case "select":
-		return sketch.ToolSelect, true
-	case "line":
-		return sketch.ToolLine, true
+// parseSketchTool names every tool a script can arm.
+//
+// It is built from AllTools rather than a hand-kept switch, which is what
+// stopped it naming only M2's four while a dozen more shipped past it. The
+// names are the tools' own, lowercased with the spaces taken out, so
+// "centre rectangle" is "centrerectangle" and adding a tool needs nothing
+// here at all.
+func parseSketchTool(name string) (sketch.Tool, bool) {
+	want := normalizeToolName(name)
+	if want == "" {
+		return 0, false
+	}
+	// The short names the older scripts use, kept working.
+	switch want {
 	case "rect":
 		return sketch.ToolRect, true
-	case "circle":
-		return sketch.ToolCircle, true
+	case "point":
+		return sketch.ToolPoint, true
+	}
+	for _, t := range sketch.AllTools() {
+		if normalizeToolName(t.String()) == want {
+			return t, true
+		}
 	}
 	return 0, false
+}
+
+// normalizeToolName folds a tool name to its comparable form.
+func normalizeToolName(s string) string {
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			out = append(out, r+('a'-'A'))
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			out = append(out, r)
+		}
+	}
+	return string(out)
 }
 
 // addEntity commits a scripted entity through the same command the UI uses.

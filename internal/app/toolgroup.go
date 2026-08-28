@@ -109,12 +109,57 @@ func (a *App) buildToolGroup(box rl.Rectangle, g sketch.ToolGroup, labelled bool
 	}
 }
 
+// flyoutBox is where a group's variant list hangs, given its button.
+//
+// One function so the draw pass and the pointer test cannot disagree about
+// where the menu is. The pointer test needs it during update, before anything
+// has been drawn, which is why it is derived from the layout rather than
+// remembered from the last frame (V-117).
+func (a *App) flyoutBox(anchor rl.Rectangle, g sketch.ToolGroup) rl.Rectangle {
+	rows := float32(len(g.Tools()))
+	return ui.Rect(anchor.X, anchor.Y+anchor.Height+a.px(2),
+		a.px(180), a.px(26)*rows+a.px(8))
+}
+
+// openFlyoutBox is the open list's rectangle, or false when none is open.
+//
+// It walks the same layout the toolbar does. A menu that hangs over the tree
+// and the viewport has to be found before either of them acts on a click, and
+// update runs before draw — so this recomputes rather than reading anything
+// the draw pass left behind.
+func (a *App) openFlyoutBox() (rl.Rectangle, bool) {
+	if !a.InSketch() || !a.sketch.flyoutUp {
+		return rl.Rectangle{}, false
+	}
+	inner := ui.InsetXY(a.layout.Toolbar, a.px(ui.Spacing), a.px(4))
+	rest := inner
+	groups := sketch.Groups()
+	labelled := a.sketchToolbarFitsLabels(rest.Width, groups)
+	for _, g := range groups {
+		var box rl.Rectangle
+		box, rest = ui.SplitLeft(rest, a.sketchGroupWidth(g, labelled))
+		box.Height = inner.Height
+		if g == a.sketch.flyoutOpen {
+			return a.flyoutBox(box, g), true
+		}
+		_, rest = ui.SplitLeft(rest, a.px(2))
+	}
+	return rl.Rectangle{}, false
+}
+
+// flyoutOwnsPointer reports that the open variant list is under the cursor.
+func (a *App) flyoutOwnsPointer(x, y float64) bool {
+	box, ok := a.openFlyoutBox()
+	if !ok {
+		return false
+	}
+	return rl.CheckCollisionPointRec(rl.Vector2{X: float32(x), Y: float32(y)}, box)
+}
+
 // buildToolFlyout lists a group's variants under its button.
 func (a *App) buildToolFlyout(anchor rl.Rectangle, g sketch.ToolGroup) {
 	sess := a.sketch.session
 	members := g.Tools()
-	rowH := a.px(26)
-	width := a.px(180)
 
 	items := make([]ui.MenuItem, len(members))
 	for i, t := range members {
@@ -125,9 +170,7 @@ func (a *App) buildToolFlyout(anchor rl.Rectangle, g sketch.ToolGroup) {
 			Selected: sess.Tool == t,
 		}
 	}
-	res := a.UI.Menu(ui.MakeID("sketchflyout."+g.Name()),
-		ui.Rect(anchor.X, anchor.Y+anchor.Height+a.px(2), width, rowH*float32(len(items))+a.px(8)),
-		items)
+	res := a.UI.Menu(ui.MakeID("sketchflyout."+g.Name()), a.flyoutBox(anchor, g), items)
 	if res.Chosen >= 0 && res.Chosen < len(members) {
 		sess.SetTool(members[res.Chosen])
 		a.sketch.groupPick[g] = members[res.Chosen]

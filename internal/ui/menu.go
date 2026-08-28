@@ -77,6 +77,9 @@ func (c *Context) Menu(id ID, r rl.Rectangle, items []MenuItem) MenuResult {
 
 	pad := c.Px(4)
 	rowH := (r.Height - pad*2) / float32(len(items))
+	// Claimed after the rows are hit-tested below, so the list answers its own
+	// clicks and nothing drawn after it answers them too.
+	defer c.ClaimPointer(r)
 	// Hit-test now, draw later: the rows have to answer clicks in the same
 	// frame the list is drawn, and the drawing is deferred above everything.
 	for i := range items {

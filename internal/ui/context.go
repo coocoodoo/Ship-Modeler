@@ -124,6 +124,16 @@ type Context struct {
 	cards     []rl.Rectangle
 	lastCards []rl.Rectangle
 
+	// claims are rectangles that swallow the pointer for the rest of *this*
+	// frame, so a panel drawn over another one is not merely on top of it but
+	// actually in front of it.
+	//
+	// lastCards cannot do this job: it is a frame old, so a widget drawn under
+	// a panel that appeared this frame would still answer the click. That was
+	// the flyout landing a sketch point and selecting a tree row through
+	// itself.
+	claims []rl.Rectangle
+
 	// popoverBox is where it landed last frame so hit-testing can see it.
 	popover    popoverState
 	popoverBox rl.Rectangle
@@ -160,6 +170,7 @@ func (c *Context) Begin(in Input) {
 	c.nextHot = NoID
 	c.wantMouse = false
 	c.lastCards, c.cards = c.cards, c.cards[:0]
+	c.claims = c.claims[:0]
 	c.wantKeyboard = c.focus != NoID
 	c.overlays = c.overlays[:0]
 	c.blocked = false
@@ -217,7 +228,29 @@ func (c *Context) hovering(r rl.Rectangle) bool {
 	if c.blocked {
 		return false
 	}
-	return rl.CheckCollisionPointRec(c.MousePos(), r)
+	p := c.MousePos()
+	if !rl.CheckCollisionPointRec(p, r) {
+		return false
+	}
+	// Something drawn earlier this frame has already claimed this pixel.
+	for _, claim := range c.claims {
+		if rl.CheckCollisionPointRec(p, claim) {
+			return false
+		}
+	}
+	return true
+}
+
+// ClaimPointer marks a rectangle as owning the pointer for the rest of the
+// frame. Widgets that run after it stop responding underneath it.
+//
+// Call it after the claiming panel has hit-tested its own contents, or it will
+// block itself.
+func (c *Context) ClaimPointer(r rl.Rectangle) {
+	c.claims = append(c.claims, r)
+	if rl.CheckCollisionPointRec(c.MousePos(), r) {
+		c.wantMouse = true
+	}
 }
 
 // Interaction is the outcome of one widget's input handling. Every interactive

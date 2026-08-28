@@ -382,6 +382,9 @@ func (a *App) cycleToolGroup(g sketch.ToolGroup) {
 	}
 	sess.SetTool(next)
 	a.sketch.groupPick[g] = next
+	// The list is a way to pick a variant; picking one by key answers the same
+	// question, so leaving it hanging would be a menu nobody asked to keep.
+	a.sketch.flyoutUp = false
 	if len(members) > 1 {
 		a.SetHint(next.String() + " · " + g.Key() + " again for the next one")
 	}

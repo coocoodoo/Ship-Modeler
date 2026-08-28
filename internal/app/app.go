@@ -421,6 +421,14 @@ func (a *App) chromeOwnsPointer(in InputFrame) bool {
 	if a.UI.CardCapturesPointer(in.MouseX, in.MouseY) {
 		return true
 	}
+	// The sketch toolbar's variant list hangs off the toolbar and over both the
+	// tree and the viewport. It has to be found here, in update, because a card
+	// is only known to the kit a frame after it is drawn — and a menu that
+	// appeared this frame would otherwise let its own clicks through to
+	// whatever is behind it (V-117).
+	if a.flyoutOwnsPointer(in.MouseX, in.MouseY) {
+		return true
+	}
 	return !rl.CheckCollisionPointRec(
 		rl.Vector2{X: float32(in.MouseX), Y: float32(in.MouseY)}, a.layout.Viewport)
 }
@@ -434,6 +442,9 @@ func (a *App) chromeOwnsPointer(in InputFrame) bool {
 // toolbar or the tree — real chrome — nothing does.
 func (a *App) cardOnlyOwnsPointer(in InputFrame) bool {
 	if a.showShortcuts || a.UI.ModalOpen() || a.UI.Dragging() {
+		return false
+	}
+	if a.flyoutOwnsPointer(in.MouseX, in.MouseY) {
 		return false
 	}
 	if a.UI.OverlayCapturesPointer(in.MouseX, in.MouseY) {

@@ -9,6 +9,40 @@ rebuilt. **Next: SK6 (image underlay) needs your go-ahead per the plan.**
 
 ---
 
+## 2026-08-27 (fix) — The flyout was clicking through itself
+
+"Dropdown menu is buggy, is also clicking behind the drop down menu." It was,
+and the interesting part is which half was broken.
+
+The **viewport** half was already covered: `CardCapturesPointer` reads
+`lastCards`, which has the menu in it one frame after it is drawn, and a user
+cannot click something before it appears. The **tree** half was not covered at
+all. `buildShell` draws the toolbar first and the tree second, so the tree's
+rows hit-tested a pointer the menu had already taken — and the menu's rows sit
+exactly over the plane rows. Clicking "Centre rectangle" picked the tool *and*
+selected the Top plane behind it (V-117).
+
+`lastCards` cannot fix that: it is read during update, before anything is
+drawn, so it knows nothing about draw order within a frame. The fix is a
+same-frame claim — `Context.ClaimPointer(rect)`, consulted by `hovering`, taken
+by the menu *after* it hit-tests its own rows so it does not block itself, and
+cleared every frame so a closed menu stops swallowing anything at once. The app
+also derives the open flyout's rectangle during update from the same layout the
+toolbar draws from, which covers the one frame a menu first appears and keeps
+the hit test and the drawing from ever disagreeing about where it is.
+
+**Proved both ways.** `sk5_flyout` arms the Point tool — which commits on every
+click, so a leak into the viewport would show — opens the Rectangle group and
+clicks the row sitting over the Top plane. With the fix: the tool changes,
+nothing is selected, nothing is drawn. With the claim removed: `sel count=1
+desc="Top plane"`.
+
+**Found on the way.** `parseSketchTool` still named only M2's four tools, so no
+script could arm a point, an arc or a slot by name. It now derives the names
+from `AllTools` (V-118).
+
+---
+
 ## 2026-08-27 (SK5) — The modify tools
 
 The milestone the plan called the multiplier: fillet, chamfer, offset, mirror
