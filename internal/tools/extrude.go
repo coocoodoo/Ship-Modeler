@@ -113,6 +113,10 @@ type ExtrudeTool struct {
 	ThroughAll   bool
 	ThroughDepth float64
 
+	// OnFace records that the sketch was drawn on a body's face, which is what
+	// lets the tool know there is an inside and an outside to aim at.
+	OnFace bool
+
 	// Straddles records that the scene has material on both sides of the sketch
 	// plane along this axis.
 	//
@@ -212,7 +216,17 @@ func (t *ExtrudeTool) ArrowDirection() geom.Vec3 {
 // into the direction, because the geometry only ever builds along a positive
 // run and "dragging through zero flips it" is a UI idea, not a geometric one.
 func (t *ExtrudeTool) BuildParams(frame geom.Frame) extrude.Params {
-	depth := t.EffectiveDepth()
+	return extrude.Params{
+		Frame: frame,
+		Depth: geom.ToSubunits(t.EffectiveDepth()),
+		Draft: t.Draft,
+		Dir:   t.EffectiveDir(),
+	}
+}
+
+// EffectiveDir is the direction the geometry will actually run in, with the
+// sign of the dragged depth already folded in.
+func (t *ExtrudeTool) EffectiveDir() extrude.Direction {
 	dir := t.Dir
 	if t.Flipped() {
 		switch dir {
@@ -222,11 +236,32 @@ func (t *ExtrudeTool) BuildParams(frame geom.Frame) extrude.Params {
 			dir = extrude.Normal
 		}
 	}
-	return extrude.Params{
-		Frame: frame,
-		Depth: geom.ToSubunits(depth),
-		Draft: t.Draft,
-		Dir:   dir,
+	return dir
+}
+
+// SetResult picks what the extrude does with its solid, aiming the solid the
+// only way the choice can mean anything when the sketch is on a face.
+//
+// A face's normal points out of the body, so a sketch drawn on one opens
+// pointing outward — right for Add, and useless for Subtract: the solid sits
+// against the outside and the boolean takes nothing away. Choosing "cut this
+// out of the body I am drawn on" has to mean cutting into it, so the sense of
+// the depth follows the choice.
+//
+// This is the same shape as SetThroughAll (V-76): the option decides a
+// direction the user cannot have meant otherwise, and an explicit flip
+// afterwards is still theirs to make.
+func (t *ExtrudeTool) SetResult(r Result) {
+	t.Result = r
+	if !t.OnFace {
+		return
+	}
+	want := extrude.Normal // outward: growing the body, or a new one beside it
+	if r == ResultSubtract {
+		want = extrude.Reverse // inward: cutting into it
+	}
+	if t.Dir != extrude.Symmetric && t.EffectiveDir() != want {
+		t.Flip()
 	}
 }
 

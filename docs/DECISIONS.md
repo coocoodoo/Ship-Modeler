@@ -1137,3 +1137,27 @@ no script could arm a point, an arc or a slot by name. It now folds each tool's
 own `String()` — lowercased, spaces removed — and matches that, which means a
 new tool needs nothing here at all. The two short names older scripts use
 ("rect", "point") are kept working explicitly.
+
+**V-119 · Picking Subtract on a face sketch aims the solid into the body.**
+A sketch drawn on a face opens with Result=Add and the arrow pointing outward
+along the face normal, which is right for adding. Clicking Subtract left the
+arrow pointing the same way, so the solid sat against the *outside* of the
+body: the boolean ran and took nothing away. "Cut this out of the body I am
+drawn on" cannot mean anything else, so the sense of the depth now follows the
+choice — `SetResult` flips it when the effective direction disagrees with what
+the result needs. It is the same shape as `SetThroughAll` (V-76): an option
+that decides a direction the user cannot have meant otherwise, with an
+explicit flip afterwards still theirs to make. Symmetric is left alone, and a
+sketch on a default plane is never second-guessed — it has no inside.
+
+**V-120 · A combining extrude that changes nothing says so.** `bodiesReachedBy`
+offers a target when bounding boxes overlap, and its own comment allowed that
+this can mean "a chip being offered that turns out to do nothing" — the hull is
+an L, so there is air inside its box. When that happens the operation succeeds,
+lands in the history, and leaves the model identical: without a word that is
+indistinguishable from a broken tool, a click that missed, or a program that
+ignored you. The commit now measures its targets before and after and warns
+when every one is unchanged, naming the likely cause and carrying Undo. The
+cheap loose test stays — running real CSG per frame to grey out a chip would
+cost more than the extrude — and the honesty moved to where the answer is
+actually known.

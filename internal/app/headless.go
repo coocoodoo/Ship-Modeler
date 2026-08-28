@@ -953,13 +953,13 @@ func (r *ScriptRunner) extrudeOp(op io.Op, commit bool) error {
 	switch op.Result {
 	case "":
 	case "new":
-		t.Result = tools.ResultNew
+		t.SetResult(tools.ResultNew)
 	case "add":
-		t.Result = tools.ResultAdd
+		t.SetResult(tools.ResultAdd)
 	case "subtract":
-		t.Result = tools.ResultSubtract
+		t.SetResult(tools.ResultSubtract)
 	case "intersect":
-		t.Result = tools.ResultIntersect
+		t.SetResult(tools.ResultIntersect)
 	default:
 		return op.Errorf("unknown result %q", op.Result)
 	}

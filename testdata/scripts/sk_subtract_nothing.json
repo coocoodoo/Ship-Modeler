@@ -1,0 +1,23 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"dump"},
+
+  {"op":"sketch.begin","plane":"Front"},
+  {"op":"sketch.rect","a":[4,3],"b":[5.5,4.5]},
+  {"op":"settle"},
+  {"op":"extrude.begin","depth":4,"dir":"symmetric","result":"subtract"},
+  {"op":"dump"},
+  {"op":"extrude.commit"},
+  {"op":"settle"},
+  {"op":"dump"},
+
+  {"op":"sketch.face","body":"Hull","face":0},
+  {"op":"sketch.rect","a":[-1,-0.5],"b":[1,0.5]},
+  {"op":"settle"},
+  {"op":"extrude.begin","depth":3,"result":"subtract"},
+  {"op":"dump"},
+  {"op":"extrude.commit"},
+  {"op":"settle"},
+  {"op":"dump"}
+]

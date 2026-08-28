@@ -1002,7 +1002,11 @@ func (a *App) buildExtrudeCard(viewport rl.Rectangle) {
 		resLabels, resSel, ui.ChipGroupOpts{
 			PerChipDisabled: disabled, PerChipWhy: reasons,
 		}); changed {
-		t.Result = results[pick]
+		// Through the tool, so choosing Subtract on a face sketch aims the
+		// solid into the body rather than leaving it pointing outward at
+		// nothing (V-119).
+		t.SetResult(results[pick])
+		a.rebuildExtrudePreview()
 	}
 
 	// Through all: the depth stops being something you drag and becomes

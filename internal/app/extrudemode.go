@@ -99,6 +99,7 @@ func (a *App) BeginExtrude() bool {
 	// A sketch drawn on a face is nearly always meant to grow that body, not to
 	// start a new one beside it (SPEC-UX §10). Subtract is one chip away, which
 	// is the "cut a hole here" path.
+	a.extrude.tool.OnFace = s.OnFace
 	if s.OnFace {
 		a.extrude.tool.Result = tools.ResultAdd
 	}
@@ -219,6 +220,13 @@ func (a *App) CommitExtrude() bool {
 		cmd.Combine, cmd.Targets = &op, targets
 	}
 
+	// What the targets measured before the boolean, so an operation that
+	// changed nothing can be recognised afterwards. Bounding boxes decide
+	// which bodies are offered (bodiesReachedBy), and a box can overlap where
+	// the geometry does not — so "Subtract" can be offered, run, and take
+	// nothing away.
+	was := a.targetVolumes(targets)
+
 	if err := a.Bus.Run(cmd); err != nil {
 		// A boolean that fails gets the standard message of SPEC-UX §11.3: it
 		// promises nothing was lost and suggests something to try, which is more
@@ -243,6 +251,7 @@ func (a *App) CommitExtrude() bool {
 	for _, b := range cmd.Emptied() {
 		a.Toast(ui.Toast{Text: b.Name + " was cut away entirely — undo brings it back"})
 	}
+	a.warnIfNothingChanged(result, targets, was)
 	a.Toast(ui.Toast{Text: s.Name + " hidden — find it in the tree"})
 
 	a.dropExtrudePreview()
@@ -251,6 +260,61 @@ func (a *App) CommitExtrude() bool {
 	a.Mode = ModeIdle
 	a.selectExtrudeResult(cmd)
 	return true
+}
+
+// targetVolumes measures the bodies an extrude is about to combine with.
+func (a *App) targetVolumes(targets []uint32) map[uint32]float64 {
+	out := make(map[uint32]float64, len(targets))
+	for _, id := range targets {
+		if b := a.Doc().BodyByID(id); b != nil && b.Mesh != nil {
+			out[id] = mesh.Volume(b.Mesh)
+		}
+	}
+	return out
+}
+
+// warnIfNothingChanged says so when a combining extrude left every body it
+// touched exactly as it was.
+//
+// The operation succeeded — the boolean ran, the command is in the history —
+// and the model is identical. Without a word that is indistinguishable from a
+// tool that is broken, a click that missed, or a program that ignored you: the
+// sketch vanishes into the tree and nothing else happens. It is the same
+// failure the through-all cut had in M9 (V-76): a result that does not match
+// what was asked for, and no way to tell why.
+//
+// The reason is nearly always the direction. A profile drawn on a face and
+// pulled *outward* sits against the body rather than inside it, and its
+// bounding box overlaps enough for the chip to be offered.
+func (a *App) warnIfNothingChanged(result tools.Result, targets []uint32, was map[uint32]float64) {
+	if !result.NeedsTarget() || len(was) == 0 {
+		return
+	}
+	const same = 1e-9
+	for id, before := range was {
+		b := a.Doc().BodyByID(id)
+		if b == nil || b.Mesh == nil {
+			return // it was consumed or emptied: something certainly happened
+		}
+		if math.Abs(mesh.Volume(b.Mesh)-before) > same {
+			return // at least one body really changed
+		}
+	}
+
+	verb, why := "removed nothing", "the solid does not reach inside it"
+	switch result {
+	case tools.ResultAdd:
+		verb, why = "added nothing", "the solid is already inside it"
+	case tools.ResultIntersect:
+		verb, why = "changed nothing", "the solid already covers it"
+	}
+	a.Toast(ui.Toast{
+		Text: fmt.Sprintf("%s %s — %s. Try the other direction, or Through all.",
+			result, verb, why),
+		Kind:     ui.ToastWarn,
+		Action:   "Undo",
+		OnAction: func() { a.Undo() },
+	})
 }
 
 // selectExtrudeResult leaves the thing the extrude produced selected, whether

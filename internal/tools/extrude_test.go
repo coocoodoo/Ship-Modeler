@@ -412,3 +412,65 @@ func TestDepthLabel(t *testing.T) {
 		t.Errorf("depth label = %q, want \"2.5\"", got)
 	}
 }
+
+// TestSubtractOnAFaceSketchAimsIntoTheBody is the user's report of
+// 2026-08-27: "subtract in extruding on a sketch on a model is not working".
+//
+// A sketch on a face opens with Result=Add and the arrow pointing outward,
+// which is right for adding. Clicking Subtract left the arrow pointing the
+// same way — so the solid sat against the outside of the body, the boolean
+// ran, and it took nothing away. Choosing "cut this out of the body I am
+// drawn on" has to mean cutting into it.
+func TestSubtractOnAFaceSketchAimsIntoTheBody(t *testing.T) {
+	frame := geom.PlaneFrame(geom.PlaneTop)
+
+	faceTool := func() *ExtrudeTool {
+		e := NewExtrudeTool(1, []int{0}, geom.Vec3{}, frame.N)
+		e.OnFace = true
+		e.Result = ResultAdd // what BeginExtrude sets for a face sketch
+		return e
+	}
+
+	// Add points outward, away from the body: that is what growing means.
+	add := faceTool()
+	if got := add.BuildParams(frame).Dir; got != extrude.Normal {
+		t.Errorf("Add on a face builds %v, want Normal (outward)", got)
+	}
+
+	// Switching to Subtract turns it round.
+	cut := faceTool()
+	cut.SetResult(ResultSubtract)
+	if got := cut.BuildParams(frame).Dir; got != extrude.Reverse {
+		t.Errorf("Subtract on a face builds %v, want Reverse (into the body)", got)
+	}
+	// The depth itself is untouched in size — only its sense changed.
+	if got := cut.EffectiveDepth(); got != DefaultDepthUnits {
+		t.Errorf("depth became %v, want the %v it was", got, DefaultDepthUnits)
+	}
+
+	// Switching back points it out again.
+	cut.SetResult(ResultAdd)
+	if got := cut.BuildParams(frame).Dir; got != extrude.Normal {
+		t.Errorf("Add again builds %v, want Normal", got)
+	}
+
+	// The user's own direction is still theirs: an explicit flip after
+	// choosing Subtract must survive.
+	cut.SetResult(ResultSubtract)
+	cut.Flip()
+	if got := cut.BuildParams(frame).Dir; got != extrude.Normal {
+		t.Errorf("after an explicit flip it builds %v, want the flip to hold", got)
+	}
+}
+
+// A sketch on a default plane has no body to be inside, so nothing is guessed.
+func TestPlaneSketchesKeepTheirDirection(t *testing.T) {
+	frame := geom.PlaneFrame(geom.PlaneFront)
+	e := NewExtrudeTool(1, []int{0}, geom.Vec3{}, frame.N)
+	before := e.DepthUnits
+	e.SetResult(ResultSubtract)
+	if e.DepthUnits != before {
+		t.Errorf("a plane sketch's depth changed from %v to %v on picking Subtract",
+			before, e.DepthUnits)
+	}
+}

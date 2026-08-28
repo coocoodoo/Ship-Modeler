@@ -9,6 +9,41 @@ rebuilt. **Next: SK6 (image underlay) needs your go-ahead per the plan.**
 
 ---
 
+## 2026-08-27 (fix) — Subtract on a face sketch
+
+"Subtract in extruding on a sketch on a model is not working." Two faults, one
+symptom.
+
+**Why it failed every time.** A sketch on a face opens with Result=Add and the
+arrow pointing outward along the face normal — right for adding. Clicking
+Subtract left it pointing the same way, so the solid sat against the *outside*
+of the body. The boolean ran, correctly, and removed nothing (V-119). Picking
+Subtract now turns the solid round, the way turning Through all on picks
+Symmetric when the plane sits inside the model (V-76). An explicit flip
+afterwards is still the user's.
+
+**Why it failed silently.** `bodiesReachedBy` offers a target on bounding-box
+overlap, and its own comment allowed that this can mean "a chip being offered
+that turns out to do nothing". When that happens the extrude succeeds, records
+history, and leaves the model identical — which without a word is
+indistinguishable from a broken tool or a click that missed. The commit now
+measures its targets before and after and says so, with Undo on the toast
+(V-120). The loose box test stays: real CSG per frame to grey out a chip would
+cost more than the extrude itself.
+
+**Reproduced before fixing.** A face sketch, rect 2×1, Subtract at depth 3:
+348.0000 → 348.0000, no toast, 28 triangles becoming 26 — the boolean had run
+and re-tessellated the face without cutting anything. After: 348 → 342, exactly
+the 6 units the profile and depth describe.
+
+The "removes nothing" test needed a case the first fix does not cure, so it
+uses a genuine geometric miss instead: the hull is an L, and a cut placed in
+the air beside its raised block is inside the bounding box and outside the
+material. Boxes overlap, geometry does not, nothing is removed — legitimately,
+and now audibly.
+
+---
+
 ## 2026-08-27 (fix) — The flyout was clicking through itself
 
 "Dropdown menu is buggy, is also clicking behind the drop down menu." It was,
