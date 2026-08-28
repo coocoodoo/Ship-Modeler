@@ -42,6 +42,15 @@ on 1. Full suite green.
 **For the user's current file:** Ctrl+Z removes the giant stamp; click the
 Res chip 8 (or the new Use 8 px/u offer) and stamps land right everywhere.
 
+**Second report, same day:** "No matter what Res I choose, is not changing
+size." Verified both paths headlessly: a bare face resizes with every chip
+change; a painted face is pinned at its first density by design
+(SPEC-GEOMETRY §8.2) — their face had been pinned at 1 by the giant stamp
+itself. The gap was that nothing at the cursor said so, which made the Res
+row read as a dead control. The tile hint now says "This face is pinned at
+N px/u — Resample in the panel changes it", and the test pins the hint, the
+prompt and the pinned painthover line together.
+
 **Next:** nothing outstanding.
 
 

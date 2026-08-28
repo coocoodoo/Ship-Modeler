@@ -995,6 +995,14 @@ func (a *App) paintHint() string {
 					"Stamps here land at %d px/u but the body is %d — the panel offers the switch",
 					st.res, bodyRes)
 			}
+		} else if h.ok && h.allocated && !sameDensity(h.paint.Texel, st.res) {
+			// The chips look like they should resize the stamp here, and they
+			// never will: a painted face keeps its first density for good
+			// (SPEC-GEOMETRY §8.2). Saying so at the cursor is what stops the
+			// Res row reading as a dead control (V-139, second report).
+			return fmt.Sprintf(
+				"This face is pinned at %.3g px/u — Resample in the panel changes it",
+				paint.Density(h.paint))
 		}
 		return "Click to stamp · drag for a trail · Alt places free of the grid"
 	}

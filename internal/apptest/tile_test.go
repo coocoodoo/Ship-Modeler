@@ -98,6 +98,18 @@ func TestABareFaceOnAPaintedBodyWarnsBeforeTheFirstStamp(t *testing.T) {
 		`hint "Stamps here land at 1 px/u but the body is 8 — the panel offers the switch"`) {
 		t.Error("the tile hint does not name the density trap")
 	}
+	// The second report, same day: "No matter what Res I choose, is not
+	// changing size." The face WAS painted — pinned at its first density —
+	// and nothing at the cursor said so, which made the Res chips read as a
+	// dead control. The hint now names the pin and points at Resample, and
+	// the painted-face prompt fires alongside it.
+	if !strings.Contains(stdout,
+		`hint "This face is pinned at 1 px/u — Resample in the panel changes it"`) {
+		t.Error("hovering a pinned face with a different chip does not explain the pin")
+	}
+	if !strings.Contains(stdout, "resprompt offer=1 armed=8") {
+		t.Error("the painted-face prompt did not fire for the pinned face")
+	}
 }
 
 func TestGoldenTileResGuard(t *testing.T) {
