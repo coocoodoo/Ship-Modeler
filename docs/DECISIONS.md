@@ -1161,3 +1161,31 @@ when every one is unchanged, naming the likely cause and carrying Undo. The
 cheap loose test stays — running real CSG per frame to grey out a chip would
 cost more than the extrude — and the honesty moved to where the answer is
 actually known.
+
+**V-121 · A face with a hole was drawn with a lid over it — every pocket has
+been invisible since M4.** Cutting into a flat face leaves that face pierced:
+an outer boundary and a hole. `appendEarTris` bridges the hole into the outer
+loop and ear-clips the result, which is right — but not one ear ever got
+clipped, so it fell through to its own `fan whatever remains` fallback and drew
+straight across the opening.
+
+The cause is what a bridge *is*. Splicing a hole into an outer loop leaves two
+pairs of vertices at identical positions, and the ear test rejected any other
+vertex lying inside the candidate triangle — with `pointInTri` counting the
+boundary as inside. A duplicate therefore always sat exactly on a corner of any
+ear that used its twin, every ear was refused, and the fan ran. The test now
+skips vertices *coincident with the ear's own corners*, comparing positions
+rather than indices.
+
+The damage was entirely in the drawing. The solver, the volumes and the saved
+files were right all along, which is exactly why it survived: `m4_cut`,
+`m5_stepped`, `m9_throughcut` and four more goldens have shown windows as flat
+outlines on unbroken walls since M4, and every acceptance number in the
+repository agreed with the geometry. Only a picture could catch it, and the
+pictures were the baselines.
+
+Found from "subtract in extruding on a sketch on a model is not working" — a
+pocket really had been cut, and looked exactly like the face it was cut into.
+`holes_test.go` measures the *unsigned* area of the triangulation, because the
+fan's signed areas cancel to the right total while overlapping, and checks
+every triangle winds with its face.

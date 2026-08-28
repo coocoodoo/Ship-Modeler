@@ -509,7 +509,21 @@ func earClip(dst []Tri, poly []projPt, fi int) []Tri {
 				if j == i0 || j == i1 || j == i2 {
 					continue
 				}
-				if pointInTri(poly[j].p, a, b, c) {
+				q := poly[j].p
+				// Bridging a hole into the outer loop leaves two pairs of
+				// vertices at identical positions — that is what a bridge is.
+				// One of a pair sitting exactly on this ear's corner is that
+				// corner, not something blocking the ear, and pointInTri counts
+				// the boundary as inside.
+				//
+				// Without this, every candidate ear on a pierced face is
+				// refused, the loop gives up, and the fan below runs instead —
+				// drawing a lid straight across the hole. A pocket then looks
+				// exactly like the face it was cut into.
+				if q == a || q == b || q == c {
+					continue
+				}
+				if pointInTri(q, a, b, c) {
 					blocked = true
 					break
 				}

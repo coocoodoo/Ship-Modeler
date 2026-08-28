@@ -9,6 +9,45 @@ rebuilt. **Next: SK6 (image underlay) needs your go-ahead per the plan.**
 
 ---
 
+## 2026-08-27 (fix) — Every pocket has been invisible since M4
+
+Chasing "subtract in extruding on a sketch on a model is not working" a second
+time led somewhere much worse than the extrude tool.
+
+The subtract *had* worked. A pocket 12 x 4 x 3 was cut into a face, 144 units
+of material were gone, the volume said so — and the face rendered as though
+nothing had happened. Cutting a face leaves it pierced: an outer boundary and a
+hole. `appendEarTris` bridges the hole in and ear-clips, which is the right
+algorithm; but no ear was ever clipped, so it fell through to its own "fan
+whatever remains" fallback and drew a lid across the opening (V-121).
+
+The cause is what a bridge is. Splicing a hole into an outer loop leaves two
+pairs of vertices at identical positions. The ear test rejected any other
+vertex inside the candidate triangle, and pointInTri counts the boundary as
+inside — so a duplicate always sat exactly on a corner of any ear using its
+twin, every ear was refused, and the fan ran. The fix skips vertices coincident
+with the ear's own corners.
+
+**Why it survived seven milestones.** The damage was only in the drawing.
+Solver, volumes, exports and saved files were right the whole time, and every
+acceptance number in the repository agreed with the geometry. Seven goldens —
+m4_cut, m4_applied, m4_union, m5_stepped, m5_pullpush, m9_throughcut,
+sk3_shapes — have shown windows as flat outlines on unbroken walls since M4,
+and they were the baselines. The only thing that could catch it was looking at
+a picture and asking why a hole was not a hole.
+
+**How it was found.** Reproduced the user's shot exactly (a chamfered box, a
+face sketch, a subtract), confirmed the volume changed and the render did not,
+then walked down: the mesh has the pocket floor and all four walls; the pierced
+face triangulates to 240 of area where 96 is right; spliceHole is correct at
+96; earClip returns a pure fan from vertex 0 with several backwards triangles.
+
+The tests measure *unsigned* triangle area, because a fan's signed areas cancel
+to the correct total while overlapping — and check that every triangle winds
+with its face, which is what a fan cannot do.
+
+---
+
 ## 2026-08-27 (fix) — Subtract on a face sketch
 
 "Subtract in extruding on a sketch on a model is not working." Two faults, one
