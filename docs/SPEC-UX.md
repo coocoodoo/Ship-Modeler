@@ -126,7 +126,8 @@ Tools are grouped, one button per group, showing the variant last used with a ch
 - **Select** (V)
 - **Line** (L) — Line · Midpoint line
 - **Rectangle** (R) — Corner · Centre · Aligned
-- **Circle** (C)
+- **Circle** (C) — Centre circle · 3 point circle · Ellipse
+- **Arc** (A) — 3 point arc · Tangent arc · Centre point arc
 - **Point** (.) — places a position to snap to; makes no segment and closes no region
 - **Construction** (Q) — a mode, not a tool: with a selection it converts those entities, with none it arms whatever is drawn next
 
@@ -137,7 +138,9 @@ Below a measured width the group labels drop and the toolbar goes icon-only rath
 ### 8.3 Drawing behaviors
 - **Line** draws a chain; clicking the chain's start point closes it (start point shows a snap ring + "close" glyph when hovered). Double-click ends without closing.
 - **Rectangle** = 4 line entities grouped logically (stored as Rect, exploded to segments for regions; dragging a whole rect later moves all 4).
-- **Circle** = regular N-gon (default 16 segments, editable 3–64 in the contextual card while the tool is active or for a selected circle). Radius live-snap to grid.
+- **Circle** = regular N-gon (default 16 segments, editable 3–64 in the contextual card while the tool is active or for a selected circle). Radius live-snap to grid. **3 point circle** fits one through three clicks; three points in a line are refused with a reason.
+- **Arc** = part of an n-gon, spending segments at the same density a whole circle would, so a quarter arc is as smooth as a quarter circle and no smoother. Three gestures build the same entity: **centre** (centre, start, sweep), **3 point** (start, end, a point on the way), **tangent** (a loose endpoint to continue from, then the far end — without an endpoint the tool refuses rather than inventing a direction). An arc's tessellation begins and ends *exactly* on the points it was built from, which is what lets lines drawn to those points close a region with it.
+- **Ellipse** = closed n-gon on two axes: centre, long axis, then how far across. The third click is measured perpendicular to the long axis, so anywhere along a parallel line gives the same oval.
 - Live rubber-band preview with snapped endpoint; segment length + angle readout floats near cursor (11 px, dim) — *this is how users learn units*.
 
 ### 8.4 Snapping & inference (Alt suppresses all while held)

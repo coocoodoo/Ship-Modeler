@@ -297,3 +297,34 @@ func corners(e model.Entity) (lo, hi geom.Vec2i) {
 	}
 	return lo, hi
 }
+
+// A click that cannot make a shape ends the attempt and says why — the rule
+// every tool has followed since M2's circle, and the one the three-click
+// gestures of SK2 follow too. Keeping the good points for a retry would be
+// kinder for some tools and inconsistent across all of them.
+func TestARefusedGestureIsOver(t *testing.T) {
+	cases := []struct {
+		tool   Tool
+		clicks []geom.Vec2i
+	}{
+		{ToolMidLine, []geom.Vec2i{at(2, 2), at(2, 2)}},
+		{ToolCenterRect, []geom.Vec2i{at(2, 2), at(2, 5)}},
+		{ToolAlignedRect, []geom.Vec2i{at(0, 0), at(4, 0), at(2, 0)}},
+	}
+	for _, tc := range cases {
+		s := session(tc.tool)
+		var last ClickResult
+		for _, p := range tc.clicks {
+			last = s.Click(p)
+		}
+		if last.Commit {
+			t.Errorf("%v: the refused gesture committed", tc.tool)
+		}
+		if last.Rejected == "" {
+			t.Errorf("%v: refused without saying why", tc.tool)
+		}
+		if s.Drawing() {
+			t.Errorf("%v: the refused gesture is still in progress", tc.tool)
+		}
+	}
+}

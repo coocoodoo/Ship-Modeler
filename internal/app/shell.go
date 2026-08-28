@@ -728,9 +728,11 @@ func (a *App) buildSketchCard(viewport rl.Rectangle) {
 	body.Y += a.px(4)
 	body.Height -= a.px(4)
 
-	// The segment count applies to new circles, and to a selected one.
+	// The segment count applies to every new curve, and to a selected circle.
+	// It is the one number that decides how round a round thing is here, and
+	// SK2 gave arcs and ellipses to spend it on too (Sketch_func.md §5 SK2).
 	row, body = ui.SplitTop(body, line)
-	a.UI.Text(row, "Circle segments", ui.FontSizeSmall, ui.ColorTextDim)
+	a.UI.Text(row, "Curve segments", ui.FontSizeSmall, ui.ColorTextDim)
 
 	row, body = ui.SplitTop(body, a.px(24))
 	segs := sess.CircleSegs
@@ -746,7 +748,7 @@ func (a *App) buildSketchCard(viewport rl.Rectangle) {
 		}
 	}
 	if pick, changed := a.UI.ChipGroup(ui.MakeID("sketch.segs"), row, labels, selected,
-		ui.ChipGroupOpts{Tooltip: "Sides of a circle"}); changed {
+		ui.ChipGroupOpts{Tooltip: "How many sides a full circle gets — an arc spends its share"}); changed {
 		sess.CircleSegs = values[pick]
 		if i, ok := a.selectedCircle(s, sess); ok {
 			a.Run(&model.SetCircleSegs{Sketch: s.ID, Index: i, Segs: values[pick]})

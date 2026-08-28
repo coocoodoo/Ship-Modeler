@@ -330,6 +330,44 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return err
 		}
 
+	case "sketch.circle3":
+		if op.A == nil || op.B == nil || op.C == nil {
+			return op.Errorf("sketch.circle3 needs three points a, b and c")
+		}
+		centre, ok := sketch.Circumcentre(vec(op.A), vec(op.B), vec(op.C))
+		if !ok {
+			return op.Errorf("those three points are in a line")
+		}
+		segs := op.Segs
+		if segs == 0 {
+			segs = model.DefaultCircleSegs
+		}
+		radius := int64(vec(op.A).Sub(centre).Len() + 0.5)
+		if err := r.addEntity(op, model.NewCircle(centre, radius, segs)); err != nil {
+			return err
+		}
+
+	case "sketch.arc":
+		if err := r.arcOp(op); err != nil {
+			return err
+		}
+
+	case "sketch.ellipse":
+		if op.C == nil || op.A == nil || op.B == nil {
+			return op.Errorf("sketch.ellipse needs c (centre), a (long axis) and b (a point across it)")
+		}
+		segs := op.Segs
+		if segs == 0 {
+			segs = model.DefaultCircleSegs
+		}
+		e, ok := sketch.EllipseThrough(vec(op.C), vec(op.A), vec(op.B), segs)
+		if !ok {
+			return op.Errorf("that makes no ellipse")
+		}
+		if err := r.addEntity(op, e); err != nil {
+			return err
+		}
+
 	case "sketch.construction":
 		if err := r.constructionOp(op); err != nil {
 			return err
@@ -1229,6 +1267,50 @@ func (r *ScriptRunner) alignedRectOp(op io.Op) error {
 		return op.Wrap(err)
 	}
 	return nil
+}
+
+// arcOp draws an arc by whichever of the three gestures the script names,
+// through the same construction the interactive tools use.
+func (r *ScriptRunner) arcOp(op io.Op) error {
+	segs := op.Segs
+	if segs == 0 {
+		segs = model.DefaultCircleSegs
+	}
+	var (
+		e  model.Entity
+		ok bool
+	)
+	switch op.Kind {
+	case "", "center":
+		if op.C == nil || op.From == nil || op.To == nil {
+			return op.Errorf("a centre arc needs c (centre), from (start) and to (a point it sweeps toward)")
+		}
+		e, ok = sketch.ArcToward(vec(op.C), vec(op.From), vec(op.To), segs)
+	case "points":
+		if op.From == nil || op.To == nil || op.A == nil {
+			return op.Errorf("a 3 point arc needs from, to and a (a point on the way)")
+		}
+		e, ok = sketch.ArcThrough(vec(op.From), vec(op.A), vec(op.To), segs)
+	case "tangent":
+		if op.From == nil || op.To == nil {
+			return op.Errorf("a tangent arc needs from (a loose endpoint) and to (the far end)")
+		}
+		s := r.App.ActiveSketch()
+		if s == nil {
+			return op.Errorf("no sketch is being edited — call sketch.begin first")
+		}
+		at, dir, found := sketch.EndpointNear(vec(op.From), s.Entities, geom.SubunitsPerUnit)
+		if !found {
+			return op.Errorf("no loose endpoint near from — a tangent arc needs one")
+		}
+		e, ok = sketch.ArcTangent(at, dir, vec(op.To), segs)
+	default:
+		return op.Errorf("arc kind %q is not center, points or tangent", op.Kind)
+	}
+	if !ok {
+		return op.Errorf("those points make no arc")
+	}
+	return r.addEntity(op, e)
 }
 
 // constructionOp arms the construction mode, or converts named entities.

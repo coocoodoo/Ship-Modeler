@@ -261,6 +261,10 @@ func (a *App) updateSketch(in InputFrame, vp render.Viewport) {
 		return
 	}
 	sess := a.sketch.session
+	// The tangent arc builds on what is already drawn, so the session is told
+	// each frame rather than holding a reference that could go stale under an
+	// undo.
+	sess.SetContext(s.Entities)
 
 	// The view cube is not the sketch plane. Without this, clicking a zone to
 	// turn the camera also put a point down through it.
@@ -299,6 +303,8 @@ func (a *App) handleSketchKeys(in InputFrame) {
 		a.cycleToolGroup(sketch.GroupRect)
 	case in.KeyPressed(rl.KeyC):
 		a.cycleToolGroup(sketch.GroupCircle)
+	case in.KeyPressed(rl.KeyA):
+		a.cycleToolGroup(sketch.GroupArc)
 	case in.KeyPressed(rl.KeyPeriod):
 		a.cycleToolGroup(sketch.GroupPoint)
 	case in.KeyPressed(rl.KeyQ):

@@ -482,3 +482,71 @@ func DrawConstructionIcon(cx, cy, size float64, col color.RGBA) {
 		line(lerp(t0), lerp(t1), w, col)
 	}
 }
+
+// DrawCircle3Icon is a circle with three points marked on it.
+func DrawCircle3Icon(cx, cy, size float64, col color.RGBA) {
+	h := size / 2
+	rl.DrawCircleLinesV(v2(cx, cy), float32(h*0.8), col)
+	for _, a := range []float64{-math.Pi / 2, math.Pi / 6, 5 * math.Pi / 6} {
+		rl.DrawCircleV(v2(cx+math.Cos(a)*h*0.8, cy+math.Sin(a)*h*0.8), float32(h*0.2), col)
+	}
+}
+
+// DrawEllipseIcon is an oval, wider than it is tall.
+func DrawEllipseIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	const sides = 16
+	pts := make([]rl.Vector2, sides)
+	for i := 0; i < sides; i++ {
+		a := 2 * math.Pi * float64(i) / sides
+		pts[i] = v2(cx+math.Cos(a)*h*0.9, cy+math.Sin(a)*h*0.5)
+	}
+	closedPoly(w, col, pts...)
+}
+
+// arcSweep strokes a partial circle, which every arc icon is built from.
+func arcSweep(cx, cy, radius, from, to float64, w float32, col color.RGBA) {
+	const steps = 12
+	prev := v2(cx+math.Cos(from)*radius, cy+math.Sin(from)*radius)
+	for i := 1; i <= steps; i++ {
+		a := from + (to-from)*float64(i)/steps
+		next := v2(cx+math.Cos(a)*radius, cy+math.Sin(a)*radius)
+		line(prev, next, w, col)
+		prev = next
+	}
+}
+
+// DrawArc3Icon is an arc with its three defining points marked.
+func DrawArc3Icon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	r := h * 0.85
+	from, to := math.Pi, 2*math.Pi
+	arcSweep(cx, cy+h*0.35, r, from, to, w, col)
+	for _, a := range []float64{from, (from + to) / 2, to} {
+		rl.DrawCircleV(v2(cx+math.Cos(a)*r, cy+h*0.35+math.Sin(a)*r), float32(h*0.2), col)
+	}
+}
+
+// DrawArcTangentIcon is an arc leaving a straight line smoothly.
+func DrawArcTangentIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	// The line runs in along the bottom, and the arc curls up off its end.
+	line(v2(cx-h*0.9, cy+h*0.6), v2(cx, cy+h*0.6), w, col)
+	arcSweep(cx, cy-h*0.15, h*0.75, math.Pi/2, -math.Pi/6, w, col)
+}
+
+// DrawArcCenterIcon is an arc with its centre marked and radii drawn to it.
+func DrawArcCenterIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	r := h * 0.85
+	cyy := cy + h*0.35
+	from, to := math.Pi, 2*math.Pi
+	arcSweep(cx, cyy, r, from, to, w, col)
+	rl.DrawCircleV(v2(cx, cyy), float32(h*0.2), col)
+	line(v2(cx, cyy), v2(cx+math.Cos(from)*r, cyy+math.Sin(from)*r), w, Fade(col, 0.5))
+	line(v2(cx, cyy), v2(cx+math.Cos(to)*r, cyy+math.Sin(to)*r), w, Fade(col, 0.5))
+}

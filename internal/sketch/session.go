@@ -30,6 +30,16 @@ const (
 	ToolCenterRect
 	// ToolAlignedRect draws a rectangle at any angle, from a base edge.
 	ToolAlignedRect
+	// ToolCircle3 fits a circle through three points.
+	ToolCircle3
+	// ToolEllipse draws an oval from its centre and two axes.
+	ToolEllipse
+	// ToolArcCenter sweeps an arc about a centre.
+	ToolArcCenter
+	// ToolArc3 fits an arc through three points.
+	ToolArc3
+	// ToolArcTangent continues an existing entity smoothly.
+	ToolArcTangent
 )
 
 // AllTools lists every tool in toolbar order, which is what the group layout
@@ -37,7 +47,8 @@ const (
 func AllTools() []Tool {
 	return []Tool{
 		ToolSelect, ToolLine, ToolMidLine, ToolRect, ToolCenterRect,
-		ToolAlignedRect, ToolCircle, ToolPoint,
+		ToolAlignedRect, ToolCircle, ToolCircle3, ToolEllipse,
+		ToolArcCenter, ToolArc3, ToolArcTangent, ToolPoint,
 	}
 }
 
@@ -57,6 +68,16 @@ func (t Tool) String() string {
 		return "Centre rectangle"
 	case ToolAlignedRect:
 		return "Aligned rectangle"
+	case ToolCircle3:
+		return "3 point circle"
+	case ToolEllipse:
+		return "Ellipse"
+	case ToolArcCenter:
+		return "Centre point arc"
+	case ToolArc3:
+		return "3 point arc"
+	case ToolArcTangent:
+		return "Tangent arc"
 	default:
 		return "Select"
 	}
@@ -70,8 +91,10 @@ func (t Tool) Shortcut() string {
 		return "L"
 	case ToolRect, ToolCenterRect, ToolAlignedRect:
 		return "R"
-	case ToolCircle:
+	case ToolCircle, ToolCircle3, ToolEllipse:
 		return "C"
+	case ToolArcCenter, ToolArc3, ToolArcTangent:
+		return "A"
 	case ToolPoint:
 		return "."
 	default:
@@ -82,7 +105,11 @@ func (t Tool) Shortcut() string {
 // staged reports whether the tool builds one shape from several clicks, which
 // is what makes Esc step back a point instead of dropping the gesture.
 func (t Tool) staged() bool {
-	return t == ToolAlignedRect
+	switch t {
+	case ToolAlignedRect, ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3:
+		return true
+	}
+	return false
 }
 
 // Hint is the standing hint-bar copy for the tool. Every tool says what to do
@@ -103,6 +130,16 @@ func (t Tool) Hint() string {
 		return "Click the centre, then a corner"
 	case ToolAlignedRect:
 		return "Click the two ends of one edge, then the height — Esc steps back one point"
+	case ToolCircle3:
+		return "Click three points on the circle"
+	case ToolEllipse:
+		return "Click the centre, then the long axis, then how far across"
+	case ToolArcCenter:
+		return "Click the centre, then the start, then sweep to the end"
+	case ToolArc3:
+		return "Click the arc's start, then its end, then a point it passes through"
+	case ToolArcTangent:
+		return "Click a loose endpoint to continue from, then where the arc ends"
 	default:
 		return "Click an entity to select it · Del removes the selection · Esc clears it"
 	}
@@ -127,7 +164,21 @@ type Session struct {
 	// hasAnchor distinguishes "no first click yet" from "anchored at the
 	// origin", which is a real place a user can click.
 	hasAnchor bool
+	// tangentDir is the direction the tangent arc must leave its anchor in,
+	// taken from the entity it was hung off.
+	tangentDir geom.Vec2i
+
+	// context is what is already drawn, which the tangent arc needs in order
+	// to find an endpoint to continue from. The session is otherwise ignorant
+	// of the sketch's contents on purpose — it owns what is half-drawn, not
+	// what is finished — so this is set by the app each frame rather than
+	// held as a reference that could go stale.
+	context []model.Entity
 }
+
+// SetContext hands the session the entities already in the sketch, for the
+// tools that build on what is there.
+func (s *Session) SetContext(ents []model.Entity) { s.context = ents }
 
 // NewSession starts editing a sketch with the Line tool ready, which is the
 // tool a first-time user needs first.
@@ -149,11 +200,11 @@ func (s *Session) Anchor() (geom.Vec2i, bool) { return s.anchor, s.hasAnchor }
 // is in progress. It is also what the inference guides work against.
 func (s *Session) RubberFrom() *geom.Vec2i {
 	switch s.Tool {
-	case ToolLine, ToolAlignedRect:
+	case ToolLine, ToolAlignedRect, ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3:
 		if n := len(s.chain); n > 0 {
 			return &s.chain[n-1]
 		}
-	case ToolRect, ToolCircle, ToolMidLine, ToolCenterRect:
+	case ToolRect, ToolCircle, ToolMidLine, ToolCenterRect, ToolArcTangent:
 		if s.hasAnchor {
 			return &s.anchor
 		}
@@ -267,9 +318,102 @@ func (s *Session) Click(p geom.Vec2i) ClickResult {
 		return s.clickCenterRect(p)
 	case ToolAlignedRect:
 		return s.clickAlignedRect(p)
+	case ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3:
+		return s.clickThreePoint(p)
+	case ToolArcTangent:
+		return s.clickTangentArc(p)
 	default:
 		return ClickResult{}
 	}
+}
+
+// clickThreePoint runs the four gestures that take three clicks and build one
+// shape from them. They differ only in what the three points mean, which is
+// the whole of buildThreePoint.
+func (s *Session) clickThreePoint(p geom.Vec2i) ClickResult {
+	if len(s.chain) < 2 {
+		if n := len(s.chain); n > 0 && s.chain[n-1] == p {
+			return ClickResult{Rejected: "That point is already placed"}
+		}
+		s.chain = append(s.chain, p)
+		return ClickResult{}
+	}
+	e, ok := s.buildThreePoint(s.chain[0], s.chain[1], p)
+	// Either way the attempt is over: a click that cannot make a shape ends
+	// the gesture and says why, which is what the circle and rectangle tools
+	// have done since M2. One rule for every tool beats a kinder one for some.
+	s.chain = s.chain[:0]
+	if !ok {
+		return ClickResult{Rejected: s.Tool.refusal()}
+	}
+	return ClickResult{Entity: e, Commit: true}
+}
+
+// buildThreePoint turns three placed points into the shape the active tool
+// makes of them.
+func (s *Session) buildThreePoint(a, b, c geom.Vec2i) (model.Entity, bool) {
+	switch s.Tool {
+	case ToolCircle3:
+		centre, ok := Circumcentre(a, b, c)
+		if !ok {
+			return model.Entity{}, false
+		}
+		e := model.NewCircle(centre, radiusOf(centre, a), s.CircleSegs)
+		return e, !e.Degenerate()
+	case ToolEllipse:
+		return ellipseThrough(a, b, c, s.CircleSegs)
+	case ToolArcCenter:
+		return arcToward(a, b, c, s.CircleSegs)
+	case ToolArc3:
+		// Start, end, then a point on the way: the third click is the bulge.
+		return arcThrough(a, c, b, s.CircleSegs)
+	}
+	return model.Entity{}, false
+}
+
+// clickTangentArc hangs an arc off a loose endpoint so it leaves smoothly.
+//
+// The first click must land on an endpoint: without one there is no direction
+// to be tangent to, and inventing one would draw a shape nobody asked for
+// (Sketch_func.md §6).
+func (s *Session) clickTangentArc(p geom.Vec2i) ClickResult {
+	if !s.hasAnchor {
+		at, dir, ok := endpointNear(p, s.context, s.tangentReach())
+		if !ok {
+			return ClickResult{
+				Rejected: "Click a loose endpoint to continue from — a tangent arc needs one",
+			}
+		}
+		s.anchor, s.hasAnchor = at, true
+		s.tangentDir = dir
+		return ClickResult{}
+	}
+	e, ok := arcTangent(s.anchor, s.tangentDir, p, s.CircleSegs)
+	s.hasAnchor = false
+	if !ok {
+		return ClickResult{Rejected: "That is straight on from the endpoint — an arc needs to curve"}
+	}
+	return ClickResult{Entity: e, Commit: true}
+}
+
+// tangentReach is how close a click must come to an endpoint to grab it. The
+// session has no zoom, so this is generous in sketch units rather than exact
+// in pixels; the app snaps the click to the endpoint first anyway.
+func (s *Session) tangentReach() int64 { return geom.SubunitsPerUnit }
+
+// refusal is what a tool says when its points make no shape.
+func (t Tool) refusal() string {
+	switch t {
+	case ToolCircle3:
+		return "Those three points are in a line — a circle needs a bend"
+	case ToolArc3:
+		return "Those three points are in a line — an arc needs a bend"
+	case ToolArcCenter:
+		return "An arc needs a centre, a start and a sweep"
+	case ToolEllipse:
+		return "An ellipse needs width across its long axis"
+	}
+	return "That does not make a shape"
 }
 
 // clickMidLine draws outward from the middle: click the centre, then one end,
@@ -319,10 +463,10 @@ func (s *Session) clickAlignedRect(p geom.Vec2i) ClickResult {
 	}
 	a, b := s.chain[0], s.chain[1]
 	lines, ok := alignedRectLines(a, b, p)
+	s.chain = s.chain[:0]
 	if !ok {
 		return ClickResult{Rejected: "An aligned rectangle needs height — click off the edge"}
 	}
-	s.chain = s.chain[:0]
 	return ClickResult{Entities: lines, Commit: true}
 }
 
@@ -523,6 +667,29 @@ func (s *Session) PreviewAt(p geom.Vec2i) Preview {
 			}
 			return Preview{Kind: model.EntLine, Entities: lines, Show: true}
 		}
+	case ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3:
+		switch len(s.chain) {
+		case 1:
+			// One point placed: a guide line to the cursor, so the gesture is
+			// visibly in progress even before it has a shape to show.
+			e := model.NewLine(s.chain[0], p)
+			return Preview{Kind: model.EntLine, Entity: e, Show: !e.Degenerate()}
+		case 2:
+			e, ok := s.buildThreePoint(s.chain[0], s.chain[1], p)
+			if !ok {
+				return Preview{}
+			}
+			return Preview{Kind: e.Kind, Entity: e, Show: true}
+		}
+	case ToolArcTangent:
+		if !s.hasAnchor {
+			return Preview{}
+		}
+		e, ok := arcTangent(s.anchor, s.tangentDir, p, s.CircleSegs)
+		if !ok {
+			return Preview{}
+		}
+		return Preview{Kind: model.EntArc, Entity: e, Show: true}
 	}
 	return Preview{}
 }

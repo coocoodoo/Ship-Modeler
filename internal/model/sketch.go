@@ -30,6 +30,12 @@ const (
 	// EntPoint is a bare position. It makes no segments and so never joins a
 	// region; it exists to be snapped to and measured from.
 	EntPoint
+	// EntArc is part of a circle: centre C, from A round to B, the direction
+	// in R (+1 counter-clockwise, -1 clockwise).
+	EntArc
+	// EntEllipse is a closed oval: centre C, major-axis endpoint A, semi-minor
+	// axis W. The angle of A about C is the rotation.
+	EntEllipse
 )
 
 func (k EntityKind) String() string {
@@ -40,6 +46,10 @@ func (k EntityKind) String() string {
 		return "circle"
 	case EntPoint:
 		return "point"
+	case EntArc:
+		return "arc"
+	case EntEllipse:
+		return "ellipse"
 	default:
 		return "line"
 	}
@@ -91,6 +101,31 @@ func NewRect(a, b geom.Vec2i) Entity { return Entity{Kind: EntRect, A: a, B: b} 
 // NewPoint builds a bare position.
 func NewPoint(a geom.Vec2i) Entity { return Entity{Kind: EntPoint, A: a} }
 
+// NewArc builds an arc of the circle centred at c, running from start round to
+// end. ccw picks which way round: the two directions are different shapes, and
+// which one the user meant is decided by the gesture, not by the endpoints.
+//
+// The radius is taken from the start point, so the arc passes through it
+// exactly. An end point off that circle is projected onto it by angle, which
+// is what every construction gesture wants — three-point and centre arcs alike
+// hand over an end that is only approximately on the radius.
+func NewArc(c, start, end geom.Vec2i, ccw bool, segs int) Entity {
+	dir := int64(1)
+	if !ccw {
+		dir = -1
+	}
+	return Entity{Kind: EntArc, C: c, A: start, B: end, R: dir, Segs: clampSegs(segs)}
+}
+
+// NewEllipse builds an oval centred at c whose major axis runs to major and
+// whose semi-minor axis is minor.
+func NewEllipse(c, major geom.Vec2i, minor int64, segs int) Entity {
+	return Entity{Kind: EntEllipse, C: c, A: major, W: minor, Segs: clampSegs(segs)}
+}
+
+// CCW reports an arc's sweep direction.
+func (e Entity) CCW() bool { return e.R >= 0 }
+
 // NewCircle builds an n-gon. The segment count is clamped to the legal range.
 func NewCircle(c geom.Vec2i, r int64, segs int) Entity {
 	return Entity{Kind: EntCircle, C: c, R: r, Segs: clampSegs(segs)}
@@ -118,6 +153,12 @@ func (e Entity) Degenerate() bool {
 		// A point is its own reason for existing, and one at the origin — where
 		// A happens to equal the unset B — is a real place to put one.
 		return false
+	case EntArc:
+		// Only a radius of nothing kills an arc. A start and end in the same
+		// place is a full turn, which is a ring and a perfectly good shape.
+		return e.A == e.C
+	case EntEllipse:
+		return e.A == e.C || e.W <= 0
 	default:
 		return e.A == e.B
 	}
@@ -150,13 +191,100 @@ func (e Entity) Points() []geom.Vec2i {
 			}
 		}
 		return pts
+	case EntArc:
+		return e.arcPoints()
+	case EntEllipse:
+		return e.ellipsePoints()
 	default:
 		return []geom.Vec2i{e.A, e.B}
 	}
 }
 
+// arcPoints tessellates an arc, starting and ending exactly on the points it
+// was built from.
+//
+// The exactness at the ends is the whole contract: those two positions are
+// snap targets and the places lines join, so they are written back verbatim
+// rather than left as whatever the cosine rounded to. Everything between them
+// is ordinary rounding (SPEC-GEOMETRY §3).
+func (e Entity) arcPoints() []geom.Vec2i {
+	radius := e.A.Sub(e.C).Len()
+	if radius <= 0 {
+		return []geom.Vec2i{e.A}
+	}
+	start := math.Atan2(float64(e.A.Y-e.C.Y), float64(e.A.X-e.C.X))
+	end := math.Atan2(float64(e.B.Y-e.C.Y), float64(e.B.X-e.C.X))
+
+	sweep := end - start
+	if e.CCW() {
+		for sweep <= 0 {
+			sweep += 2 * math.Pi
+		}
+	} else {
+		for sweep >= 0 {
+			sweep -= 2 * math.Pi
+		}
+	}
+
+	// Segments are spent at the same density a whole circle would use, so a
+	// quarter arc is as smooth as a quarter of a circle and no smoother.
+	full := clampSegs(e.Segs)
+	n := int(math.Round(float64(full) * math.Abs(sweep) / (2 * math.Pi)))
+	if n < 1 {
+		n = 1
+	}
+
+	pts := make([]geom.Vec2i, n+1)
+	for i := 0; i <= n; i++ {
+		a := start + sweep*float64(i)/float64(n)
+		pts[i] = geom.Vec2i{
+			X: e.C.X + int64(math.Round(radius*math.Cos(a))),
+			Y: e.C.Y + int64(math.Round(radius*math.Sin(a))),
+		}
+	}
+	// The ends are exactly where they were placed, whatever the trigonometry
+	// made of them.
+	pts[0] = e.A
+	pts[n] = e.B
+	return pts
+}
+
+// ellipsePoints tessellates a closed oval, rotated so its major axis runs from
+// the centre to A.
+func (e Entity) ellipsePoints() []geom.Vec2i {
+	major := e.A.Sub(e.C).Len()
+	if major <= 0 {
+		return []geom.Vec2i{e.A}
+	}
+	minor := float64(e.W)
+	rot := math.Atan2(float64(e.A.Y-e.C.Y), float64(e.A.X-e.C.X))
+	cosR, sinR := math.Cos(rot), math.Sin(rot)
+
+	n := clampSegs(e.Segs)
+	pts := make([]geom.Vec2i, n)
+	for i := 0; i < n; i++ {
+		t := 2 * math.Pi * float64(i) / float64(n)
+		// A point on the axis-aligned ellipse, then turned into place.
+		x, y := major*math.Cos(t), minor*math.Sin(t)
+		pts[i] = geom.Vec2i{
+			X: e.C.X + int64(math.Round(x*cosR-y*sinR)),
+			Y: e.C.Y + int64(math.Round(x*sinR+y*cosR)),
+		}
+	}
+	// t=0 is the major-axis endpoint, which the user placed: exact.
+	pts[0] = e.A
+	return pts
+}
+
 // Closed reports whether the entity's points form a loop.
-func (e Entity) Closed() bool { return e.Kind != EntLine && e.Kind != EntPoint }
+func (e Entity) Closed() bool {
+	switch e.Kind {
+	case EntLine, EntPoint, EntArc:
+		return false
+	default:
+		return true
+	}
+}
 
 // Equal compares two entities field for field.
 //

@@ -960,3 +960,48 @@ one gesture and could strand a half-edited sketch if the second failed. One
 atomic command, validated before anything moves, undone by removing the
 additions from the end and reinserting the removals at their recorded indices.
 SK1 ships it with the aligned rectangle as its first user.
+
+**V-99 · A curve's tessellation ends exactly where it was built.** An arc's
+first and last points, and an ellipse's major-axis endpoint, are written back
+verbatim after the trigonometry rather than left as whatever the cosine
+rounded to. Those positions are snap targets and the places lines join: one
+subunit of drift and a profile of three lines and an arc has four open ends
+and no region instead of a closed outline — silently, and only visible when an
+extrude refuses. Everything between the ends is ordinary rounding
+(SPEC-GEOMETRY §3). Pinned per kind, and end to end by
+TestAnArcClosesAProfileWithItsLines.
+
+**V-100 · Three gestures, one arc.** Centre, 3-point and tangent are three ways
+to say the same thing, and they all build the same `EntArc` — centre, start,
+end, direction. Only the construction differs, and it lives in
+`internal/sketch/curves.go` as pure functions tested on their own, because a
+circumcentre a few subunits out draws a shape that looks perfectly plausible
+and puts every later join in the wrong place.
+
+**V-101 · The tangent arc demands an endpoint, and says so.** Tangency needs a
+direction, and the only honest source of one is an entity that already ends
+there. Rather than guess from the nearest geometry or default to horizontal,
+the first click must land on a loose endpoint; if it does not, the tool
+refuses with a reason (Sketch_func.md §6). The session learns what is drawn
+through `SetContext`, fed each frame rather than held, so an undo cannot leave
+it pointing at entities that are gone.
+
+**V-102 · Arc segments are spent at circle density.** `Segs` means "sides for a
+whole circle", so an arc takes the fraction its sweep covers. A quarter arc at
+32 is eight segments, not thirty-two crammed into ninety degrees. That keeps
+one number meaningful across circles, arcs and ellipses alike — the card row
+is now "Curve segments" — and keeps a hull outline's arcs the same smoothness
+as its circles.
+
+**V-103 · A refused gesture is over.** A click that cannot make a shape ends
+the attempt and says why, for every tool. Keeping the good points so the user
+can retry the last one is kinder for three-click tools and inconsistent with
+the circle and rectangle, which have reset since M2. One rule, explained once,
+beats a better rule that applies to half the toolbar.
+
+**V-104 · Elliptical arcs and conics are not built.** Sketch_func.md §2 listed
+them as stretch goals inside SK2. They are the two shapes from the Onshape
+toolbar with no obvious use in a low-poly hull that the arc and ellipse
+already shipped do not cover, and each needs its own entity kind, gesture and
+tessellation. Deferred, not refused: the kinds are reserved in the enum order
+of Sketch_func.md §3 and can be appended without disturbing anything.

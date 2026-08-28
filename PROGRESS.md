@@ -2,10 +2,49 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **SK1 done.** Tool groups, construction geometry, points,
-midpoint line, centre and aligned rectangles, and the ReplaceEntities command
-the modify tools will be built on. Suite green (15 packages), exe rebuilt.
-**Next: SK2 — arcs, ellipses, 3-point circle.**
+**Current state:** **SK1 and SK2 done.** Tool groups, construction geometry,
+points, line and rectangle variants, ReplaceEntities; then arcs (three
+gestures), ellipses and the 3-point circle. Suite green (15 packages), exe
+rebuilt. **Next: SK3 — polygons and slots.**
+
+---
+
+## 2026-08-27 (SK2) — Arcs, ellipses and a circle through three points
+
+**Shipped.** `EntArc` and `EntEllipse`, the 3-point circle (no new kind — it
+is a fitted `EntCircle`), and five new gestures: 3-point circle, centre arc,
+3-point arc, tangent arc, ellipse. The Arc group joins the toolbar on `A`;
+the card row became "Curve segments" because one number now decides how round
+every round thing is (V-102).
+
+**The contract that matters.** An arc's tessellation begins and ends *exactly*
+on the points it was built from (V-99). Everything else in SK2 is downstream
+of that: the acceptance script draws a D-shape from three lines closed by an
+arc, and it becomes a region with **zero open ends**. One subunit of drift at
+either end and it would be four open ends and no region — silently, visible
+only when an extrude refuses.
+
+**The acceptance number.** Three curved profiles pulled 2 units deep:
+**151.4946**, against 151.4944 computed from the regular-polygon area formula
+for each (a 6×3 rectangle plus half a 32-gon of radius 3; a 32-gon of radius
+2; a 32-gon ellipse with semi-axes 5 and 2). The test computes those rather
+than recording them, so a tessellation that changed density or dropped a
+segment fails instead of passing on a stale baseline.
+
+**Design calls.** Three gestures build one entity, with the construction
+arithmetic in `curves.go` as pure functions — a circumcentre a few subunits
+out draws something plausible and puts every later join wrong (V-100). The
+tangent arc demands a loose endpoint and refuses without one rather than
+guessing a direction (V-101), and learns what is drawn through `SetContext`
+fed per frame, so an undo cannot strand it. A refused gesture resets, matching
+the circle and rectangle since M2 rather than inventing a kinder rule for
+half the toolbar (V-103).
+
+**Deferred:** elliptical arc and conic, the two stretch goals — the shapes
+from the Onshape toolbar with no use a low-poly hull cannot already meet
+(V-104). The enum order reserves them.
+
+**Next:** SK3 — polygons and slots.
 
 ---
 
