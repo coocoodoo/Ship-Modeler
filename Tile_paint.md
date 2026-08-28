@@ -20,11 +20,13 @@
 
 Milestones are **TP1–TP3** in dependency order, each independently
 shippable; **TP4** is stretch and needs the user's go-ahead. "Adjust the
-tile pattern" is read as BOTH of its plausible meanings, because both are
-cheap: (a) adjusting how the sheet slices into tiles — tile width/height,
-margin, spacing — and (b) adjusting the stamp itself — rotate and flip.
-If the user meant something else (e.g. a repeating fill pattern), stop and
-ask before TP3.
+tile pattern" is confirmed by the user (2026-08-28) to mean **the tile
+grid that separates the sheet into tiles**, offered as preset chips —
+**8x8, 16x16, 32x32, 64x64, or Custom** — the same chip idiom as the Res
+and Size rows. Presets are square with margin 0 and spacing 0; Custom
+reveals the W, H, Margin and Spacing fields for sheets that need them
+(Tiled-style gutters). Rotate/flip of the stamp stays in scope as its own
+small thing — pixel-art stamping wants it regardless.
 
 Before writing any code, re-read: `internal/paint/mapping.go` (texel space,
 `FaceRect`, `At`/`Set`, growth), `internal/paint/command.go` (the stroke
@@ -163,7 +165,8 @@ Settings: `TileSettings{Path string; TileW, TileH, Margin, Spacing, Selected
 int; Rot uint8; FlipX bool}` on `io.Settings`, round-trip tested. The armed
 *tool* is still not persisted (same reasoning as PaintSettings).
 
-Ops: `tile.import {path}`, `tile.grid {w,h,margin,spacing}`, `tile.select
+Ops: `tile.import {path}`, `tile.grid {w,h,margin,spacing}` (presets are
+UI sugar for w=h=N, margin=spacing=0 — the op speaks the general case), `tile.select
 {index}`, `tile.orient {rot, flip}`, `tile.stamp {body, face, uv}`. Dump
 line: `tileset w= h= tiles= sel= rot= flip=` plus the existing `facepaint
 … opaque=` lines carrying the stamped-pixel assertions.
@@ -202,8 +205,10 @@ line: `tileset w= h= tiles= sel= rot= flip=` plus the existing `facepaint
 - [ ] Tile tool: stroke icon, `T` key, tool button in the paint tools row
 - [ ] Tile section (replaces the palette section while the Tile tool is
       armed — tiles carry their own colours; pattern: buildEdgeSection):
-      [Import…] via zenity → copy to config dir; W/H/Margin/Spacing
-      DragNumbers re-slicing live; the sheet drawn nearest-filtered at
+      [Import…] via zenity → copy to config dir; Grid chips
+      [8][16][32][64][Custom] — presets square, margin/spacing 0; Custom
+      reveals W/H/Margin/Spacing DragNumbers — re-slicing live either
+      way; the sheet drawn nearest-filtered at
       integer zoom fit to panel width (wheel scrolls if tall), selected
       tile outlined in the accent; rotate / flip stroke-icon buttons
       showing the current orientation
