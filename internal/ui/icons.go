@@ -673,3 +673,27 @@ func DrawMarkerIcon(cx, cy, size float64, col color.RGBA) {
 	rl.DrawCircleLinesV(rl.Vector2{X: float32(cx), Y: float32(cy)}, float32(r), col)
 	rl.DrawCircleV(rl.Vector2{X: float32(cx), Y: float32(cy)}, float32(size*0.14), col)
 }
+
+// DrawTileIcon is the tile stamp: a 2x2 of little squares.
+func DrawTileIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	s := size * 0.34
+	g := size * 0.10
+	for _, d := range [][2]float64{{-1, -1}, {1, -1}, {-1, 1}, {1, 1}} {
+		x := cx + d[0]*(s+g)/1.55 - s/2
+		y := cy + d[1]*(s+g)/1.55 - s/2
+		closedPoly(w, col,
+			v2(x, y), v2(x+s, y), v2(x+s, y+s), v2(x, y+s))
+	}
+}
+
+// DrawRotateCWIcon is a three-quarter arc with an arrowhead, turning
+// clockwise.
+func DrawRotateCWIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	r := size * 0.36
+	rl.DrawRingLines(v2(cx, cy), float32(r)-w/2, float32(r)+w/2, 90, 360, 24, col)
+	// Arrowhead at the arc's end, pointing along the turn.
+	ax, ay := cx, cy-r
+	poly(w, col, v2(ax-size*0.16, ay-size*0.14), v2(ax+size*0.06, ay), v2(ax-size*0.16, ay+size*0.14))
+}

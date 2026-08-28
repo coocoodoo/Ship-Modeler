@@ -148,6 +148,11 @@ func New(headless bool) *App {
 	// No dot is under the pointer until one is, and index 0 is a real dot.
 	a.markers.hover = -1
 	a.initPaint()
+	if !headless {
+		// The tile setup persists like the palette does; a headless run must
+		// not inherit it, for the same reason it ignores the settings file.
+		a.restoreTileset()
+	}
 	a.restorePaint()
 	a.initFiles()
 	a.Bus.Events.Listen(a.onDocumentEvent)
@@ -163,7 +168,9 @@ func New(headless bool) *App {
 
 // Close releases GPU resources and persists the settings.
 func (a *App) Close() {
+	a.storeTileSettings()
 	a.saveSettings()
+	a.dropTilePickerTexture()
 	for _, g := range a.gpu {
 		g.Unload()
 	}

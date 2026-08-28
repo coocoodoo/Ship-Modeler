@@ -2,7 +2,8 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Edge bands land on the face side of their edge, decided by
+**Current state:** Tile stamping shipped end to end — TP1-TP3 of Tile_paint.md
+(V-138). Edge bands land on the face side of their edge, decided by
 winding (V-137); edge picks follow the whole line through seam vertices
 (V-136); edge paint bands reach their edges gap-free (V-135); fold
 creases draw and pick at any angle (V-134); bent faces
@@ -14,6 +15,75 @@ Iron Drift. Both suites green. Repo now pushes to
 github.com/coocoodoo/Iron-Drift-Modeler by the owner's instruction.
 
 ---
+
+## 2026-08-28 — Tile stamping: TP1-TP3 in one sweep (V-138)
+
+**Asked for:** "do them in one sweep" — the whole of Tile_paint.md's planned
+scope: import a tileset, adjust the tile grid (8/16/32/64/Custom), select a
+tile, stamp it onto the model.
+
+**Done, one commit per milestone:**
+- **TP1** `internal/paint/tileset.go` + `stamp.go`: Tiled-convention slicing
+  (margin, spacing, partial columns dropped), D4 orientation
+  (flip-then-rotate, all eight members witnessed by an asymmetric probe
+  tile), `StampRect` (alpha >= 128 paints opaque, below leaves the surface
+  alone — a stamp never erases), `StampFace` mirroring the stroke command:
+  replayed from its cells, coalesced per mouse-down, dirty-rect undo,
+  allocate-on-first-touch. `TileSettings` on io.Settings.
+- **TP2** ops `tile.import/grid/select/orient/stamp` + a `tileset` dump line;
+  the committed 19x19 fixture sheet is generated, never hand-drawn, pinned
+  pixel-for-pixel by a test (`MODELER_WRITE_FIXTURE=1` regenerates). Flow
+  test with hand-computed counts: two snapped stamps butt to 128 opaque
+  texels, the turned stamp 192, the half-transparent tile adds exactly its
+  32, undo hashes back bit-identical.
+- **TP3** the Tile tool (`T`, sixth column of the tools rows), the panel
+  section: Import via zenity (copied into the config dir), grid preset chips
+  + Custom fields, the sheet picker (nearest-filtered, faint slicing grid,
+  armed tile in the accent), rotate/mirror buttons, the ghost preview
+  drawing the armed tile's actual pixels half-strength at the snapped cell,
+  click stamps / drag trails / Alt places free, face lock respected, setup
+  persisted like the palette.
+
+**Verified:**
+- 20 new paint-package tests (slicing tables, D4, snap flooring negatives,
+  stamp clip/threshold/undo/coalesce/refusal, fixture pinning, settings
+  round-trip), 4 apptest flows, 3 new goldens (stamps, panel+ghost, pointer
+  click-stamp) — all read.
+- **Fail-checked:** with the snap broken the flow test fails at 206 opaque
+  texels where 224 belong — the unsnapped stamp hangs off the face and the
+  clip eats it.
+- The pointer path is exercised for real: a scripted `click` stamps 64
+  texels through beginTileStamp -> bus drag -> commit.
+- Full suite green. 26 paint-panel goldens legitimately regenerated (the
+  tools rows went 5 -> 6 columns for the new tool; the diff was read — the
+  change is exactly the second row gaining the tile icon). Ten more goldens
+  the update pass touched showed 0-2 changed pixels of encoder jitter and
+  were REVERTED rather than committed.
+
+**Decisions/deviations:** V-138 — the picker fits the whole sheet in a fixed
+box instead of fit-width+scroll; the footer stays under the tile section.
+
+**Open issues:**
+- TP4 (multi-tile block stamping, grid phase offset) remains parked for the
+  user's go-ahead, per the plan.
+- The picker has no hover highlight; clicking is the only affordance. Worth
+  a polish pass if the tool sees use.
+
+**Next:** nothing outstanding — TP1-TP3 complete.
+
+**Try it (user):**
+```bash
+C:\Modeler\modeler.exe
+```
+1. Paint mode, pick the **Tile** tool (the 2x2-squares icon, or `T`).
+2. **Import tileset PNG**, then set the grid chips to your tile size —
+   or Custom for sheets with margins and gutters.
+3. Click a tile in the sheet; hover the model — the tile previews on the
+   surface, snapped to the grid.
+4. Click to stamp; drag to lay a run; they butt seamlessly.
+5. The rotate and mirror buttons turn the stamp; Alt places off-grid.
+6. Ctrl+Z removes a whole trail at once.
+
 
 ## 2026-08-28 — The band lands on the face's side of its edge (V-137)
 

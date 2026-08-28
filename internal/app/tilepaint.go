@@ -3,8 +3,12 @@ package app
 import (
 	"image"
 
+	rl "github.com/gen2brain/raylib-go/raylib"
+
 	"modeler/internal/geom/mesh"
+	"modeler/internal/io"
 	"modeler/internal/paint"
+	"modeler/internal/render"
 	"modeler/internal/ui"
 )
 
@@ -37,6 +41,10 @@ type tilePaintState struct {
 	stampFace mesh.FaceUID
 	stampPt   *mesh.FacePaint
 	cells     []image.Point
+
+	// tex mirrors the sheet on the GPU for the panel's picker.
+	tex      rl.Texture2D
+	texReady bool
 	// free is live while Alt suppresses the snap, refreshed every frame the
 	// tool updates.
 	free bool
@@ -171,10 +179,171 @@ func (a *App) StampTileAt(body uint32, face mesh.FaceUID, texel image.Point, fre
 	})
 }
 
-// refreshTileTexture mirrors the sheet to the GPU for the panel's picker.
-// TP3 owns the actual texture; until then this is the seam it hangs off.
-func (a *App) refreshTileTexture() { a.dropTilePickerTexture() }
+// beginTileStamp opens a stamp trail on the hovered face (Tile_paint.md §3).
+func (a *App) beginTileStamp() {
+	tile := a.armedTile()
+	if tile == nil {
+		a.Toast(ui.Toast{Text: "Import a tileset and pick a tile first", Kind: ui.ToastWarn})
+		return
+	}
+	h := a.paint.hover
+	if !h.ok || h.paint == nil {
+		return
+	}
+	st := &a.paint.tiles
+	st.stamping = true
+	st.stampBody, st.stampFace = h.body, h.face
+	st.stampPt = h.paint
+	st.cells = append(st.cells[:0], a.tileCellFor(h.texel, st.free))
+	a.applyTileStamp()
+}
 
-// dropTilePickerTexture releases the picker's GPU copy of the sheet. TP3
-// replaces this stub with the real unload.
-func (a *App) dropTilePickerTexture() {}
+// trackTileStamp trails the pointer: each new cell it enters takes a stamp,
+// and the face the trail started on is the only face it can touch — like a
+// stroke, a body passing in front of the cursor mid-drag must not capture it.
+func (a *App) trackTileStamp(in InputFrame, vp render.Viewport) {
+	st := &a.paint.tiles
+	if !in.Down[MouseLeft] {
+		a.finishTileStamp()
+		return
+	}
+	if st.stampPt == nil {
+		return
+	}
+	p, ok := a.pointOnFace(in.MouseX, in.MouseY, vp, st.stampPt.Frame)
+	if !ok {
+		return
+	}
+	st.free = in.Alt
+	cell := a.tileCellFor(paint.Texel(st.stampPt, p), st.free)
+	for _, had := range st.cells {
+		if had == cell {
+			return
+		}
+	}
+	st.cells = append(st.cells, cell)
+	a.applyTileStamp()
+}
+
+// applyTileStamp pushes the trail so far through the bus as a live drag, so
+// the history gets one entry per mouse-down (SPEC-DATA §3.2).
+func (a *App) applyTileStamp() {
+	st := &a.paint.tiles
+	cmd := &paint.StampFace{
+		Body: st.stampBody, Face: st.stampFace, Res: a.paint.res,
+		Tile: a.armedTile(),
+		// The command reruns the trail from its cells each frame, so it needs
+		// its own copy.
+		Cells: append([]image.Point(nil), st.cells...),
+	}
+	if a.Bus.Dragging() {
+		_ = a.Bus.UpdateDrag(cmd)
+		return
+	}
+	_ = a.Bus.BeginDrag(cmd)
+}
+
+// finishTileStamp commits the trail as one step.
+func (a *App) finishTileStamp() {
+	st := &a.paint.tiles
+	if !st.stamping {
+		return
+	}
+	st.stamping = false
+	st.cells = st.cells[:0]
+	st.stampPt = nil
+	if a.Bus.Dragging() {
+		a.Bus.CommitDrag()
+	}
+}
+
+// cancelTileStamp reverts a live trail, which is Escape mid-drag.
+func (a *App) cancelTileStamp() {
+	st := &a.paint.tiles
+	if !st.stamping {
+		return
+	}
+	st.stamping = false
+	st.cells = st.cells[:0]
+	st.stampPt = nil
+	a.Bus.CancelDrag()
+}
+
+// refreshTileTexture mirrors the sheet to the GPU for the panel's picker,
+// nearest-filtered so the pixels stay pixels.
+func (a *App) refreshTileTexture() {
+	a.dropTilePickerTexture()
+	t := &a.paint.tiles
+	if t.set == nil || t.set.Img == nil {
+		return
+	}
+	img := rl.NewImageFromImage(t.set.Img)
+	t.tex = rl.LoadTextureFromImage(img)
+	rl.UnloadImage(img)
+	rl.SetTextureFilter(t.tex, rl.FilterPoint)
+	t.texReady = true
+}
+
+// dropTilePickerTexture releases the picker's GPU copy of the sheet.
+func (a *App) dropTilePickerTexture() {
+	t := &a.paint.tiles
+	if t.texReady {
+		rl.UnloadTexture(t.tex)
+		t.texReady = false
+	}
+}
+
+// restoreTileset quietly re-arms the sheet the last session used. Quiet on
+// purpose: a missing file at startup is not the user's doing right now, and
+// the panel's empty state says what to do about it.
+func (a *App) restoreTileset() {
+	ts := a.Settings.Tiles
+	if ts.Path == "" {
+		return
+	}
+	set, err := paint.LoadTilesetFile(ts.Path)
+	if err != nil {
+		return
+	}
+	if ok, _ := paint.ValidTileGrid(ts.TileW, ts.TileH); ok {
+		set.TileW, set.TileH = ts.TileW, ts.TileH
+		set.Margin, set.Spacing = ts.Margin, ts.Spacing
+	}
+	t := &a.paint.tiles
+	t.set, t.path = set, ts.Path
+	t.orient = paint.Orientation{Rot: ts.Rot % 4, FlipX: ts.FlipX}
+	if ts.Selected >= 0 && ts.Selected < set.Count() {
+		t.sel = ts.Selected
+	}
+	a.dropTileCache()
+	a.refreshTileTexture()
+}
+
+// storeTileSettings writes the tile setup back to the preferences.
+func (a *App) storeTileSettings() {
+	t := &a.paint.tiles
+	if t.set == nil {
+		return
+	}
+	a.Settings.Tiles = io.TileSettings{
+		Path: t.path, TileW: t.set.TileW, TileH: t.set.TileH,
+		Margin: t.set.Margin, Spacing: t.set.Spacing,
+		Selected: t.sel, Rot: t.orient.Rot, FlipX: t.orient.FlipX,
+	}
+}
+
+// importTilesetWithDialog is the panel's Import button: ask for a PNG, copy
+// it into the config dir so the original can move, and arm the copy.
+func (a *App) importTilesetWithDialog() {
+	path, ok, err := io.AskOpenTileset(a.Settings.LastDir)
+	if err != nil || !ok {
+		return
+	}
+	kept, err := io.CopyIntoConfig("tilesets", path)
+	if err != nil {
+		// The copy failing is not worth losing the import over: arm the
+		// original and let the settings remember where it was.
+		kept = path
+	}
+	a.ImportTileset(kept)
+}

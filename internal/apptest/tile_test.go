@@ -62,3 +62,23 @@ func TestGoldenTileStamp(t *testing.T) {
 	_, outDir := runScript(t, "tile_stamp")
 	checkGolden(t, "tile_stamp", outDir)
 }
+
+// The pointer path (Tile_paint.md TP3): with the Tile tool armed, a click on
+// the model stamps through beginTileStamp -> the bus drag -> commit, exactly
+// as a person would. The 8x8 blue tile is 64 opaque texels.
+func TestAClickStampsThroughTheRealPointerPath(t *testing.T) {
+	stdout, _ := runScript(t, "tile_panel")
+	if !regexp.MustCompile(`facepaint body=1 face=\d+ faces=1 res=8 .* opaque=64`).MatchString(stdout) {
+		t.Error("the click did not stamp 64 texels through the pointer path")
+	}
+	if !strings.Contains(stdout, `hint "Click to stamp · drag for a trail · Alt places free of the grid"`) {
+		t.Error("the tile tool's hint is missing")
+	}
+}
+
+// The panel and the ghost: the picker with the armed tile outlined, the grid
+// chips, and the tile's own pixels previewed on the face under the cursor.
+func TestGoldenTilePanel(t *testing.T) {
+	_, outDir := runScript(t, "tile_panel")
+	checkGolden(t, "tile_panel", outDir)
+}

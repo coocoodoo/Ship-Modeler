@@ -47,6 +47,7 @@ const (
 	fileSaveAs
 	fileExport
 	fileImportPalette
+	fileImportTileset
 	fileSample
 )
 
@@ -187,6 +188,8 @@ func (a *App) RunPendingFile() {
 		a.runExport()
 	case fileImportPalette:
 		a.importPaletteWithDialog()
+	case fileImportTileset:
+		a.importTilesetWithDialog()
 	case fileSample:
 		a.BuildSampleShip()
 	}

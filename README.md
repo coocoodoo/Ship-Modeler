@@ -76,6 +76,16 @@ other half at the corner, so it reads as one line rather than two that nearly
 line up, and it is baked into the faces own pictures: it saves, exports and can
 be painted over like anything else you drew.
 
+The **Tile tool** (`T`) stamps pixel-art tiles from an imported sheet. Import
+a PNG, pick the grid that separates its tiles — 8, 16, 32, 64, or Custom with
+margin and spacing for Tiled-style sheets — click a tile in the panel, and
+click the model to stamp it. Stamps snap to a tile grid so they butt
+seamlessly (hold `Alt` to place free), dragging lays a trail, and the rotate
+and mirror buttons turn the stamp. One tile pixel is one texel at the face's
+own resolution, transparent tile pixels leave the surface alone, and a whole
+trail is a single undo step. The sheet and its grid are remembered between
+sessions, like the palette.
+
 The **dither modes** (2×2, 4×4, 8×8 Bayer) are how a gradient or a soft brush
 gets a middle without leaving the palette: the shading is spent on how many
 whole texels are painted, not on inventing colours between two of them.

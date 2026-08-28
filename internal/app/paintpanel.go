@@ -56,21 +56,30 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	// resolution mean nothing to it, and a panel offering them would be a
 	// panel mostly full of things that do not apply.
 	showEdges := st.tool == paint.ToolEdge
+	// The tile tool swaps the palette for the sheet: tiles carry their own
+	// colours, and a swatch grid under a stamp would be a grid of things that
+	// do nothing (Tile_paint.md TP3).
+	showTiles := st.tool == paint.ToolTile
 	// The brush's square is meaningless to the edge tool, which has its own
-	// width. A control that does nothing is worse than an absent one.
-	showSize := !showEdges
+	// width, and to the tile tool, whose size is the tile's. A control that
+	// does nothing is worse than an absent one.
+	showSize := !showEdges && !showTiles
 
 	h := a.px(38) + // title
 		line + a.px(26)*2 + a.px(4) + a.px(6) + // two rows of tools
 		line + a.px(24) + a.px(8) + // res
-		line + float32(paintPaletteRows)*(swatch+gap) + a.px(6) + // palette
-		line + swatch + a.px(8) + // recents
-		a.px(26) + a.px(6) + // current colour + custom
 		a.px(26) + a.px(4) // import + textures
+	if !showTiles {
+		h += line + float32(paintPaletteRows)*(swatch+gap) + a.px(6) + // palette
+			line + swatch + a.px(8) + // recents
+			a.px(26) + a.px(6) // current colour + custom
+	} else {
+		h += a.tileSectionHeight(line) + a.px(6)
+	}
 	if showSize {
 		h += line + a.px(24) + a.px(6)
 	}
-	if len(st.custom) > 0 {
+	if len(st.custom) > 0 && !showTiles {
 		h += a.px(24) + a.px(4)
 	}
 	if mismatch {
@@ -175,7 +184,12 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	}
 	space(8)
 
-	if len(st.custom) > 0 {
+	if showTiles {
+		a.buildTileSection(row, space, line)
+		space(6)
+	}
+
+	if len(st.custom) > 0 && !showTiles {
 		pages := []string{"Built-in", "Imported"}
 		if pick, changed := a.UI.ChipGroup(ui.MakeID("paint.page"), row(a.px(24)),
 			pages, st.page, ui.ChipGroupOpts{
@@ -186,16 +200,18 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 		space(4)
 	}
 
-	a.UI.Text(row(line), "Palette", ui.FontSizeSmall, ui.ColorTextDim)
-	a.paintPaletteGrid(row(float32(paintPaletteRows)*(swatch+gap)), swatch, gap)
-	space(6)
+	if !showTiles {
+		a.UI.Text(row(line), "Palette", ui.FontSizeSmall, ui.ColorTextDim)
+		a.paintPaletteGrid(row(float32(paintPaletteRows)*(swatch+gap)), swatch, gap)
+		space(6)
 
-	a.UI.Text(row(line), "Recents", ui.FontSizeSmall, ui.ColorTextDim)
-	a.paintRecentsStrip(row(swatch), swatch, gap)
-	space(8)
+		a.UI.Text(row(line), "Recents", ui.FontSizeSmall, ui.ColorTextDim)
+		a.paintRecentsStrip(row(swatch), swatch, gap)
+		space(8)
 
-	a.paintColorRow(row(a.px(26)))
-	space(6)
+		a.paintColorRow(row(a.px(26)))
+		space(6)
+	}
 	a.paintFooterRow(row(a.px(26)))
 
 	space(6)
@@ -290,6 +306,8 @@ func paintShapeTools() []paintTool {
 			"Drag to ramp from the near colour to the far one"},
 		{paint.ToolEdge, ui.DrawEdgeLineIcon,
 			"Click edges, then bake a line along them onto both faces"},
+		{paint.ToolTile, ui.DrawTileIcon,
+			"Stamp tiles from an imported sheet, snapped to a tile grid"},
 	}
 }
 
@@ -298,7 +316,7 @@ func paintShapeTools() []paintTool {
 // Both rows are laid out on the same five-column grid so the icons line up
 // under each other even though one row is a tool shorter.
 func (a *App) paintToolRow(r rl.Rectangle, tools []paintTool) {
-	const columns = 5
+	const columns = 6
 	gap := a.px(4)
 	w := (r.Width - gap*float32(columns-1)) / float32(columns)
 	for i, t := range tools {

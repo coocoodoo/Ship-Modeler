@@ -33,13 +33,16 @@ const (
 	// ToolEdge selects edges of the model and bakes a line along them onto the
 	// faces that meet there, rather than painting where the pointer goes.
 	ToolEdge
+	// ToolTile stamps the armed tile of the imported sheet, snapped to a
+	// tile grid so stamps butt seamlessly (Tile_paint.md).
+	ToolTile
 )
 
 // Tools lists them in the order the panel draws them: the ones that paint where
 // the pointer goes first, then the ones decided by two points.
 var Tools = []Tool{
 	ToolPencil, ToolBrush, ToolEraser, ToolFill, ToolPick,
-	ToolLine, ToolRect, ToolCircle, ToolGradient, ToolEdge,
+	ToolLine, ToolRect, ToolCircle, ToolGradient, ToolEdge, ToolTile,
 }
 
 func (t Tool) String() string {
@@ -62,6 +65,8 @@ func (t Tool) String() string {
 		return "Gradient"
 	case ToolEdge:
 		return "Edge"
+	case ToolTile:
+		return "Tile"
 	default:
 		return "Pencil"
 	}
@@ -110,6 +115,8 @@ func (t Tool) Shortcut() string {
 		return "N"
 	case ToolEdge:
 		return "K"
+	case ToolTile:
+		return "T"
 	default:
 		return "D"
 	}

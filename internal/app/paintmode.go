@@ -372,6 +372,23 @@ func (a *App) updatePaint(in InputFrame, vp render.Viewport) {
 		return
 	}
 
+	// The tile tool stamps cells rather than texels, and Alt means "place
+	// free of the grid" here rather than the eyedropper: a stamp is aimed by
+	// its snap, and holding the aim off is the tool's own gesture
+	// (Tile_paint.md §3).
+	if a.paint.tool == paint.ToolTile && !a.paint.awaitingLock {
+		if a.paint.tiles.stamping {
+			a.trackTileStamp(in, vp)
+			return
+		}
+		a.refreshPaintHover(in, vp)
+		a.paint.tiles.free = in.Alt
+		if in.Pressed[MouseLeft] && a.paint.hover.ok {
+			a.beginTileStamp()
+		}
+		return
+	}
+
 	// The pick pass is the only thing that knows which face is in front at the
 	// cursor, but a stroke already knows: it stays on the face it started on.
 	if a.paint.stroking {
@@ -408,6 +425,7 @@ func (a *App) updatePaint(in InputFrame, vp render.Viewport) {
 func (a *App) setPaintTool(t paint.Tool) {
 	if t != a.paint.tool {
 		a.finishStroke()
+		a.finishTileStamp()
 	}
 	a.paint.tool = t
 }
@@ -426,6 +444,9 @@ func (a *App) paintChromeFrame(in InputFrame) {
 	a.paint.hoverEdgeBody = 0
 	if a.paint.stroking && !in.Down[MouseLeft] {
 		a.finishStroke()
+	}
+	if a.paint.tiles.stamping && !in.Down[MouseLeft] {
+		a.finishTileStamp()
 	}
 }
 
@@ -723,6 +744,10 @@ func (a *App) finishStroke() {
 
 // CancelStroke reverts a live stroke, which is what Escape mid-drag does.
 func (a *App) CancelStroke() bool {
+	if a.paint.tiles.stamping {
+		a.cancelTileStamp()
+		return true
+	}
 	if !a.paint.stroking {
 		return false
 	}
@@ -831,6 +856,23 @@ func (a *App) FaceView() bool {
 
 // paintCursorOverlay is the texel cursor for this frame, or nil.
 func (a *App) paintCursorOverlay() *render.Overlay {
+	// The tile tool's cursor is the tile itself: the armed pixels, half
+	// strength, at the cell the click would fill (Tile_paint.md TP3).
+	if a.paint.tool == paint.ToolTile && !a.paint.awaitingLock {
+		h := a.paint.hover
+		if a.paint.tiles.stamping || !h.ok || h.paint == nil {
+			return nil
+		}
+		tile := a.armedTile()
+		if tile == nil {
+			return nil
+		}
+		return scene.BuildTileGhost(scene.TileGhostView{
+			Paint: h.paint,
+			Cell:  a.tileCellFor(h.texel, a.paint.tiles.free),
+			Tile:  tile,
+		})
+	}
 	if a.paint.awaitingLock {
 		// Choosing a face is not painting one. The face under the cursor already
 		// pre-highlights; a texel cursor on top of it would say the next click
@@ -888,6 +930,7 @@ var paintToolKeys = []struct {
 	{rl.KeyC, paint.ToolCircle},
 	{rl.KeyN, paint.ToolGradient},
 	{rl.KeyK, paint.ToolEdge},
+	{rl.KeyT, paint.ToolTile},
 }
 
 // handlePaintKeys is the paint-mode keyboard map: the tools, the colour swap,
@@ -938,6 +981,15 @@ func (a *App) paintHint() string {
 				plural(n, "edge", "edges"))
 		}
 		return "Click edges to draw a line along · All corners picks them for you"
+	}
+	if st.tool == paint.ToolTile {
+		if st.tiles.stamping {
+			return "Stamping · drag to lay a trail · release to finish"
+		}
+		if !a.TileReady() {
+			return "Import a tileset in the panel, then click a tile to arm it"
+		}
+		return "Click to stamp · drag for a trail · Alt places free of the grid"
 	}
 	if st.stroking {
 		return st.tool.String() + " · release to finish the stroke"

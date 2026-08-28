@@ -148,3 +148,45 @@ func traceRectDashed(o *render.Overlay, p *mesh.FacePaint, r image.Rectangle, co
 		})
 	}
 }
+
+// TileGhostView is what the tile stamp's preview needs: the face mapping, the
+// cell the stamp would land on, and the oriented tile pixels themselves.
+type TileGhostView struct {
+	Paint *mesh.FacePaint
+	Cell  image.Point
+	Tile  *image.RGBA
+}
+
+// BuildTileGhost draws the armed tile as a translucent preview at its cell —
+// the actual pixels, half-strength, with the stamp's outline over them. Seeing
+// the real pixels is the point: a rectangle would say where, this says what.
+func BuildTileGhost(v TileGhostView) *render.Overlay {
+	if v.Paint == nil || v.Paint.Texel <= 0 || v.Tile == nil {
+		return nil
+	}
+	b := v.Tile.Bounds()
+	if b.Empty() {
+		return nil
+	}
+	o := &render.Overlay{}
+	for y := 0; y < b.Dy(); y++ {
+		for x := 0; x < b.Dx(); x++ {
+			px := v.Tile.RGBAAt(b.Min.X+x, b.Min.Y+y)
+			if px.A < paint.StampAlphaThreshold {
+				continue
+			}
+			fill := px
+			fill.A = 0x8C
+			c := liftedCorners(v.Paint, v.Cell.Add(image.Point{X: x, Y: y}))
+			o.Fills = append(o.Fills,
+				render.OverlayTri{A: c[0], B: c[1], C: c[2], Color: fill},
+				render.OverlayTri{A: c[0], B: c[2], C: c[3], Color: fill})
+		}
+	}
+	outline := image.Rectangle{Min: v.Cell, Max: v.Cell.Add(image.Point{X: b.Dx(), Y: b.Dy()})}
+	traceRect(o, v.Paint, outline, ui.ColorText, 2)
+	if o.Empty() {
+		return nil
+	}
+	return o
+}

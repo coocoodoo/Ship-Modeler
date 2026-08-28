@@ -1,6 +1,7 @@
 package io
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"image/color"
@@ -285,4 +286,40 @@ func (s *Settings) AddRecentColor(c color.RGBA) {
 		}
 	}
 	s.RecentColors = out
+}
+
+// CopyIntoConfig copies a file into a subfolder of the config dir and returns
+// the copy's path. A name collision gets a numeric suffix rather than an
+// overwrite: two sheets that share a filename are not the same sheet.
+func CopyIntoConfig(sub, src string) (string, error) {
+	dir, err := SettingsDir()
+	if err != nil {
+		return "", err
+	}
+	folder := filepath.Join(dir, sub)
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return "", err
+	}
+	base := filepath.Base(src)
+	ext := filepath.Ext(base)
+	stem := strings.TrimSuffix(base, ext)
+	dst := filepath.Join(folder, base)
+	for n := 2; ; n++ {
+		prev, err := os.ReadFile(dst)
+		if os.IsNotExist(err) {
+			break
+		}
+		if err == nil && bytes.Equal(prev, data) {
+			return dst, nil // the identical copy is already there
+		}
+		dst = filepath.Join(folder, fmt.Sprintf("%s-%d%s", stem, n, ext))
+	}
+	if err := os.WriteFile(dst, data, 0o644); err != nil {
+		return "", err
+	}
+	return dst, nil
 }

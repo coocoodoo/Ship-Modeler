@@ -1,0 +1,106 @@
+[
+ {
+  "op": "file.new"
+ },
+ {
+  "op": "plane.visible",
+  "plane": "Top",
+  "visible": false
+ },
+ {
+  "op": "plane.visible",
+  "plane": "Front",
+  "visible": false
+ },
+ {
+  "op": "plane.visible",
+  "plane": "Right",
+  "visible": false
+ },
+ {
+  "op": "sketch.begin",
+  "plane": "Top"
+ },
+ {
+  "op": "sketch.rect",
+  "a": [
+   -4,
+   -3
+  ],
+  "b": [
+   4,
+   3
+  ]
+ },
+ {
+  "op": "extrude",
+  "depth": 2,
+  "result": "new"
+ },
+ {
+  "op": "settle"
+ },
+ {
+  "op": "camera.view",
+  "view": "iso"
+ },
+ {
+  "op": "camera.frame"
+ },
+ {
+  "op": "settle"
+ },
+ {
+  "op": "paint.begin"
+ },
+ {
+  "op": "paint.res",
+  "res": 8
+ },
+ {
+  "op": "tile.import",
+  "path": "testdata/tileset_test.png"
+ },
+ {
+  "op": "tile.grid",
+  "tileW": 8,
+  "tileH": 8,
+  "tileMargin": 1,
+  "tileSpacing": 1
+ },
+ {
+  "op": "tile.select",
+  "tile": 2
+ },
+ {
+  "op": "paint.tool",
+  "kind": "tile"
+ },
+ {
+  "op": "hover",
+  "at": [
+   620,
+   380
+  ]
+ },
+ {
+  "op": "dump"
+ },
+ {
+  "op": "shot",
+  "name": "tile_panel"
+ },
+ {
+  "op": "click",
+  "at": [
+   620,
+   380
+  ]
+ },
+ {
+  "op": "settle"
+ },
+ {
+  "op": "dump"
+ }
+]

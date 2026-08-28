@@ -1536,3 +1536,17 @@ The flow test rebuilds the user's model from its own feature history — the
 .pxm's feature list is the recipe — and pins the exact numbers: the ledge-end
 edge is 2 u at 8 px/u, 3 wide, so each of its two faces takes exactly 48
 texels. Before the fix the wall side took 0.
+
+**V-138 · Tile stamping shipped as Tile_paint.md TP1-TP3, with two small
+deviations from the plan.** The picker scales the whole sheet to fit a fixed
+box instead of fitting width with a wheel-scroll region — every tile stays
+clickable at once, and a scroll nobody discovers is worse than smaller tiles.
+And the panel's footer (Import .hex, the Textures eye) stays visible under
+the tile section rather than being replaced with it: the Textures toggle is
+exactly the control a person stamping wants at hand, and the .hex button
+costs a row that was already there. Everything else landed as planned:
+Tiled-convention slicing behind preset chips 8/16/32/64/Custom, D4
+orientations with flip-then-rotate order, alpha-128 stamping that never
+erases, grid snap with Alt free placement, one undo step per trail, the
+sheet-as-settings contract, and the ghost preview drawing the armed tile's
+actual pixels on the face.

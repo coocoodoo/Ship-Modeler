@@ -86,6 +86,19 @@ func AskOpenPalette(startIn string) (string, bool, error) {
 	))
 }
 
+// AskOpenTileset asks for a tileset sheet (Tile_paint.md TP3).
+func AskOpenTileset(startIn string) (string, bool, error) {
+	return ask(zenity.SelectFile(
+		zenity.Title("Import tileset"),
+		zenity.FileFilters{{
+			Name:     "Tileset image (*.png)",
+			Patterns: []string{"*.png"},
+			CaseFold: true,
+		}},
+		zenity.Filename(startIn),
+	))
+}
+
 // ask turns zenity's cancel-as-error into a plain false.
 func ask(path string, err error) (string, bool, error) {
 	if errors.Is(err, errCancelled) {
