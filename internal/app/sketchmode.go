@@ -46,7 +46,24 @@ type sketchState struct {
 	// flyoutOpen is the group whose variant list is showing, if any.
 	flyoutOpen sketch.ToolGroup
 	flyoutUp   bool
+
+	// lastClick and sinceClick recognise a double click in the viewport, which
+	// is how a line chain or a spline ends without closing (SPEC-UX §8.3).
+	// The widget kit has its own double-click tracking, but it is for widgets:
+	// a click in the viewport never reaches one.
+	lastClick  geom.Vec2i
+	hadClick   bool
+	sinceClick float64
 }
+
+// DoubleClickMillis is how long after a click a second one at the same place
+// counts as a double click.
+const DoubleClickMillis = 350
+
+// doubleClickReach is how far the second click may stray, in subunits. A hand
+// wobbles a little between two fast clicks, and the snapped positions are what
+// is being compared, so this is generous.
+const doubleClickReach = geom.SubunitsPerUnit / 2
 
 // InSketch reports whether sketch mode is active.
 func (a *App) InSketch() bool { return a.Mode == ModeSketch && a.sketch.session != nil }
@@ -274,6 +291,8 @@ func (a *App) updateSketch(in InputFrame, vp render.Viewport) {
 		return
 	}
 
+	a.sketch.sinceClick += in.DeltaMillis
+
 	raw, ok := a.cursorInSketchPlane(in, vp)
 	a.sketch.hasSnap = ok
 	if ok {
@@ -309,6 +328,8 @@ func (a *App) handleSketchKeys(in InputFrame) {
 		a.cycleToolGroup(sketch.GroupPolygon)
 	case in.KeyPressed(rl.KeyO):
 		a.cycleToolGroup(sketch.GroupSlot)
+	case in.KeyPressed(rl.KeyS):
+		a.cycleToolGroup(sketch.GroupSpline)
 	case in.KeyPressed(rl.KeyPeriod):
 		a.cycleToolGroup(sketch.GroupPoint)
 	case in.KeyPressed(rl.KeyQ):
@@ -366,9 +387,21 @@ func (a *App) handleSketchClick(in InputFrame, s *model.Sketch, sess *sketch.Ses
 	p := a.sketch.snap.Point
 
 	if sess.Tool == sketch.ToolSelect {
+		a.noteClick(p)
 		a.handleSketchSelectClick(in, s, sess, p)
 		return
 	}
+
+	// A second click in the same place ends an open run without closing it,
+	// which is what the line tool's hint has promised since M2 and what a
+	// spline needs to finish at all (SPEC-UX §8.3).
+	if a.wasDoubleClick(p) {
+		a.noteClick(p)
+		if a.finishOpenRun(s, sess) {
+			return
+		}
+	}
+	a.noteClick(p)
 
 	res := sess.Click(p)
 	if res.Rejected != "" {
@@ -453,6 +486,47 @@ func (a *App) toggleConstruction() {
 	} else {
 		a.Toast(ui.Toast{Text: "Drawing ordinary geometry again"})
 	}
+}
+
+// noteClick records a click for double-click recognition.
+func (a *App) noteClick(p geom.Vec2i) {
+	a.sketch.lastClick, a.sketch.hadClick, a.sketch.sinceClick = p, true, 0
+}
+
+// wasDoubleClick reports whether this click follows another close behind it,
+// in time and in place.
+func (a *App) wasDoubleClick(p geom.Vec2i) bool {
+	if !a.sketch.hadClick || a.sketch.sinceClick > DoubleClickMillis {
+		return false
+	}
+	d := p.Sub(a.sketch.lastClick)
+	return d.X*d.X+d.Y*d.Y <= doubleClickReach*doubleClickReach
+}
+
+// finishOpenRun ends whatever multi-click run is in progress without closing
+// it, and reports whether there was one.
+func (a *App) finishOpenRun(s *model.Sketch, sess *sketch.Session) bool {
+	switch sess.Tool {
+	case sketch.ToolLine:
+		if !sess.Drawing() {
+			return false
+		}
+		sess.FinishChain()
+		a.SetHint("Chain finished")
+		return true
+	case sketch.ToolSpline:
+		res := sess.FinishSpline()
+		if res.Rejected != "" {
+			a.Toast(ui.Toast{Text: res.Rejected, Kind: ui.ToastWarn})
+			return true
+		}
+		if ents := res.Committed(); len(ents) > 0 {
+			a.commitDrawn(s, ents)
+			return true
+		}
+		return false
+	}
+	return false
 }
 
 // SketchStrokePickPx is how close the pointer must come to a sketch line to

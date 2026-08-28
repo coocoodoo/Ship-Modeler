@@ -46,6 +46,10 @@ const (
 	ToolPolygonCirc
 	// ToolSlot draws a capsule: a track with rounded ends.
 	ToolSlot
+	// ToolSpline draws a smooth curve through the points you place.
+	ToolSpline
+	// ToolBezier draws one cubic from four control points.
+	ToolBezier
 )
 
 // AllTools lists every tool in toolbar order, which is what the group layout
@@ -55,7 +59,8 @@ func AllTools() []Tool {
 		ToolSelect, ToolLine, ToolMidLine, ToolRect, ToolCenterRect,
 		ToolAlignedRect, ToolCircle, ToolCircle3, ToolEllipse,
 		ToolArcCenter, ToolArc3, ToolArcTangent,
-		ToolPolygon, ToolPolygonCirc, ToolSlot, ToolPoint,
+		ToolPolygon, ToolPolygonCirc, ToolSlot,
+		ToolSpline, ToolBezier, ToolPoint,
 	}
 }
 
@@ -91,6 +96,10 @@ func (t Tool) String() string {
 		return "Circumscribed polygon"
 	case ToolSlot:
 		return "Slot"
+	case ToolSpline:
+		return "Spline"
+	case ToolBezier:
+		return "Bezier"
 	default:
 		return "Select"
 	}
@@ -112,6 +121,8 @@ func (t Tool) Shortcut() string {
 		return "P"
 	case ToolSlot:
 		return "O"
+	case ToolSpline, ToolBezier:
+		return "S"
 	case ToolPoint:
 		return "."
 	default:
@@ -124,7 +135,7 @@ func (t Tool) Shortcut() string {
 func (t Tool) staged() bool {
 	switch t {
 	case ToolAlignedRect, ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3,
-		ToolSlot:
+		ToolSlot, ToolSpline, ToolBezier:
 		return true
 	}
 	return false
@@ -164,6 +175,10 @@ func (t Tool) Hint() string {
 		return "Click the centre, then the middle of a flat side"
 	case ToolSlot:
 		return "Click the two ends of the track, then how wide it is"
+	case ToolSpline:
+		return "Click points for the curve to run through — click the first to close it, or double-click to finish · Esc steps back one point"
+	case ToolBezier:
+		return "Click the start, two handles, then the end"
 	default:
 		return "Click an entity to select it · Del removes the selection · Esc clears it"
 	}
@@ -179,6 +194,9 @@ type Session struct {
 	CircleSegs int
 	// Sides is how many a new polygon gets.
 	Sides int
+	// Subdivisions is how finely a new spline or bezier is tessellated, per
+	// span. Zero means the default.
+	Subdivisions int
 
 	// Selected holds the entity indices the Select tool has picked.
 	Selected []int
@@ -232,7 +250,7 @@ func (s *Session) Anchor() (geom.Vec2i, bool) { return s.anchor, s.hasAnchor }
 func (s *Session) RubberFrom() *geom.Vec2i {
 	switch s.Tool {
 	case ToolLine, ToolAlignedRect, ToolCircle3, ToolEllipse, ToolArcCenter,
-		ToolArc3, ToolSlot:
+		ToolArc3, ToolSlot, ToolSpline, ToolBezier:
 		if n := len(s.chain); n > 0 {
 			return &s.chain[n-1]
 		}
@@ -355,6 +373,10 @@ func (s *Session) Click(p geom.Vec2i) ClickResult {
 		return s.clickThreePoint(p)
 	case ToolPolygon, ToolPolygonCirc:
 		return s.clickPolygon(p)
+	case ToolSpline:
+		return s.clickSpline(p)
+	case ToolBezier:
+		return s.clickBezier(p)
 	case ToolArcTangent:
 		return s.clickTangentArc(p)
 	default:
@@ -406,6 +428,70 @@ func (s *Session) buildThreePoint(a, b, c geom.Vec2i) (model.Entity, bool) {
 		return slotThrough(a, b, c)
 	}
 	return model.Entity{}, false
+}
+
+// clickSpline collects points for a curve to run through, the way the line
+// tool collects a chain — but the whole run becomes one entity, because a
+// spline is one curve and not a series of them.
+//
+// Clicking the first point again closes the loop; FinishSpline ends it open,
+// which is what a double-click does.
+func (s *Session) clickSpline(p geom.Vec2i) ClickResult {
+	if n := len(s.chain); n >= 2 && p == s.chain[0] {
+		e := model.NewSpline(s.chain, true, s.SplineSegs())
+		s.chain = s.chain[:0]
+		if e.Degenerate() {
+			return ClickResult{Rejected: "A closed spline needs points that are not all in one place"}
+		}
+		return ClickResult{Entity: e, Commit: true, ClosedChain: true}
+	}
+	if n := len(s.chain); n > 0 && s.chain[n-1] == p {
+		return ClickResult{Rejected: "That point is already placed"}
+	}
+	s.chain = append(s.chain, p)
+	return ClickResult{}
+}
+
+// FinishSpline ends an open curve, which is what double-clicking does. A run
+// of fewer than two points is not a curve, so it simply clears.
+func (s *Session) FinishSpline() ClickResult {
+	if s.Tool != ToolSpline {
+		return ClickResult{}
+	}
+	pts := s.chain
+	if len(pts) < 2 {
+		s.chain = s.chain[:0]
+		return ClickResult{}
+	}
+	e := model.NewSpline(pts, false, s.SplineSegs())
+	s.chain = s.chain[:0]
+	if e.Degenerate() {
+		return ClickResult{Rejected: "A spline needs points that are not all in one place"}
+	}
+	return ClickResult{Entity: e, Commit: true}
+}
+
+// clickBezier takes four controls: the two ends and the two handles that pull
+// the curve between them.
+func (s *Session) clickBezier(p geom.Vec2i) ClickResult {
+	if len(s.chain) < 3 {
+		s.chain = append(s.chain, p)
+		return ClickResult{}
+	}
+	e := model.NewBezier(s.chain[0], s.chain[1], s.chain[2], p, s.SplineSegs())
+	s.chain = s.chain[:0]
+	if e.Degenerate() {
+		return ClickResult{Rejected: "A bezier needs its controls in more than one place"}
+	}
+	return ClickResult{Entity: e, Commit: true}
+}
+
+// SplineSegs is the subdivision count new curves get.
+func (s *Session) SplineSegs() int {
+	if s.Subdivisions == 0 {
+		return model.DefaultSplineSegs
+	}
+	return s.Subdivisions
 }
 
 // clickPolygon takes a centre and then a size, the second click meaning a
@@ -738,6 +824,32 @@ func (s *Session) PreviewAt(p geom.Vec2i) Preview {
 			}
 			return Preview{Kind: model.EntLine, Entities: lines, Show: true}
 		}
+	case ToolSpline:
+		if len(s.chain) == 0 {
+			return Preview{}
+		}
+		// The preview is the real curve through the points placed so far plus
+		// the cursor, so what is shown is what would land.
+		pts := append(append([]geom.Vec2i(nil), s.chain...), p)
+		closes := len(s.chain) >= 2 && p == s.chain[0]
+		e := model.NewSpline(pts, closes, s.SplineSegs())
+		if closes {
+			e = model.NewSpline(s.chain, true, s.SplineSegs())
+		}
+		return Preview{
+			Kind: model.EntSpline, Entity: e,
+			Show: !e.Degenerate(), ClosesChain: closes,
+		}
+	case ToolBezier:
+		switch len(s.chain) {
+		case 1, 2:
+			// The control cage, so the handles being placed are visible.
+			e := model.NewLine(s.chain[len(s.chain)-1], p)
+			return Preview{Kind: model.EntLine, Entity: e, Show: !e.Degenerate()}
+		case 3:
+			e := model.NewBezier(s.chain[0], s.chain[1], s.chain[2], p, s.SplineSegs())
+			return Preview{Kind: model.EntBezier, Entity: e, Show: !e.Degenerate()}
+		}
 	case ToolPolygon, ToolPolygonCirc:
 		if !s.hasAnchor {
 			return Preview{}
@@ -777,7 +889,7 @@ func (s *Session) PreviewAt(p geom.Vec2i) Preview {
 // ChainStart returns the first point of an in-progress chain, which the UI
 // rings so the user can see where to click to close (SPEC-UX §8.3).
 func (s *Session) ChainStart() (geom.Vec2i, bool) {
-	if s.Tool == ToolLine && len(s.chain) >= 2 {
+	if (s.Tool == ToolLine || s.Tool == ToolSpline) && len(s.chain) >= 2 {
 		return s.chain[0], true
 	}
 	return geom.Vec2i{}, false

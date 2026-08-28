@@ -130,6 +130,7 @@ Tools are grouped, one button per group, showing the variant last used with a ch
 - **Arc** (A) — 3 point arc · Tangent arc · Centre point arc
 - **Polygon** (P) — Inscribed · Circumscribed
 - **Slot** (O)
+- **Spline** (S) - Spline / Bezier
 - **Point** (.) — places a position to snap to; makes no segment and closes no region
 - **Construction** (Q) — a mode, not a tool: with a selection it converts those entities, with none it arms whatever is drawn next
 
@@ -142,6 +143,7 @@ Below a measured width the group labels drop and the toolbar goes icon-only rath
 - **Rectangle** = 4 line entities grouped logically (stored as Rect, exploded to segments for regions; dragging a whole rect later moves all 4).
 - **Circle** = regular N-gon (default 16 segments, editable 3–64 in the contextual card while the tool is active or for a selected circle). Radius live-snap to grid. **3 point circle** fits one through three clicks; three points in a line are refused with a reason.
 - **Arc** = part of an n-gon, spending segments at the same density a whole circle would, so a quarter arc is as smooth as a quarter circle and no smoother. Three gestures build the same entity: **centre** (centre, start, sweep), **3 point** (start, end, a point on the way), **tangent** (a loose endpoint to continue from, then the far end — without an endpoint the tool refuses rather than inventing a direction). An arc's tessellation begins and ends *exactly* on the points it was built from, which is what lets lines drawn to those points close a region with it.
+- **Spline** = a smooth curve *through* the points you click, Catmull-Rom, 8 subdivisions per span. Click the first point again to close it into a region, or double-click to finish it open. **Bezier** = one cubic from four clicks: the start, two handles, the end - pulled toward the handles without reaching them, with the cage previewed while they are placed.
 - **Polygon** = regular n-gon, 3–24 sides, set by the card's Sides row while a polygon tool is armed or a polygon is selected. **Inscribed** measures the click to a corner; **circumscribed** measures it to the middle of a flat side, the way a nut is measured. Both store the same entity — the circumscribed radius is normalized to its inscribed equivalent, so there is one kind and no variant flag to carry through saving, selection and every later tool.
 - **Slot** = a capsule: two clicks for the ends of the track, a third for how wide across. The width is measured perpendicular, so sliding the third click along the track does not change it. The rounded ends are what a router of that width would leave, 8 segments each.
 - **Ellipse** = closed n-gon on two axes: centre, long axis, then how far across. The third click is measured perpendicular to the long axis, so anywhere along a parallel line gives the same oval.

@@ -19,6 +19,7 @@ const (
 	GroupArc
 	GroupPolygon
 	GroupSlot
+	GroupSpline
 	GroupPoint
 )
 
@@ -26,7 +27,7 @@ const (
 func Groups() []ToolGroup {
 	return []ToolGroup{
 		GroupSelect, GroupLine, GroupRect, GroupCircle, GroupArc,
-		GroupPolygon, GroupSlot, GroupPoint,
+		GroupPolygon, GroupSlot, GroupSpline, GroupPoint,
 	}
 }
 
@@ -46,6 +47,8 @@ func (g ToolGroup) Tools() []Tool {
 		return []Tool{ToolPolygon, ToolPolygonCirc}
 	case GroupSlot:
 		return []Tool{ToolSlot}
+	case GroupSpline:
+		return []Tool{ToolSpline, ToolBezier}
 	case GroupPoint:
 		return []Tool{ToolPoint}
 	default:
@@ -68,6 +71,8 @@ func (g ToolGroup) Name() string {
 		return "Polygon"
 	case GroupSlot:
 		return "Slot"
+	case GroupSpline:
+		return "Spline"
 	case GroupPoint:
 		return "Point"
 	default:

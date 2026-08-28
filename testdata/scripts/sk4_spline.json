@@ -1,0 +1,26 @@
+[
+  {"op":"body.visible","body":"Hull","visible":false},
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+
+  {"op":"sketch.begin","plane":"Front"},
+
+  {"op":"sketch.spline","closed":true,"segs":8,
+   "pts":[[-9,0],[-5,2.5],[1,3],[7,1.5],[9,0],[7,-1.5],[1,-3],[-5,-2.5]]},
+
+  {"op":"sketch.bezier","segs":8,"pts":[[-9,4],[-4,7],[4,7],[9,4]]},
+  {"op":"sketch.line","from":[9,4],"to":[-9,4]},
+
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"sk4_spline"},
+
+  {"op":"extrude.begin","depth":3,"result":"new","regions":[0,1]},
+  {"op":"extrude.commit"},
+  {"op":"settle"},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"sk4_extruded"}
+]

@@ -591,3 +591,58 @@ func DrawSlotIcon(cx, cy, size float64, col color.RGBA) {
 	arcSweep(right, cy, r, -math.Pi/2, math.Pi/2, w, col)
 	arcSweep(left, cy, r, math.Pi/2, 3*math.Pi/2, w, col)
 }
+
+// DrawSplineIcon is a curve through three marked points.
+func DrawSplineIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	// An S-curve, sampled from a sine so it reads as smooth at icon size.
+	const steps = 16
+	sample := func(t float64) rl.Vector2 {
+		x := cx + (t-0.5)*h*1.8
+		y := cy - math.Sin(t*2*math.Pi)*h*0.5
+		return v2(x, y)
+	}
+	prev := sample(0)
+	for i := 1; i <= steps; i++ {
+		next := sample(float64(i) / steps)
+		line(prev, next, w, col)
+		prev = next
+	}
+	for _, t := range []float64{0, 0.5, 1} {
+		rl.DrawCircleV(sample(t), float32(h*0.18), col)
+	}
+}
+
+// DrawBezierIcon is a curve with its control cage.
+func DrawBezierIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	p0 := v2(cx-h*0.85, cy+h*0.6)
+	p1 := v2(cx-h*0.5, cy-h*0.8)
+	p2 := v2(cx+h*0.5, cy-h*0.8)
+	p3 := v2(cx+h*0.85, cy+h*0.6)
+	// The cage, faint.
+	faint := Fade(col, 0.45)
+	line(p0, p1, w, faint)
+	line(p2, p3, w, faint)
+	// The curve itself.
+	const steps = 16
+	at := func(t float64) rl.Vector2 {
+		u := 1 - t
+		a, b := float32(u*u*u), float32(3*u*u*t)
+		c, d := float32(3*u*t*t), float32(t*t*t)
+		return rl.Vector2{
+			X: a*p0.X + b*p1.X + c*p2.X + d*p3.X,
+			Y: a*p0.Y + b*p1.Y + c*p2.Y + d*p3.Y,
+		}
+	}
+	prev := at(0)
+	for i := 1; i <= steps; i++ {
+		next := at(float64(i) / steps)
+		line(prev, next, w, col)
+		prev = next
+	}
+	rl.DrawCircleV(p1, float32(h*0.16), faint)
+	rl.DrawCircleV(p2, float32(h*0.16), faint)
+}

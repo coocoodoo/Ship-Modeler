@@ -169,6 +169,10 @@ func sketchToolIcon(t sketch.Tool) ui.IconFunc {
 		return ui.DrawPolygonCircIcon
 	case sketch.ToolSlot:
 		return ui.DrawSlotIcon
+	case sketch.ToolSpline:
+		return ui.DrawSplineIcon
+	case sketch.ToolBezier:
+		return ui.DrawBezierIcon
 	case sketch.ToolPoint:
 		return ui.DrawPointToolIcon
 	default:

@@ -373,6 +373,41 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return err
 		}
 
+	case "sketch.spline":
+		if len(op.Pts) < 2 {
+			return op.Errorf("sketch.spline needs at least two points in pts")
+		}
+		segs := op.Segs
+		if segs == 0 {
+			segs = model.DefaultSplineSegs
+		}
+		through := make([]geom.Vec2i, len(op.Pts))
+		for i := range op.Pts {
+			p := op.Pts[i]
+			through[i] = vec(&p)
+		}
+		if err := r.addEntity(op, model.NewSpline(through, op.Closed, segs)); err != nil {
+			return err
+		}
+
+	case "sketch.bezier":
+		if len(op.Pts) != 4 {
+			return op.Errorf("sketch.bezier needs exactly four control points in pts")
+		}
+		segs := op.Segs
+		if segs == 0 {
+			segs = model.DefaultSplineSegs
+		}
+		var ctrl [4]geom.Vec2i
+		for i := range op.Pts {
+			p := op.Pts[i]
+			ctrl[i] = vec(&p)
+		}
+		if err := r.addEntity(op,
+			model.NewBezier(ctrl[0], ctrl[1], ctrl[2], ctrl[3], segs)); err != nil {
+			return err
+		}
+
 	case "sketch.slot":
 		if op.A == nil || op.B == nil || op.C == nil {
 			return op.Errorf("sketch.slot needs a and b (the two ends) and c (a point across the track)")

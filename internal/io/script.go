@@ -30,6 +30,10 @@ type Op struct {
 	// Indices name entities within a sketch, for the ops that convert or
 	// modify what is already drawn.
 	Indices []int `json:"indices,omitempty"`
+	// Pts is a run of sketch positions, for the curves built from a list.
+	Pts [][2]float64 `json:"pts,omitempty"`
+	// Closed joins a curve's last point back to its first.
+	Closed bool `json:"closed,omitempty"`
 	// On is a generic flag for ops that turn something on or off.
 	On *bool `json:"on,omitempty"`
 
@@ -160,6 +164,7 @@ var knownOps = map[string]bool{
 	"sketch.alignedrect": true, "sketch.construction": true,
 	"sketch.circle3": true, "sketch.arc": true, "sketch.ellipse": true,
 	"sketch.polygon": true, "sketch.slot": true,
+	"sketch.spline": true, "sketch.bezier": true,
 	"pushpull": true,
 	"extrude": true, "extrude.begin": true, "extrude.commit": true,
 	"extrude.cancel": true,

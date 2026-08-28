@@ -42,7 +42,32 @@ const (
 	EntPolygon
 	// EntSlot is a capsule: a track from centre A to centre B, W across.
 	EntSlot
+	// EntSpline is a smooth curve through the points in Pts, subdivided Segs
+	// times per span. R is 1 when the curve closes back on its start.
+	EntSpline
+	// EntBezier is one cubic: Pts holds its four control points.
+	EntBezier
 )
+
+// Spline subdivision limits (Sketch_func.md §3). The ceiling comes from
+// BenchmarkBuildLoop: a closed spline through a dozen points at 16 is under
+// 200 short segments, which the region engine builds in a fifth of a
+// millisecond.
+const (
+	MinSplineSegs     = 2
+	MaxSplineSegs     = 16
+	DefaultSplineSegs = 8
+)
+
+func clampSplineSegs(n int) int {
+	if n < MinSplineSegs {
+		return MinSplineSegs
+	}
+	if n > MaxSplineSegs {
+		return MaxSplineSegs
+	}
+	return n
+}
 
 // Polygon side-count limits (Sketch_func.md §3). The ceiling is lower than a
 // circle's because past it a polygon is a circle, and the circle tool is the
@@ -79,6 +104,10 @@ func (k EntityKind) String() string {
 		return "polygon"
 	case EntSlot:
 		return "slot"
+	case EntSpline:
+		return "spline"
+	case EntBezier:
+		return "bezier"
 	default:
 		return "line"
 	}
@@ -188,6 +217,30 @@ func NewSlot(a, b geom.Vec2i, half int64, caps int) Entity {
 	return Entity{Kind: EntSlot, A: a, B: b, W: half, Segs: caps}
 }
 
+// NewSpline builds a smooth curve through the given points. closed joins the
+// last back to the first.
+func NewSpline(through []geom.Vec2i, closed bool, segs int) Entity {
+	e := Entity{
+		Kind: EntSpline,
+		Pts:  append([]geom.Vec2i(nil), through...),
+		Segs: clampSplineSegs(segs),
+	}
+	if closed {
+		e.R = 1
+	}
+	return e
+}
+
+// NewBezier builds one cubic from its four control points: the curve runs from
+// a to d, pulled toward b and c without reaching them.
+func NewBezier(a, b, c, d geom.Vec2i, segs int) Entity {
+	return Entity{
+		Kind: EntBezier,
+		Pts:  []geom.Vec2i{a, b, c, d},
+		Segs: clampSplineSegs(segs),
+	}
+}
+
 // CCW reports an arc's sweep direction.
 func (e Entity) CCW() bool { return e.R >= 0 }
 
@@ -230,6 +283,17 @@ func (e Entity) Degenerate() bool {
 		// Both a width and two distinct centres. A slot whose centres coincide
 		// is a circle, and the circle tool draws those.
 		return e.W <= 0 || e.A == e.B
+	case EntSpline, EntBezier:
+		// Two distinct points somewhere in the list, or there is no curve.
+		if len(e.Pts) < 2 {
+			return true
+		}
+		for _, p := range e.Pts[1:] {
+			if p != e.Pts[0] {
+				return false
+			}
+		}
+		return true
 	default:
 		return e.A == e.B
 	}
@@ -270,6 +334,10 @@ func (e Entity) Points() []geom.Vec2i {
 		return e.polygonPoints()
 	case EntSlot:
 		return e.slotPoints()
+	case EntSpline:
+		return e.splinePoints()
+	case EntBezier:
+		return e.bezierPoints()
 	default:
 		return []geom.Vec2i{e.A, e.B}
 	}
@@ -322,6 +390,102 @@ func (e Entity) arcPoints() []geom.Vec2i {
 	pts[0] = e.A
 	pts[n] = e.B
 	return pts
+}
+
+// splinePoints tessellates a Catmull-Rom curve through its control points.
+//
+// Catmull-Rom rather than a B-spline because it interpolates: the curve goes
+// through the points that were clicked, which makes them snap targets and
+// makes the tool behave the way its preview looked. The ends of an open curve
+// duplicate their neighbours, which is the standard way to give the first and
+// last spans a phantom control point.
+func (e Entity) splinePoints() []geom.Vec2i {
+	src := e.Pts
+	if len(src) < 2 {
+		return append([]geom.Vec2i(nil), src...)
+	}
+	closed := e.R == 1
+	n := clampSplineSegs(e.Segs)
+
+	// at wraps for a closed curve and clamps for an open one, which is what
+	// makes the phantom endpoints work.
+	at := func(i int) geom.Vec2i {
+		if closed {
+			m := len(src)
+			return src[((i%m)+m)%m]
+		}
+		if i < 0 {
+			return src[0]
+		}
+		if i >= len(src) {
+			return src[len(src)-1]
+		}
+		return src[i]
+	}
+
+	spans := len(src) - 1
+	if closed {
+		spans = len(src)
+	}
+	out := make([]geom.Vec2i, 0, spans*n+1)
+	for i := 0; i < spans; i++ {
+		p0, p1, p2, p3 := at(i-1), at(i), at(i+1), at(i+2)
+		// The span starts exactly on its control point, every time (V-99).
+		out = append(out, p1)
+		for k := 1; k < n; k++ {
+			t := float64(k) / float64(n)
+			out = append(out, catmullRom(p0, p1, p2, p3, t))
+		}
+	}
+	if !closed {
+		out = append(out, src[len(src)-1])
+	}
+	return out
+}
+
+// catmullRom is the uniform curve through p1 and p2, shaped by its neighbours.
+func catmullRom(p0, p1, p2, p3 geom.Vec2i, t float64) geom.Vec2i {
+	t2 := t * t
+	t3 := t2 * t
+	axis := func(a, b, c, d int64) int64 {
+		v := 0.5 * (2*float64(b) +
+			(-float64(a)+float64(c))*t +
+			(2*float64(a)-5*float64(b)+4*float64(c)-float64(d))*t2 +
+			(-float64(a)+3*float64(b)-3*float64(c)+float64(d))*t3)
+		return int64(math.Round(v))
+	}
+	return geom.Vec2i{
+		X: axis(p0.X, p1.X, p2.X, p3.X),
+		Y: axis(p0.Y, p1.Y, p2.Y, p3.Y),
+	}
+}
+
+// bezierPoints tessellates one cubic.
+func (e Entity) bezierPoints() []geom.Vec2i {
+	if len(e.Pts) < 4 {
+		return append([]geom.Vec2i(nil), e.Pts...)
+	}
+	p0, p1, p2, p3 := e.Pts[0], e.Pts[1], e.Pts[2], e.Pts[3]
+	// A cubic is spent at the whole subdivision count rather than per span:
+	// there is only one span.
+	n := clampSplineSegs(e.Segs) * 2
+	out := make([]geom.Vec2i, n+1)
+	axis := func(a, b, c, d int64, t float64) int64 {
+		u := 1 - t
+		v := u*u*u*float64(a) + 3*u*u*t*float64(b) +
+			3*u*t*t*float64(c) + t*t*t*float64(d)
+		return int64(math.Round(v))
+	}
+	for i := 0; i <= n; i++ {
+		t := float64(i) / float64(n)
+		out[i] = geom.Vec2i{
+			X: axis(p0.X, p1.X, p2.X, p3.X, t),
+			Y: axis(p0.Y, p1.Y, p2.Y, p3.Y, t),
+		}
+	}
+	// The ends are the controls that were placed (V-99).
+	out[0], out[n] = p0, p3
+	return out
 }
 
 // polygonPoints walks a regular n-gon from its placed vertex.
@@ -414,8 +578,10 @@ func (e Entity) ellipsePoints() []geom.Vec2i {
 // Closed reports whether the entity's points form a loop.
 func (e Entity) Closed() bool {
 	switch e.Kind {
-	case EntLine, EntPoint, EntArc:
+	case EntLine, EntPoint, EntArc, EntBezier:
 		return false
+	case EntSpline:
+		return e.R == 1
 	default:
 		return true
 	}
@@ -491,6 +657,16 @@ func (e Entity) Translate(d geom.Vec2i) Entity {
 	e.A = e.A.Add(d)
 	e.B = e.B.Add(d)
 	e.C = e.C.Add(d)
+	e.D = e.D.Add(d)
+	if len(e.Pts) > 0 {
+		// A copy: entities are values, and translating one must not move the
+		// original's points out from under it.
+		pts := make([]geom.Vec2i, len(e.Pts))
+		for i, p := range e.Pts {
+			pts[i] = p.Add(d)
+		}
+		e.Pts = pts
+	}
 	return e
 }
 

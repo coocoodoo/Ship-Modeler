@@ -2,10 +2,49 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **SK1, SK2 and SK3 done.** Tool groups, construction
-geometry, points, line and rectangle variants, ReplaceEntities; arcs (three
-gestures), ellipses, the 3-point circle; polygons and slots. Suite green (15 packages), exe
-rebuilt. **Next: SK4 — splines and beziers.**
+**Current state:** **SK1-SK4 done.** Tool groups, construction geometry,
+points, line and rectangle variants, ReplaceEntities; arcs (three gestures),
+ellipses, the 3-point circle; polygons and slots; splines and beziers.
+Sixteen sketch tools in eight groups. Suite green (15 packages), exe
+rebuilt. **Next: SK5 — the modify tools (fillet, offset, mirror, patterns, project).**
+
+---
+
+## 2026-08-27 (SK4) — Splines and beziers
+
+**Measured first.** §6 named the region engine as this milestone's risk and
+said to benchmark before building. `BenchmarkBuildLoop`: 1024 short segments
+in a single closed loop build in **0.57 ms**, scaling about n^1.4 rather than
+n². A realistic spline is ~96 segments — 0.045 ms, once per edit. The risk
+does not materialize (V-109); the benchmark stays.
+
+**Shipped.** `EntSpline` (Catmull-Rom through the clicked points) and
+`EntBezier` (one cubic, handles previewed as a cage), a Spline group on `S`,
+and the double-click that ends an open run.
+
+**The acceptance.** A closed spline hull and a bezier canopy, extruded 3 deep.
+The test does not record the volume — it samples both curves from their
+textbook definitions two hundred times more finely than the program draws
+them, and asserts the program's coarser tessellation comes in slightly under
+that and never over. A spline that interpolated the wrong control points, or a
+bezier that read its handles in the wrong order, would still close into
+something plausible; only a number from the definition catches it.
+
+**A seven-milestone-old broken promise.** SPEC-UX §8.3 has said "double-click
+to finish" for the line chain since M2. The hint bar says it. `FinishChain`
+was written for it. Nothing ever called it (V-110). The spline needed the same
+gesture, so it is wired now — for both.
+
+**Deferred, and honestly.** SK4's third item was dragging a spline's control
+points, "extending the existing endpoint-drag machinery in §8.5". That
+machinery does not exist: `MoveEntities` is a command nothing calls, and
+sketch mode has no drag path at all. Building it is a feature in its own
+right — and one that would give *every* entity the dragging §8.5 has promised
+since M2, not just curves. Left as its own piece of work rather than
+half-built here (V-111).
+
+**Next:** SK5 — the modify tools. It is the largest milestone, and every one
+of its tools is a `ReplaceEntities` production over a selection.
 
 ---
 

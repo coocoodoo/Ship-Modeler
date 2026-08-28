@@ -1028,3 +1028,41 @@ segment control and the resolution to spend. The card's Sides row offers
 row only appears while a polygon tool is armed or a polygon is selected,
 because a card full of controls for tools you are not holding is a card nobody
 reads.
+
+**V-108 · Splines interpolate; beziers approximate. Both were wanted.**
+Catmull-Rom for the spline because it passes *through* the points that were
+clicked: they stay snap targets, the preview is the curve, and there is
+nothing to explain. The bezier keeps its handles because that is the control a
+bezier is for — pull the curve without moving where it starts. Two tools in
+one group rather than one compromise.
+
+**V-109 · The region engine was measured before the spline UI was built.**
+Sketch_func.md §6 named "region engine chokes on many short segments" as this
+milestone's first risk and required a benchmark first. BenchmarkBuildLoop
+builds one closed loop of n short segments: 64 → 0.040 ms, 256 → 0.092 ms,
+512 → 0.207 ms, 1024 → 0.571 ms. That is roughly n^1.4, not n², and a
+realistic closed spline through a dozen points at the default 8 subdivisions
+is about 96 segments — 0.045 ms, paid once per edit because the arrangement is
+cached. The risk does not materialize; the 2..16 clamp keeps even a
+pathological curve under a millisecond. The benchmark stays.
+
+**V-110 · Double-click to finish was specced in M2 and never wired.** SPEC-UX
+§8.3 has promised "double-click to finish" for the line chain since M2, the
+hint bar says it, and Session.FinishChain was written for it — but nothing in
+the app ever called it, so the promise had been false for seven milestones.
+The spline needs the same gesture to end an open curve, so SK4 wired it for
+both: a click within 350 ms and half a unit of the last one finishes the run.
+The widget kit's own double-click tracking is for widgets, and a click in the
+viewport never reaches one, so this is tracked in sketch state.
+
+**V-111 · Control-point editing is deferred, because the machinery it was to
+extend does not exist.** Sketch_func.md §5 SK4 item 3 says to drag a spline's
+points by extending "the existing endpoint-drag machinery in §8.5". SPEC-UX
+§8.5 does describe dragging entities and endpoints — and it was never built:
+MoveEntities exists as a command with nothing calling it, and sketch mode has
+no drag path at all. Building it is a real feature (handle hit-testing, drag
+state, a live command through the bus, snapping), not an extension, and it
+would deliver the missing §8.5 behaviour for every entity rather than only for
+curves. Deferred as its own piece of work rather than half-built here; a
+spline's shape is still fully editable by undoing and redrawing, which is what
+every other tool offers today.
