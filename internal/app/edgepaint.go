@@ -23,9 +23,14 @@ import (
 // colour and the thickness already live, and because the answer to "what does
 // clicking do" has to stay one thing per tool (SPEC-UX §1).
 
-// EdgeWidths are the band thicknesses the panel offers, in texels on each
-// face. One is a hairline panel seam; four is a painted stripe.
-var EdgeWidths = []int{1, 2, 3, 4, 6}
+// The band's width runs from one texel — the thinnest a face can draw — up to
+// a stripe. A slider rather than chips because the useful value depends on the
+// model's resolution and the look wanted, and a range asks to be swept rather
+// than chosen from a list (the user's request, 2026-08-27).
+const (
+	MinEdgeWidth = 1
+	MaxEdgeWidth = 16
+)
 
 // edgeRef names one edge of one body, which is what the tool collects.
 type edgeRef struct {
@@ -127,6 +132,7 @@ func (a *App) PaintSelectedEdges() bool {
 	}
 
 	painted := 0
+	widest := 0.0
 	for _, id := range order {
 		cmd := &paint.StrokeEdges{
 			Body:  id,
@@ -139,18 +145,57 @@ func (a *App) PaintSelectedEdges() bool {
 			return false
 		}
 		painted += len(byBody[id])
+		if _, hi := cmd.WorldWidth(); hi > widest {
+			widest = hi
+		}
 	}
 
 	a.paint.recents.Add(a.paint.color)
 	a.paint.edges = a.paint.edges[:0]
-	a.Toast(ui.Toast{
-		Text: fmt.Sprintf("Painted %s, %s wide",
-			plural(painted, "edge", "edges"),
-			plural(a.paint.edgeWidth, "texel", "texels")),
-		Action:   "Undo",
-		OnAction: func() { a.Undo() },
-	})
+	// The real size is worth saying out loud: the same number of pixels is a
+	// different thickness on faces of different resolutions, and "one pixel is
+	// still fat" is answered by that number rather than by the tool.
+	text := fmt.Sprintf("Painted %s, %s wide",
+		plural(painted, "edge", "edges"), plural(a.paint.edgeWidth, "pixel", "pixels"))
+	if widest > 0 {
+		text += fmt.Sprintf(" (%.3g u)", widest)
+	}
+	a.Toast(ui.Toast{Text: text, Action: "Undo", OnAction: func() { a.Undo() }})
 	return true
+}
+
+// edgeTexelSize is how much world one texel covers on the faces under the
+// picked edges: the smallest and largest, since faces differ.
+//
+// It is what the panel shows beside the width slider, so the thickness on
+// screen is explained before it is painted rather than after.
+func (a *App) edgeTexelSize() (lo, hi float64, ok bool) {
+	for _, ref := range a.paint.edges {
+		b := a.Doc().BodyByID(ref.body)
+		if b == nil || b.Mesh == nil {
+			continue
+		}
+		for _, fi := range paint.FacesOfEdge(b.Mesh, ref.edge) {
+			t := 0.0
+			if p := b.Mesh.Faces[fi].Paint; p != nil {
+				t = p.Texel
+			} else if p, err := paint.Allocate(b.Mesh, fi, a.paint.res); err == nil {
+				// The face has no picture yet, so report the one it would get.
+				t = p.Texel
+			}
+			if t <= 0 {
+				continue
+			}
+			if !ok || t < lo {
+				lo = t
+			}
+			if !ok || t > hi {
+				hi = t
+			}
+			ok = true
+		}
+	}
+	return lo, hi, ok
 }
 
 // SelectBodyCreases takes every sharp edge of the bodies already involved, or
@@ -242,24 +287,34 @@ func (a *App) buildEdgeSection(row func(float32) rl.Rectangle, space func(float6
 
 	a.UI.Text(row(line), "Edge line", ui.FontSizeSmall, ui.ColorTextDim)
 
-	// Width chips, in texels on each face.
-	labels := make([]string, len(EdgeWidths))
-	sel := 0
-	for i, w := range EdgeWidths {
-		labels[i] = itoa(w)
-		if w == st.edgeWidth {
-			sel = i
+	// The width, in pixels, on a slider. Beside it, what that comes to in real
+	// size on the faces involved — because the same pixel count is a different
+	// thickness on faces of different resolutions, and that is the answer to
+	// "one pixel is still too fat" (V-126).
+	head := row(line)
+	sizeNote, headLabel := ui.SplitRight(head, a.px(120))
+	a.UI.Text(headLabel, "Width", ui.FontSizeSmall, ui.ColorTextDim)
+	if lo, hi, ok := a.edgeTexelSize(); ok {
+		text := fmt.Sprintf("%d px = %.3g u", st.edgeWidth, lo*float64(st.edgeWidth))
+		if hi > lo*1.01 {
+			text = fmt.Sprintf("%d px = %.3g–%.3g u",
+				st.edgeWidth, lo*float64(st.edgeWidth), hi*float64(st.edgeWidth))
 		}
+		a.UI.Text(sizeNote, text, ui.FontSizeSmall, ui.Fade(ui.ColorTextDim, 0.9))
 	}
-	if pick, changed := a.UI.ChipGroup(ui.MakeID("paint.edgewidth"), row(a.px(24)),
-		labels, sel, ui.ChipGroupOpts{
-			Tooltip: "How thick the line is, in texels on each face",
+
+	r := row(a.px(24))
+	valueBox, sliderBox := ui.SplitRight(r, a.px(44))
+	if v, changed := a.UI.Slider(ui.MakeID("paint.edgewidth"), sliderBox,
+		float64(st.edgeWidth), MinEdgeWidth, MaxEdgeWidth, ui.ButtonOpts{
+			Tooltip: "How many pixels wide the line is, on each face that meets the edge",
 		}); changed {
-		st.edgeWidth = EdgeWidths[pick]
+		st.edgeWidth = clampInt(int(v+0.5), MinEdgeWidth, MaxEdgeWidth)
 	}
+	a.UI.Text(valueBox, fmt.Sprintf("%d px", st.edgeWidth), ui.FontSizeUI, ui.ColorText)
 	space(6)
 
-	r := row(a.px(26))
+	r = row(a.px(26))
 	allBox, paintBox := ui.SplitLeft(r, r.Width*0.42)
 	paintBox.X += a.px(6)
 	paintBox.Width -= a.px(6)
@@ -283,4 +338,15 @@ func (a *App) buildEdgeSection(row func(float32) rl.Rectangle, space func(float6
 	}) {
 		a.PaintSelectedEdges()
 	}
+}
+
+// clampInt keeps a value inside a range.
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }

@@ -31,8 +31,12 @@ func TestPaintingEveryEdgeOfABox(t *testing.T) {
 	if !hasToast(after.toasts, "Picked 12 edges") {
 		t.Errorf("the crease pick did not find a box's 12 edges:\n%q", after.toasts)
 	}
-	// One press, one report, and the report says what it did.
-	if !hasToast(after.toasts, "Painted 12 edges, 2 texels wide") {
-		t.Errorf("the bake did not report what it did:\n%q", after.toasts)
+	// One press, one report, and the report says what it did — including what
+	// the chosen pixel count came to in real size. That number is the answer to
+	// "one pixel is still too thick": the face's resolution decides how big a
+	// pixel is, and the tool cannot draw a finer one (V-126).
+	if !hasToast(after.toasts, "Painted 12 edges, 2 pixels wide (0.75 u)") {
+		t.Errorf("the bake did not report its width in pixels and in units:\n%q",
+			after.toasts)
 	}
 }

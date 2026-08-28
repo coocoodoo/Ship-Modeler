@@ -67,10 +67,14 @@ sides of the cut is still exactly where it was.
 
 The **Edge tool** (`K`) paints a band along edges you pick — panel seams,
 plating lines, an outlined hull. **All corners** takes every sharp edge of a
-body at once. The band is laid inside each face and meets its other half at the
-corner, so it reads as one line rather than two that nearly line up. It is
-baked into the faces own pictures, so it saves, exports and can be painted
-over like anything else you drew.
+body at once. The width slider is in pixels, 1 to 16, on each face the edge
+touches; the panel shows what that comes to in units beside it, because a pixel
+is a different size on faces of different resolutions — one pixel is the
+thinnest a face can draw, and if it is still too thick the answer is a higher
+Res for that face. The band is laid inside each face and meets its other half at
+the corner, so it reads as one line rather than two that nearly line up, and it
+is baked into the faces own pictures: it saves, exports and can be painted over
+like anything else you drew.
 
 The **dither modes** (2×2, 4×4, 8×8 Bayer) are how a gradient or a soft brush
 gets a middle without leaving the palette: the shading is spent on how many

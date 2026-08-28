@@ -20,8 +20,15 @@ import (
 // lands in its own texels (Texel). This is the arithmetic that puts the band
 // on the face rather than across the boundary.
 
-// EdgeBand paints a stripe of the brush's width along an edge, on one face,
-// and returns the texel rectangle it wrote.
+// EdgeBand paints a stripe of the brush's width in texels along an edge, on
+// one face, and returns the texel rectangle it wrote.
+//
+// The width is in texels because this is a pixel-art tool: a line one texel
+// wide is the crispest a face can draw, and "how many pixels" is the question
+// someone drawing panel seams is actually asking. It does mean the band is a
+// different *physical* thickness on faces with different texel densities —
+// a face's texel is its longest side over its resolution — which is the same
+// thing every brush stroke in the program already does (V-126).
 //
 // The band is laid *inside* the face rather than centred on the edge. An edge
 // is the boundary between two faces, so a brush centred on it spends half its
@@ -37,6 +44,7 @@ func EdgeBand(m *mesh.Mesh, fi int, p *mesh.FacePaint, b Brush, worldA, worldB g
 	if size < 1 {
 		size = 1
 	}
+	b.Size = size
 	ta, tb := edgeBandLine(m, fi, p, size, worldA, worldB)
 
 	// Nothing may land off the face: the margin around a face's picture exists

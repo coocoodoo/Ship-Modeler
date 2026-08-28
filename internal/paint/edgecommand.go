@@ -26,7 +26,7 @@ type StrokeEdges struct {
 	// Edges index into the body mesh's topology.
 	Edges []int
 	Color color.RGBA
-	// Size is the band's width in texels, on each face.
+	// Size is the band's width in texels, on each face that meets the edge.
 	Size int
 	// Res is the resolution a face is given if it has no picture yet.
 	Res int
@@ -36,6 +36,40 @@ type StrokeEdges struct {
 	// allocated is true when any face was given its first picture, which means
 	// the body's UVs changed and its render form has to be rebuilt.
 	allocated bool
+	// texels records how wide one texel was on each face it wrote, so the app
+	// can say what the chosen number of pixels came to in real size.
+	texels []float64
+}
+
+// DefaultEdgeWidth is how many texels a fresh session paints: one, the
+// thinnest a face can draw, because a panel seam is what this is usually for.
+const DefaultEdgeWidth = 1
+
+// WorldWidth is the thinnest and thickest the band actually came out, in world
+// units, across the faces it touched.
+//
+// A texel is a face's longest side over its resolution, so the same number of
+// pixels is a different real thickness on a big face than on a small one. The
+// app shows this so "why is one pixel still fat" has an answer on screen: the
+// face's resolution, not the tool.
+func (c *StrokeEdges) WorldWidth() (lo, hi float64) {
+	for _, t := range c.texels {
+		w := t * float64(maxInt(c.Size, 1))
+		if lo == 0 || w < lo {
+			lo = w
+		}
+		if w > hi {
+			hi = w
+		}
+	}
+	return lo, hi
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // edgeFacePaint is one face's share of the command, and what undo needs to put
@@ -134,9 +168,10 @@ func (c *StrokeEdges) Do(doc *model.Document) error {
 
 	size := c.Size
 	if size < 1 {
-		size = 1
+		size = DefaultEdgeWidth
 	}
 	brush := Brush{Color: c.Color, Size: size, Under: b.Color}
+	c.texels = c.texels[:0]
 
 	var touched []edgeFacePaint
 	anyAllocated := false
@@ -187,6 +222,7 @@ func (c *StrokeEdges) Do(doc *model.Document) error {
 			uid: m.Faces[fi].ID, paint: p, allocated: fresh,
 			rect: wrote, before: before, after: after,
 		})
+		c.texels = append(c.texels, p.Texel)
 	}
 	if len(touched) == 0 {
 		return fmt.Errorf("that changed nothing — the edges are already this colour")

@@ -141,7 +141,8 @@ type paintState struct {
 	edges         []edgeRef
 	hoverEdge     int
 	hoverEdgeBody uint32
-	edgeWidth     int
+	// edgeWidth is the band's thickness in texels, on each face (V-126).
+	edgeWidth int
 }
 
 // paintHover is the face and texel under the pointer.
@@ -176,7 +177,7 @@ func (a *App) initPaint() {
 	// The far end of a ramp defaults to the palette's near-black, so a gradient
 	// straight out of the box fades into shadow rather than into nothing.
 	a.paint.colorB = paint.DefaultPalette()[0]
-	a.paint.edgeWidth = 2
+	a.paint.edgeWidth = paint.DefaultEdgeWidth
 	a.paint.hoverEdge = -1
 	a.paint.custom = append([]color.RGBA(nil), a.Settings.CustomPalette...)
 	a.paint.recents.Set(a.Settings.RecentColors)

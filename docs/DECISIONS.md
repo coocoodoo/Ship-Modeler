@@ -1222,3 +1222,32 @@ that lands on nothing. This tool wants exactly the opposite, so it says so —
 `PickFacesOnly` is now "in paint mode, except the edge tool". One tool, one
 answer to what a click does (SPEC-UX §1); the flag stays honest instead of
 becoming a general escape hatch.
+
+**V-126 · The edge band is measured in pixels, on a slider, and the panel says
+what that comes to in units.** The first cut offered chips of 1–6 texels, and
+the report was "way thick even at 1". Two things were behind it, and only one
+was a mistake.
+
+The mistake was the control: a handful of chips for a value whose useful
+setting depends on the model's size and the look wanted. It is a slider now,
+1–16 pixels.
+
+The other thing is not a mistake and cannot be fixed by the tool. A texel is a
+face's longest side over its resolution, so one pixel on a 12-unit face at
+res 32 is 0.375 units and on an 8-unit face it is 0.25 — and on a big hull it
+is bigger still. One pixel is the thinnest line a face can draw; if that is too
+thick the answer is a higher resolution for that face, not a smaller number.
+Measuring the band in world units instead was tried and rejected: this is a
+pixel-art tool, every brush stroke already works in the face's own texels, and
+"how many pixels" is the question someone drawing panel seams is actually
+asking.
+
+So the program says it out loud instead. The panel shows the live conversion
+beside the slider — "3 px = 0.75–1.12 u", a range when the faces differ — and
+the toast repeats it after the bake. The number that explains the thickness is
+the one on screen before you press the button.
+
+**V-127 · The brush's Size row is hidden while the edge tool is armed.** It has
+its own width; the brush square does nothing for it. A control that does
+nothing is worse than an absent one, and the panel already hides the dither and
+fill rows on the same principle.

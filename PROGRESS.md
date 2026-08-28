@@ -9,6 +9,36 @@ rebuilt. **Next: SK6 (image underlay) needs your go-ahead per the plan.**
 
 ---
 
+## 2026-08-27 (fix) — The edge line's width control
+
+"Why is my edge line crappy compared to yours? My edge paint is way thick even
+at 1."
+
+Measured before changing anything: at size 1 the band is exactly one texel, so
+there was no width bug. What there was: a texel is a face's longest side over
+its resolution, so on the test box one pixel is **0.375 units on four faces and
+0.250 on two** — and on a bigger model every pixel is bigger. One pixel is the
+thinnest line a face can draw, and if that is too thick the answer is the
+face's resolution.
+
+**Two changes.** The control is a slider now, 1–16 pixels, which is what was
+asked for and the right shape for a value whose useful setting depends on the
+model. And the program says what the number means: the panel shows the live
+conversion beside the slider — "3 px = 0.75–1.12 u", a range when the faces
+differ — and the toast repeats it after the bake (V-126).
+
+**A road not taken.** I started converting the width to world units so both
+halves of an edge line would match physically, and stopped: this is a pixel-art
+tool, every brush stroke already works in the face's own texels, and "how many
+pixels" is the question someone drawing panel seams is asking. The mismatch is
+inherent to per-face texel grids, and the honest answer is to show it rather
+than to hide it behind a unit conversion.
+
+Also: the brush's Size row is hidden while the edge tool is armed — it has its
+own width and the brush square does nothing for it (V-127).
+
+---
+
 ## 2026-08-27 (feature) — Edge lines
 
 "I want a way to paint on edges that I like to select and bake it to the model

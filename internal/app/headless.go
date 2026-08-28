@@ -1295,9 +1295,9 @@ func (r *ScriptRunner) paintOp(op io.Op) error {
 
 	case "paint.edgewidth":
 		if op.Size <= 0 {
-			return op.Errorf("paint.edgewidth needs a positive size")
+			return op.Errorf("paint.edgewidth needs a positive width in pixels")
 		}
-		a.paint.edgeWidth = op.Size
+		a.paint.edgeWidth = clampInt(op.Size, MinEdgeWidth, MaxEdgeWidth)
 
 	case "paint.creases":
 		// Every sharp edge of the named body, or of everything visible.

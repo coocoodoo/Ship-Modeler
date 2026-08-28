@@ -48,15 +48,20 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	// resolution mean nothing to it, and a panel offering them would be a
 	// panel mostly full of things that do not apply.
 	showEdges := st.tool == paint.ToolEdge
+	// The brush's square is meaningless to the edge tool, which has its own
+	// width. A control that does nothing is worse than an absent one.
+	showSize := !showEdges
 
 	h := a.px(38) + // title
 		line + a.px(26)*2 + a.px(4) + a.px(6) + // two rows of tools
-		line + a.px(24) + a.px(6) + // size
 		line + a.px(24) + a.px(8) + // res
 		line + float32(paintPaletteRows)*(swatch+gap) + a.px(6) + // palette
 		line + swatch + a.px(8) + // recents
 		a.px(26) + a.px(6) + // current colour + custom
 		a.px(26) + a.px(4) // import + textures
+	if showSize {
+		h += line + a.px(24) + a.px(6)
+	}
 	if len(st.custom) > 0 {
 		h += a.px(24) + a.px(4)
 	}
@@ -80,6 +85,7 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 		h += a.px(24) + a.px(6)
 	}
 	if showEdges {
+		// Header, the width slider, then the two buttons.
 		h += line + a.px(24) + a.px(6) + a.px(26) + a.px(6)
 	}
 
@@ -115,22 +121,24 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	a.paintToolRow(row(a.px(26)), paintShapeTools())
 	space(6)
 
-	a.UI.Text(row(line), "Size", ui.FontSizeSmall, ui.ColorTextDim)
-	sizeLabels := make([]string, len(paint.BrushSizes))
-	sizeSel := 0
-	for i, s := range paint.BrushSizes {
-		sizeLabels[i] = itoa(s)
-		if s == st.size {
-			sizeSel = i
+	if showSize {
+		a.UI.Text(row(line), "Size", ui.FontSizeSmall, ui.ColorTextDim)
+		sizeLabels := make([]string, len(paint.BrushSizes))
+		sizeSel := 0
+		for i, s := range paint.BrushSizes {
+			sizeLabels[i] = itoa(s)
+			if s == st.size {
+				sizeSel = i
+			}
 		}
+		if pick, changed := a.UI.ChipGroup(ui.MakeID("paint.size"), row(a.px(24)),
+			sizeLabels, sizeSel, ui.ChipGroupOpts{
+				Tooltip: "Brush square, in texels",
+			}); changed {
+			st.size = paint.BrushSizes[pick]
+		}
+		space(6)
 	}
-	if pick, changed := a.UI.ChipGroup(ui.MakeID("paint.size"), row(a.px(24)),
-		sizeLabels, sizeSel, ui.ChipGroupOpts{
-			Tooltip: "Brush square, in texels",
-		}); changed {
-		st.size = paint.BrushSizes[pick]
-	}
-	space(6)
 
 	if showFill {
 		if a.UI.Toggle(ui.MakeID("paint.fillshape"), row(a.px(24)), "Fill the shape",
