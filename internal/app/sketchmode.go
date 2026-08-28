@@ -46,6 +46,8 @@ type sketchState struct {
 	// flyoutOpen is the group whose variant list is showing, if any.
 	flyoutOpen sketch.ToolGroup
 	flyoutUp   bool
+	// modify is the card section that acts on a selection (SK5).
+	modify modifyState
 
 	// lastClick and sinceClick recognise a double click in the viewport, which
 	// is how a line chain or a spline ends without closing (SPEC-UX §8.3).
@@ -106,6 +108,7 @@ func (a *App) enterSketch(s *model.Sketch) {
 	a.sketch.groupPick = map[sketch.ToolGroup]sketch.Tool{}
 	a.sketch.construction = false
 	a.sketch.flyoutUp = false
+	a.sketch.modify.init()
 	a.sketch.hoverRegion = -1
 	a.sketch.returnCamera = a.targetCamera()
 	a.sketch.awaitingPlane = false

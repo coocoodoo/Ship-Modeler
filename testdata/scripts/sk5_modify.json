@@ -1,0 +1,34 @@
+[
+  {"op":"body.visible","body":"Hull","visible":false},
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+
+  {"op":"sketch.begin","plane":"Front"},
+  {"op":"sketch.rect","a":[-9,-5],"b":[9,5]},
+  {"op":"extrude.begin","depth":2,"result":"new","regions":[0]},
+  {"op":"extrude.commit"},
+  {"op":"settle"},
+
+  {"op":"sketch.begin","plane":"Front"},
+  {"op":"sketch.circle","c":[-6,2],"r":0.75,"segs":16},
+  {"op":"sketch.pattern","indices":[0],"kind":"linear","segs":4,"delta":[3,0,0]},
+  {"op":"sketch.select","indices":[0,1,2,3]},
+  {"op":"sketch.mirror","axis":"horizontal"},
+
+  {"op":"sketch.line","from":[-4,-4],"to":[4,-4]},
+  {"op":"sketch.line","from":[4,-4],"to":[4,-1]},
+  {"op":"sketch.fillet","indices":[8,9],"r":1},
+
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"sk5_modify"},
+
+  {"op":"extrude.begin","depth":4,"dir":"symmetric","result":"subtract","regions":[0,1,2,3,4,5,6,7]},
+  {"op":"extrude.commit"},
+  {"op":"settle"},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"sk5_cut"}
+]

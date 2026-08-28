@@ -694,6 +694,12 @@ func (a *App) buildSketchCard(viewport rl.Rectangle) {
 	onFace, faceGone := a.faceSketchState(s)
 	w := a.px(232)
 	h := a.px(198)
+	// The modify section only exists when there is something to modify, and it
+	// is tall, so the card is measured with and without it.
+	showModify := sess.Tool == sketch.ToolSelect && len(sess.Selected) > 0
+	if showModify {
+		h += a.modifyCardHeight(a.UI.Fonts.LineHeight(ui.FontSizeUI) + a.px(2))
+	}
 	if s.Consumed {
 		h += a.px(44)
 	}
@@ -826,6 +832,17 @@ func (a *App) buildSketchCard(viewport rl.Rectangle) {
 		}) {
 			a.ProjectFaceOutline()
 		}
+	}
+
+	if showModify {
+		a.buildModifySection(func(h float32) rl.Rectangle {
+			var r rl.Rectangle
+			r, body = ui.SplitTop(body, h)
+			return r
+		}, func(v float64) {
+			body.Y += a.px(v)
+			body.Height -= a.px(v)
+		}, line)
 	}
 
 	// Re-editing a consumed sketch says so, rather than pretending the bodies

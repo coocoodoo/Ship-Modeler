@@ -160,6 +160,14 @@ After every change the region engine (GEOM §4) recomputes:
 - **Closed regions fill** with accentSoft; hovering a region raises fill to 30% + outline; regions are click-selectable (for extrude).
 - **Open endpoints** (degree-1 nodes) render as 5 px **error-red rings**; contextual card shows "2 open ends" (clicking that message zooms to the nearest one). Extrude button disabled while selected regions is empty; tooltip explains: *"Select a closed region — close the red endpoints first"*.
 
+### 8.10 Modifying what is drawn (SK5)
+With the Select tool and a selection, the sketch card grows a **Modify** section. Each control acts on the selection and lands as one undo step; a button that does not apply is disabled with the reason rather than hidden, so the rows never move under the pointer.
+
+- **Fillet** / **Chamfer** — select the two lines that meet at a corner, set a radius, press. A fillet is always the *minor* arc between its tangent points. A radius that does not fit is refused with the size that would.
+- **Offset** — select one closed shape and give a distance, outward positive. Corners are mitred; an offset that would turn the shape inside out is refused rather than emitting a bowtie. The result is a closed spline, because a mitred offset of a polygon is no longer a regular polygon.
+- **Mirror** — reflects the selection about the sketch's Vertical or Horizontal axis, *copying* rather than moving. This copies entities; live model symmetry is a separate mode.
+- **Pattern** — Linear takes a count and a step; Circular takes a count and a sweep about the sketch origin. The count includes the original.
+
 ### 8.9 Construction geometry
 `Q` marks entities as guides: things to snap to and measure against that are deliberately not part of the shape. Construction entities draw dashed and dimmed, are skipped when the sketch expands to segments — so they never close a region and never ring as an open end — and are still drawn, snapped to and selectable. With a selection, `Q` converts it (all-to-construction if any of it is still geometry, else back); with nothing selected, `Q` arms the mode so everything drawn next is a guide.
 

@@ -1066,3 +1066,46 @@ would deliver the missing §8.5 behaviour for every entity rather than only for
 curves. Deferred as its own piece of work rather than half-built here; a
 spline's shape is still fully editable by undoing and redrawing, which is what
 every other tool offers today.
+
+**V-112 · The modify tools are a card, not four new pointer modes.** Fillet,
+offset, mirror and the patterns all act on a selection and all need a number.
+Inventing four click gestures to collect numbers a card can hold would be four
+more things to learn for nothing — Onshape uses dialogs for these too. Select,
+set, press. It is also what makes every one of them scriptable through the
+same function the button calls, so a scripted fillet and a clicked one are the
+same fillet.
+
+**V-113 · A fillet is the minor arc, and taking the long way closes a region
+that was never drawn.** Deriving the arc's winding from the cross product of
+the two legs picks the 270° sweep for half of the four corner orientations.
+That is not merely ugly: the long arc crosses its own legs, and the region
+engine correctly finds a closed loop in the result — so a plain L, which has no
+inside, becomes an extrudable shape. Found by the SK5 script reporting nine
+regions where eight circles were drawn. The winding now comes from the sweep
+between the tangent points, and `TestFilletTakesTheShortWayRound` checks all
+four orientations plus the one that caught it.
+
+**V-114 · An offset returns a closed spline, not the kind it started from.**
+Offsetting a circle gives a circle, but offsetting a polygon with mitred
+corners does not give a regular polygon, and storing one would mean an entity
+that redraws itself as the wrong shape. The result is a closed spline at
+minimum subdivision — every span a straight run, which is exactly what a
+mitred offset is: corners joined by straight edges.
+
+**V-115 · Mirror offers the sketch's own two axes, not an arbitrary line.**
+The gesture Onshape uses is "pick a line to mirror about", which needs a new
+pointer mode and a line already drawn in the right place. What a symmetrical
+hull actually needs is the sketch's centreline, so the card offers Vertical and
+Horizontal, and the entities are copied rather than moved. The card says out
+loud that this copies entities and that live model symmetry is a separate mode
+(PLAN M10 item 1), because the two are easy to confuse.
+
+**V-116 · Transform and general Use/Project are not in SK5.** Sketch_func.md
+listed six modify tools; four shipped whole, and these two did not. A transform
+card that moves, rotates and scales a selection numerically is buildable, but
+what makes transform worth having is dragging — and that is V-111's missing
+§8.5 machinery again. General Use/Project needs to pick a face of a body from
+inside sketch mode, which is a new pointer mode against geometry the sketch
+overlay currently hides; the face-sketch case it exists for already has
+`ProjectFaceOutline` on the card since M5. Both left as their own work rather
+than half-built.

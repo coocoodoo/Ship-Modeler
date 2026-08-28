@@ -436,6 +436,91 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return err
 		}
 
+	case "sketch.select":
+		// The modify ops all act on a selection, so a script needs a way to
+		// make one. Indices into the sketch, which is what the tools use.
+		if !a.InSketch() {
+			return op.Errorf("no sketch is being edited")
+		}
+		sk := a.ActiveSketch()
+		for _, i := range op.Indices {
+			if i < 0 || i >= len(sk.Entities) {
+				return op.Errorf("no entity %d in that sketch", i)
+			}
+		}
+		a.sketch.session.Selected = append([]int(nil), op.Indices...)
+
+	case "sketch.fillet":
+		if err := r.selectFor(op); err != nil {
+			return err
+		}
+		if !a.FilletSelection(op.R) {
+			return op.Errorf("the fillet was refused")
+		}
+
+	case "sketch.chamfer":
+		if err := r.selectFor(op); err != nil {
+			return err
+		}
+		if !a.ChamferSelection(op.R) {
+			return op.Errorf("the chamfer was refused")
+		}
+
+	case "sketch.offset":
+		if err := r.selectFor(op); err != nil {
+			return err
+		}
+		if !a.OffsetSelection(op.Depth) {
+			return op.Errorf("the offset was refused")
+		}
+
+	case "sketch.mirror":
+		if err := r.selectFor(op); err != nil {
+			return err
+		}
+		axis := MirrorVertical
+		switch op.Axis {
+		case "", "vertical", "v":
+		case "horizontal", "h":
+			axis = MirrorHorizontal
+		default:
+			return op.Errorf("mirror axis %q is not vertical or horizontal", op.Axis)
+		}
+		if !a.MirrorSelection(axis) {
+			return op.Errorf("the mirror was refused")
+		}
+
+	case "sketch.pattern":
+		if err := r.selectFor(op); err != nil {
+			return err
+		}
+		kind := PatternLinear
+		switch op.Kind {
+		case "", "linear":
+		case "circular":
+			kind = PatternCircular
+		default:
+			return op.Errorf("pattern kind %q is not linear or circular", op.Kind)
+		}
+		count := op.Segs
+		if count == 0 {
+			count = 2
+		}
+		var delta geom.Vec2i
+		if op.Delta != nil {
+			delta = geom.Vec2i{
+				X: geom.ToSubunits(op.Delta[0]),
+				Y: geom.ToSubunits(op.Delta[1]),
+			}
+		}
+		sweep := op.Degrees
+		if sweep == 0 {
+			sweep = 360
+		}
+		if !a.PatternSelection(kind, count, delta, sweep) {
+			return op.Errorf("the pattern was refused")
+		}
+
 	case "sketch.construction":
 		if err := r.constructionOp(op); err != nil {
 			return err
@@ -1379,6 +1464,25 @@ func (r *ScriptRunner) arcOp(op io.Op) error {
 		return op.Errorf("those points make no arc")
 	}
 	return r.addEntity(op, e)
+}
+
+// selectFor points the session's selection at the entities an op names, so a
+// modify op can be one line in a script instead of two.
+func (r *ScriptRunner) selectFor(op io.Op) error {
+	if !r.App.InSketch() {
+		return op.Errorf("no sketch is being edited — call sketch.begin first")
+	}
+	if len(op.Indices) == 0 {
+		return nil // act on whatever is already selected
+	}
+	s := r.App.ActiveSketch()
+	for _, i := range op.Indices {
+		if i < 0 || i >= len(s.Entities) {
+			return op.Errorf("no entity %d in that sketch", i)
+		}
+	}
+	r.App.sketch.session.Selected = append([]int(nil), op.Indices...)
+	return nil
 }
 
 // constructionOp arms the construction mode, or converts named entities.

@@ -2,11 +2,52 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **SK1-SK4 done.** Tool groups, construction geometry,
-points, line and rectangle variants, ReplaceEntities; arcs (three gestures),
-ellipses, the 3-point circle; polygons and slots; splines and beziers.
-Sixteen sketch tools in eight groups. Suite green (15 packages), exe
-rebuilt. **Next: SK5 — the modify tools (fillet, offset, mirror, patterns, project).**
+**Current state:** **SK1-SK5 done.** Sixteen sketch tools in eight groups,
+construction geometry, and the modify tools: fillet, chamfer, offset, mirror
+and both patterns. Suite green (16 packages), exe rebuilt. Suite green (15 packages), exe
+rebuilt. **Next: SK6 (image underlay) needs your go-ahead per the plan.**
+
+---
+
+## 2026-08-27 (SK5) — The modify tools
+
+The milestone the plan called the multiplier: fillet, chamfer, offset, mirror
+and both patterns, each a `ReplaceEntities` over a selection so a whole
+gesture is one undo step (V-98, written in SK1 for exactly this).
+
+**Shipped.** A Modify section on the sketch card, appearing when the Select
+tool has a selection: Fillet and Chamfer sharing a radius, Offset with a
+distance, Mirror about the sketch's vertical or horizontal axis, and Linear or
+Circular patterns with a count and either a step or a sweep. Buttons that do
+not apply are disabled with the reason rather than hidden, so the section's
+rows do not move under the pointer as the selection changes. Six script ops,
+each calling the same function the button does.
+
+**The acceptance.** One porthole, patterned four across, mirrored to eight,
+cut through an 18×10×2 plate: **360 → 332.5**, against 27.55 of hole computed
+from the polygon formula. Eight identical holes is a number both tools have to
+earn — a pattern that dropped one or a mirror that resized what it reflected
+moves it.
+
+**The bug this milestone found in itself.** The script reported *nine* regions
+where eight circles had been drawn. The ninth was the fillet: its winding came
+from the cross product of the two legs, which picks the 270° sweep for half of
+the four corner orientations. A 270° arc crosses its own legs, and the region
+engine then correctly finds a closed loop — so a plain L, which has no inside,
+had become an extrudable shape (V-113). The fix is to take the sweep between
+the tangent points and pick the short way; the test walks all four
+orientations plus the one that caught it. It is the same class of bug as M9's
+through-all: geometry that looks plausible and is quietly wrong, caught only
+by a number.
+
+**Two of the six deferred, and named.** Transform (move/rotate/scale of a
+selection) and general Use/Project. Transform's value is in dragging, which
+needs V-111's missing §8.5 machinery; Use/Project needs face picking from
+inside sketch mode, and the face-sketch case it exists for has had
+`ProjectFaceOutline` on the card since M5 (V-116).
+
+**Next:** SK6 is the image underlay, and the plan says it needs the user's
+go-ahead before starting.
 
 ---
 
