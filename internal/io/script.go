@@ -183,6 +183,7 @@ var knownOps = map[string]bool{
 	"paint.begin": true, "paint.exit": true, "paint.res": true,
 	"paint.color": true, "paint.tool": true, "paint.size": true,
 	"paint.pixel": true, "paint.stroke": true, "paint.resample": true,
+	"paint.pickedge": true,
 	"paint.textures": true, "paint.faceview": true,
 	"paint.color2": true, "paint.swap": true, "paint.dither": true,
 	"paint.shapefill": true, "paint.lock": true, "paint.unlock": true,

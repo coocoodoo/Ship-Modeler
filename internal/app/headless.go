@@ -660,7 +660,7 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		"paint.size", "paint.pixel", "paint.stroke", "paint.resample",
 		"paint.textures", "paint.faceview", "paint.color2", "paint.swap",
 		"paint.dither", "paint.shapefill", "paint.lock", "paint.unlock",
-		"paint.edges", "paint.edgewidth", "paint.creases":
+		"paint.edges", "paint.edgewidth", "paint.creases", "paint.pickedge":
 		if err := r.paintOp(op); err != nil {
 			return err
 		}
@@ -1363,6 +1363,15 @@ func (r *ScriptRunner) paintOp(op io.Op) error {
 		if !a.SelectBodyCreases() {
 			return op.Errorf("no sharp edges to pick")
 		}
+
+	case "paint.pickedge":
+		// The click path, minus the pixel hunt: toggling an edge into the
+		// tool's selection the same way pickPaintEdge does, chain and all.
+		b := a.Doc().BodyByName(op.Body)
+		if b == nil {
+			return op.Errorf("no body named %q", op.Body)
+		}
+		a.toggleEdge(b.ID, op.Face)
 
 	case "paint.edges":
 		// Indices name edges of the body; with none, whatever is already

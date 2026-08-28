@@ -2,7 +2,8 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Edge paint bands reach their edges gap-free (V-135); fold
+**Current state:** Edge picks follow the whole line through seam vertices
+(V-136); edge paint bands reach their edges gap-free (V-135); fold
 creases draw and pick at any angle (V-134); bent faces
 fold into flat pieces along real creases (V-133), and the whole-corpus validity invariant is back from the dead. Placed
 dots are selectable and draggable (V-132). .pxm
@@ -12,6 +13,51 @@ Iron Drift. Both suites green. Repo now pushes to
 github.com/coocoodoo/Iron-Drift-Modeler by the owner's instruction.
 
 ---
+
+## 2026-08-28 — A picked edge is a line, not a segment (V-136)
+
+**Reported by the user:** "thats better, but it skipped this end" — the edge
+band stopping mid-crest with an angled cut, bare face beyond.
+
+**Diagnosed from the screenshot's signature** after two recreations came up
+clean: the band ends exactly where a fold crease meets the crest. The crest
+there is two collinear topology edges split at a vertex the model's history
+left on the boundary. The click picked one segment; the band covered exactly
+that segment; the user meant the line.
+
+**Fix:** `paint.EdgeChain` — from the clicked edge, walk out of each endpoint
+while exactly one other edge continues within 25 degrees of straight ahead;
+corners and junctions stop the walk, and the continuation is deliberately not
+required to be sharp itself (a fold piece that leaned does not cut the line
+short). Clicking toggles the whole chain; Pick creases chain-completes its
+sweep the same way. New `paint.pickedge` op drives the real click path in
+scripts.
+
+**Verified:**
+- 4 unit tests on the seam prism: chain through the seam, stop at corners,
+  shallow continuation joins, a real kink stops the chain.
+- App flow `edge_chain`: flush-butt union, pick one edge by index through the
+  click path, bake — toast pins the count; golden pins the pixels.
+- Full suite green; no existing golden moved; existing "Picked N edges"
+  toasts unchanged (chain-completion adds nothing on unsegmented shapes).
+
+**Open issues:**
+- App-level fixture gap, recorded in V-136: no op sequence currently
+  manufactures a segmented straight boundary (booleans straighten collinear
+  verts; fold chords end at corners), so the chain-through-a-seam case is
+  pinned at the unit level only.
+
+**Next:** nothing outstanding on this report.
+
+**Try it (user):**
+```bash
+C:\Modeler\modeler.exe
+```
+1. Edge tool, click the crest that stopped short before — the whole line
+   lights up, including the stretch past the fold vertex.
+2. Paint: the band now runs to the end you pointed at.
+3. Click the line again to unpick all of it at once.
+
 
 ## 2026-08-28 — Edge bands reach their edges (V-135)
 

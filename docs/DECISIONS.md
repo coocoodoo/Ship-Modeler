@@ -1486,3 +1486,28 @@ texel; interior ends still do not extend, keeping the union-seam nub fix.
 Each texel is now visited once, which also removes the old walk's
 double-blend on overlapping dabs. The lattice-aligned goldens did not move by
 a pixel; the slanted-wedge golden is new and pins the flush silhouette.
+
+**V-136 · A picked edge is a line, not a topology segment** (the user's
+report, 2026-08-28, third round: "it skipped this end"). The screenshot showed
+an edge band ending in a clean angled cut where a fold crease meets the crest,
+bare face beyond: the crest there is two collinear topology edges split at a
+vertex the model's history left on the boundary, the click picked one of them,
+and the band honestly covered exactly what was picked. Honest and wrong — a
+person who clicks a straight line means the line.
+
+paint.EdgeChain walks from a clicked edge out of each endpoint while exactly
+one other edge leaves the vertex within 25 degrees of straight ahead; a real
+corner offers none, a junction offers several, and both stop the walk. The
+continuation is deliberately not required to be a crease itself: half a line
+whose face has leaned until the crease went shallow is still the same line.
+Clicking toggles the whole chain — on or off decided by the segment actually
+clicked — and Pick creases chain-completes its threshold sweep the same way,
+so a shallow stretch of a picked line no longer cuts it short.
+
+Recorded honestly: the app-level fixture gap. Booleans straighten collinear
+verts away, and fold chords end at existing corners, so no op sequence in the
+current vocabulary manufactures a segmented straight boundary from scratch —
+the user's model carries one from its longer history. The seam-prism unit
+tests pin the chain exactly; the app wiring is a thin pass-through
+(toggleEdge, SelectBodyCreases), and paint.pickedge drives the real click
+path headlessly.

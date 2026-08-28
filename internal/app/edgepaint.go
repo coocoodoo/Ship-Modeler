@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"image/color"
+	"sort"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
@@ -43,8 +44,39 @@ func (a *App) InEdgePaint() bool {
 	return a.InPaint() && a.paint.tool == paint.ToolEdge
 }
 
-// toggleEdge adds an edge to the selection, or takes it out again.
+// toggleEdge adds an edge to the selection, or takes it out again — and it
+// works on the whole straight line, not the one topology segment (the user's
+// report, 2026-08-28: "it skipped this end"). A boundary that history split
+// at a vertex — a union seam, a fold chord landing on it — is one line to the
+// eye, and a click on a line means the line. Whether the click adds or
+// removes is decided by the segment actually clicked, and the whole chain
+// follows it either way.
 func (a *App) toggleEdge(body uint32, edge int) {
+	b := a.Doc().BodyByID(body)
+	if b == nil || b.Mesh == nil {
+		return
+	}
+	chain := paint.EdgeChain(b.Mesh, edge, EdgeChainDegrees)
+	if a.edgeSelected(body, edge) {
+		for _, e := range chain {
+			a.removeEdge(body, e)
+		}
+		return
+	}
+	for _, e := range chain {
+		if !a.edgeSelected(body, e) {
+			a.paint.edges = append(a.paint.edges, edgeRef{body: body, edge: e})
+		}
+	}
+}
+
+// EdgeChainDegrees is how far a continuation may turn at a vertex and still
+// count as the same line. Tight enough that a chamfer's oblique meeting is a
+// corner, loose enough that float noise on a seam vertex is not.
+const EdgeChainDegrees = 25
+
+// removeEdge drops one edge from the tool's selection if present.
+func (a *App) removeEdge(body uint32, edge int) {
 	ref := edgeRef{body: body, edge: edge}
 	for i, had := range a.paint.edges {
 		if had == ref {
@@ -52,7 +84,6 @@ func (a *App) toggleEdge(body uint32, edge int) {
 			return
 		}
 	}
-	a.paint.edges = append(a.paint.edges, ref)
 }
 
 // edgeSelected reports whether an edge is in the tool's selection.
@@ -231,11 +262,28 @@ func (a *App) SelectBodyCreases() bool {
 		if !bodies[b.ID] || b.Mesh == nil || !b.Visible {
 			continue
 		}
+		picked := map[int]bool{}
 		for i := range b.Mesh.Topo().Edges {
 			if paint.EdgeIsCrease(b.Mesh, i, CreaseDegrees) {
-				a.paint.edges = append(a.paint.edges, edgeRef{body: b.ID, edge: i})
-				found++
+				picked[i] = true
 			}
+		}
+		// A picked line keeps its whole length: a stretch that continues
+		// straight through a vertex joins even where its own crease has gone
+		// shallow — a fold piece that leaned does not cut the line short.
+		for i := range picked {
+			for _, e := range paint.EdgeChain(b.Mesh, i, EdgeChainDegrees) {
+				picked[e] = true
+			}
+		}
+		idx := make([]int, 0, len(picked))
+		for i := range picked {
+			idx = append(idx, i)
+		}
+		sort.Ints(idx)
+		for _, i := range idx {
+			a.paint.edges = append(a.paint.edges, edgeRef{body: b.ID, edge: i})
+			found++
 		}
 	}
 	if found == 0 {

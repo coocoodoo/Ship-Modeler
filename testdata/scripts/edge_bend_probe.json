@@ -1,0 +1,38 @@
+[
+  {"op":"file.new"},
+  {"op":"plane.visible","plane":"Top","visible":false},
+  {"op":"plane.visible","plane":"Front","visible":false},
+  {"op":"plane.visible","plane":"Right","visible":false},
+
+  {"op":"sketch.begin","plane":"Front"},
+  {"op":"sketch.line","from":[0,0],"to":[10,0]},
+  {"op":"sketch.line","from":[10,0],"to":[10,9]},
+  {"op":"sketch.line","from":[10,9],"to":[6,9]},
+  {"op":"sketch.line","from":[6,9],"to":[6,6]},
+  {"op":"sketch.line","from":[6,6],"to":[3,6]},
+  {"op":"sketch.line","from":[3,6],"to":[0,3]},
+  {"op":"sketch.line","from":[0,3],"to":[0,0]},
+  {"op":"extrude.begin","depth":8,"result":"new","regions":[0]},
+  {"op":"extrude.commit"},
+  {"op":"settle"},
+
+  {"op":"select","kind":"vert","body":"Body 1","vert":0},
+  {"op":"move","delta":[0,0,1.2]},
+  {"op":"settle"},
+  {"op":"dump"},
+
+  {"op":"paint.begin"},
+  {"op":"paint.res","res":4},
+  {"op":"paint.tool","kind":"edge"},
+  {"op":"paint.color","hex":"B03040"},
+  {"op":"paint.edgewidth","size":3},
+  {"op":"paint.creases","body":"Body 1"},
+  {"op":"paint.edges"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"paint.exit"},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"shot","name":"edge_bend_probe"}
+]

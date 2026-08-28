@@ -1,6 +1,7 @@
 package apptest
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -49,4 +50,20 @@ func TestPaintingEveryEdgeOfABox(t *testing.T) {
 func TestGoldenSlantedEdgeBands(t *testing.T) {
 	_, outDir := runScript(t, "edge_slant")
 	checkGolden(t, "edge_slant", outDir)
+}
+
+// The click path headlessly: paint.pickedge routes through toggleEdge — the
+// same entry a real click uses — so the chain pick (V-136) is on this path.
+// On a body with no segmented lines the chain is the edge itself, and the
+// bake names one edge.
+func TestPickedgeRoutesThroughTheClickPath(t *testing.T) {
+	stdout, _ := runScript(t, "edge_chain")
+	if !strings.Contains(stdout, `toast "Painted 1 edge, 3 pixels wide (0.75 u)"`) {
+		t.Error("picking one edge by index did not bake one edge")
+	}
+}
+
+func TestGoldenEdgeChain(t *testing.T) {
+	_, outDir := runScript(t, "edge_chain")
+	checkGolden(t, "edge_chain", outDir)
 }

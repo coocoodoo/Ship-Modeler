@@ -265,3 +265,86 @@ func EdgeIsCrease(m *mesh.Mesh, edge int, degrees float64) bool {
 	}
 	return math.Acos(d)*180/math.Pi >= degrees
 }
+
+// EdgeChain returns the run of edges that continue straight through edge's
+// endpoints, edge included (the user's report, 2026-08-28: "it skipped this
+// end").
+//
+// A boundary that history has split at a vertex — a union seam, a fold chord
+// landing on it — is several topology edges but one line to the eye, and a
+// person who clicks a line means the line. The chain walks out of each
+// endpoint while exactly one other edge leaves the vertex within maxDeg of
+// straight ahead; a real corner offers none and a junction offers several,
+// and both stop the walk. Deliberately no crease check on the continuation:
+// half a line whose face has leaned until the crease went shallow is still
+// the same line.
+func EdgeChain(m *mesh.Mesh, edge int, maxDeg float64) []int {
+	if m == nil {
+		return nil
+	}
+	t := m.Topo()
+	if edge < 0 || edge >= len(t.Edges) {
+		return nil
+	}
+	minDot := math.Cos(maxDeg * math.Pi / 180)
+
+	// next is the unique straight continuation of cur out of vertex v, or -1.
+	next := func(cur, v int) int {
+		e := t.Edges[cur]
+		from := e.A
+		if v == e.A {
+			from = e.B
+		}
+		dir, ok := m.Verts[v].Sub(m.Verts[from]).NormalizeOK()
+		if !ok {
+			return -1
+		}
+		best := -1
+		for i := range t.Edges {
+			if i == cur {
+				continue
+			}
+			o := t.Edges[i]
+			var far int
+			switch v {
+			case o.A:
+				far = o.B
+			case o.B:
+				far = o.A
+			default:
+				continue
+			}
+			cont, ok := m.Verts[far].Sub(m.Verts[v]).NormalizeOK()
+			if !ok || cont.Dot(dir) < minDot {
+				continue
+			}
+			if best >= 0 {
+				return -1 // two candidates: a junction, not a line
+			}
+			best = i
+		}
+		return best
+	}
+
+	chain := []int{edge}
+	seen := map[int]bool{edge: true}
+	for _, start := range [2]int{t.Edges[edge].A, t.Edges[edge].B} {
+		cur, v := edge, start
+		for {
+			n := next(cur, v)
+			if n < 0 || seen[n] {
+				break
+			}
+			seen[n] = true
+			chain = append(chain, n)
+			e := t.Edges[n]
+			if e.A == v {
+				v = e.B
+			} else {
+				v = e.A
+			}
+			cur = n
+		}
+	}
+	return chain
+}
