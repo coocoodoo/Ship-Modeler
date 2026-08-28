@@ -1657,9 +1657,10 @@ func (r *ScriptRunner) dump() {
 		// always did. valid was on this line once, and the whole-corpus
 		// invariant test quietly skipped every script while it was gone —
 		// its regex found nothing to check.
-		fmt.Printf("body id=%d name=%q visible=%d tris=%d vol=%.4f color=%02X%02X%02X faces=%d valid=%d\n",
+		fmt.Printf("body id=%d name=%q visible=%d tris=%d vol=%.4f color=%02X%02X%02X faces=%d edges=%d valid=%d\n",
 			b.ID, b.Name, boolBit(b.Visible), b.TriangleCount(), bodyVolume(b),
-			b.Color.R, b.Color.G, b.Color.B, len(b.Mesh.Faces), boolBit(bodyValid(b)))
+			b.Color.R, b.Color.G, b.Color.B, len(b.Mesh.Faces),
+			len(b.Mesh.DrawnEdges()), boolBit(bodyValid(b)))
 	}
 	for _, s := range doc.Sketches {
 		fmt.Printf("sketch id=%d name=%q visible=%d\n", s.ID, s.Name, boolBit(s.Visible))

@@ -132,6 +132,15 @@ const (
 // (SPEC-RENDER §5). Blocky models put nearly every visible edge above it.
 const CreaseAngleDeg = 25.0
 
+// FoldCreaseAngleDeg is the far lower threshold for an edge whose two faces
+// are pieces of the same source face (V-134). A shallow angle between two
+// authored faces is a 16-gon pretending to be a cylinder and stays smooth;
+// the same angle between two pieces of what used to be one face is a fold
+// the user just made, and an edge you made is an edge you can see and grab —
+// however gently you bent it. One degree keeps flush boolean fragments and
+// folds later flattened back out from growing seams.
+const FoldCreaseAngleDeg = 1.0
+
 // ClassifyEdge returns the drawing class of edge ei.
 func (m *Mesh) ClassifyEdge(ei int) EdgeKind {
 	t := m.Topo()
@@ -146,7 +155,16 @@ func (m *Mesh) ClassifyEdge(ei int) EdgeKind {
 	n0 := m.FaceNormal(f0)
 	n1 := m.FaceNormal(f1)
 	cos := math.Max(-1, math.Min(1, n0.Dot(n1)))
-	if math.Acos(cos) > CreaseAngleDeg*math.Pi/180 {
+	angle := math.Acos(cos)
+	if angle > CreaseAngleDeg*math.Pi/180 {
+		return EdgeCrease
+	}
+	// Pieces of one former face meeting at any real angle are a fold the user
+	// made, not authored smoothness — the NoFace guard matters, because two
+	// primitive faces with no lineage both answer NoFace and are not thereby
+	// the same face.
+	s0, s1 := m.Faces[f0].SrcFace, m.Faces[f1].SrcFace
+	if s0 != NoFace && s0 == s1 && angle > FoldCreaseAngleDeg*math.Pi/180 {
 		return EdgeCrease
 	}
 	return EdgeSmooth

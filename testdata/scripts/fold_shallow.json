@@ -1,0 +1,16 @@
+[
+  {"op":"body.visible","body":"Hull","visible":false},
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"select","kind":"vert","body":"Wing pod","vert":7},
+  {"op":"move","delta":[0,0.6,0]},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"fold_shallow"},
+  {"op":"undo"},
+  {"op":"settle"},
+  {"op":"dump"}
+]

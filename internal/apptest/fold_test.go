@@ -14,10 +14,11 @@ import (
 // triangulation happened to put the fold.
 
 var foldBodyLine = regexp.MustCompile(
-	`^body id=\d+ name="Wing pod" .* vol=([\d.]+) .* faces=(\d+) valid=(\d)$`)
+	`^body id=\d+ name="Wing pod" .* vol=([\d.]+) .* faces=(\d+) edges=(\d+) valid=(\d)$`)
 
-// wingPodDumps returns the Wing pod's (volume, faces, valid) at each dump.
-func wingPodDumps(t *testing.T, stdout string) (vols []float64, faces []int, valid []bool) {
+// wingPodDumps returns the Wing pod's (volume, faces, edges, valid) at
+// each dump. Edges counts what is drawn AND pickable — the two are one list.
+func wingPodDumps(t *testing.T, stdout string) (vols []float64, faces, edges []int, valid []bool) {
 	t.Helper()
 	for _, raw := range strings.Split(stdout, "\n") {
 		m := foldBodyLine.FindStringSubmatch(strings.TrimRight(raw, "\r"))
@@ -29,14 +30,17 @@ func wingPodDumps(t *testing.T, stdout string) (vols []float64, faces []int, val
 			t.Fatalf("bad volume in %q: %v", raw, err)
 		}
 		f, _ := strconv.Atoi(m[2])
-		vols, faces, valid = append(vols, v), append(faces, f), append(valid, m[3] == "1")
+		e, _ := strconv.Atoi(m[3])
+		vols = append(vols, v)
+		faces, edges = append(faces, f), append(edges, e)
+		valid = append(valid, m[4] == "1")
 	}
 	return
 }
 
 func TestBendingACornerFoldsTheFacesAlongRealCreases(t *testing.T) {
 	stdout, _ := runScript(t, "fold_bend")
-	vols, faces, valid := wingPodDumps(t, stdout)
+	vols, faces, _, valid := wingPodDumps(t, stdout)
 	if len(faces) != 3 {
 		t.Fatalf("got %d dumps of the Wing pod, want 3 — the script changed", len(faces))
 	}
@@ -85,4 +89,40 @@ func TestBendingACornerFoldsTheFacesAlongRealCreases(t *testing.T) {
 func TestGoldenFoldBend(t *testing.T) {
 	_, outDir := runScript(t, "fold_bend")
 	checkGolden(t, "fold_bend", outDir)
+}
+
+// The user's second report (2026-08-28): a gentle bend folded the face, but
+// the crease "didn't process as an edge" — under CreaseAngleDeg it classified
+// smooth, so it neither drew nor picked. Same-source pieces now crease at any
+// real angle (V-134). The numbers say it all: a 0.6-unit corner nudge folds
+// two faces (6 to 8) and the drawn-and-pickable edge list grows by exactly
+// the two new creases (12 to 14).
+func TestAGentleBendStillMakesGrabbableCreases(t *testing.T) {
+	stdout, _ := runScript(t, "fold_shallow")
+	_, faces, edges, valid := wingPodDumps(t, stdout)
+	if len(faces) != 3 {
+		t.Fatalf("got %d dumps, want 3", len(faces))
+	}
+	for i, ok := range valid {
+		if !ok {
+			t.Fatalf("invalid solid at dump %d", i)
+		}
+	}
+	if faces[0] != 6 || edges[0] != 12 {
+		t.Fatalf("the pod starts with %d faces and %d edges, want 6 and 12", faces[0], edges[0])
+	}
+	if faces[1] != 8 {
+		t.Errorf("the gentle bend left %d faces, want 8 — it did not fold", faces[1])
+	}
+	if edges[1] != 14 {
+		t.Errorf("after the fold %d edges draw, want 14 — the shallow creases are invisible and unpickable again", edges[1])
+	}
+	if faces[2] != 6 || edges[2] != 12 {
+		t.Errorf("undo left %d faces and %d edges, want 6 and 12", faces[2], edges[2])
+	}
+}
+
+func TestGoldenFoldShallow(t *testing.T) {
+	_, outDir := runScript(t, "fold_shallow")
+	checkGolden(t, "fold_shallow", outDir)
 }

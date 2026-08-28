@@ -1439,3 +1439,25 @@ nothing and silently skipped every script — the whole-corpus validity net was
 dead. Restored, plus a `faces=` field (folding changes face count where
 triangle count cannot tell: a quad split into two triangles draws the same two
 triangles). 53 scripts are checked again; 5 dump no bodies and skip honestly.
+
+**V-134 · A crease inside one former face draws at any real angle** (the
+user's report, 2026-08-28: "didn't process this line as edge"). A gentle bend
+folded a face correctly (V-133), but the crease classified under
+CreaseAngleDeg (25) as smooth — so it neither drew nor picked, since the
+overlay and the pick pass share one edge list. The fold showed as a lighting
+seam with no line, and clicking it selected the face behind it.
+
+Lowering the threshold globally was not an option: a 16-gon circle prism's
+side faces meet at 22.5 and D-06 promises those read as a smooth cylinder.
+The distinction that matters is already in the mesh — lineage. Two faces
+sharing a nonzero SrcFace are pieces of what used to be one face; an angle
+between them is a crease somebody made, not authored smoothness. ClassifyEdge
+now creases those at any angle past FoldCreaseAngleDeg (1), which keeps flush
+boolean fragments and folds later flattened back out from growing seams. The
+NoFace guard matters: primitive faces with no lineage all answer NoFace and
+are not thereby the same face.
+
+The one existing golden that moved, fold_bend, moved by 16 pixels: the sliver
+of the second fold's crease visible past the pod's silhouette, previously
+hidden because that fold is under 25 degrees. The diff was read before the
+baseline was accepted; it is the bug, fixed.

@@ -2,8 +2,8 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Bent faces now fold into flat pieces along real creases
-(V-133), and the whole-corpus validity invariant is back from the dead. Placed
+**Current state:** Fold creases draw and pick at any angle (V-134); bent faces
+fold into flat pieces along real creases (V-133), and the whole-corpus validity invariant is back from the dead. Placed
 dots are selectable and draggable (V-132). .pxm
 shipped end to end (V-131): markers in the modeler,
 game payload in the file, loader + basis correction + thruster anchors in
@@ -11,6 +11,49 @@ Iron Drift. Both suites green. Repo now pushes to
 github.com/coocoodoo/Iron-Drift-Modeler by the owner's instruction.
 
 ---
+
+## 2026-08-28 — A shallow fold crease is still an edge (V-134)
+
+**Reported by the user** with screenshots: after bending an edge on the
+stepped-wedge shape, the fold happened but the crease "didn't process as an
+edge" — a visible lighting seam with no line, not clickable.
+
+**Recreated headlessly first:** a hand-built stepped wedge (the screenshot
+shape), bottom-of-slope vertex nudged 0.4 units. The folds land, and the
+creases come out at 9.9 and 10.2 degrees — under CreaseAngleDeg (25), so
+ClassifyEdge called them smooth. DrawnEdges feeds both the overlay and the
+pick pass, so a smooth edge neither draws nor picks. Diagnosis in one line:
+the fold made the faces but the classifier refused the edge.
+
+**Fix:** lineage, not thresholds. Fold pieces share their source face's
+SrcFace (V-133, same convention as boolean fragments) — and an angle between
+two pieces of one former face is a crease somebody made. ClassifyEdge creases
+same-nonzero-SrcFace pairs at any angle past 1 degree, while different faces
+keep the 25-degree rule, so the 16-gon engine pod stays a smooth cylinder
+(D-06) and flush fragment seams stay invisible.
+
+**Verified:**
+- New mesh tests: the wedge recreation (fails against the old classifier with
+  the exact symptom), the 16-gon contract, the coplanar-pieces contract.
+- New flow test `fold_shallow`: a 0.6-unit corner nudge folds 2 faces and the
+  drawn-and-pickable edge count goes 12 → 14 → 12 across fold and undo. The
+  body dump line grew an `edges=` field to make that assertable.
+- Goldens: `fold_shallow.png` new (crease strokes visible on a gentle bend);
+  `fold_bend.png` moved by 16 pixels — read before accepting: the sliver of
+  the under-25-degree crease visible past the silhouette, previously hidden.
+- Full suite green; build/vet/gofmt clean.
+
+**Next:** nothing outstanding on this report.
+
+**Try it (user):**
+```bash
+C:\Modeler\modeler.exe
+```
+1. Bend an edge gently — barely off flat.
+2. The fold now draws its crease line, however shallow the bend.
+3. Hover the crease: it names itself as an edge; click it and drag — the
+   crease itself is grabbable, so you can keep adjusting the bend you made.
+
 
 ## 2026-08-28 — Bent faces fold along real creases (V-133)
 
