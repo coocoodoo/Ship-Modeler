@@ -1,0 +1,38 @@
+[
+  {"op":"file.new"},
+  {"op":"plane.visible","plane":"Top","visible":false},
+  {"op":"plane.visible","plane":"Front","visible":false},
+  {"op":"plane.visible","plane":"Right","visible":false},
+
+  {"op":"sketch.begin","plane":"Top"},
+  {"op":"sketch.rect","a":[-4,-3],"b":[4,3]},
+  {"op":"extrude","depth":2,"result":"new"},
+  {"op":"settle"},
+
+  {"op":"paint.begin"},
+  {"op":"paint.res","res":8},
+  {"op":"tile.import","path":"testdata/tileset_test.png"},
+  {"op":"tile.grid","tileW":8,"tileH":8,"tileMargin":1,"tileSpacing":1},
+  {"op":"tile.select","tile":2},
+  {"op":"dump"},
+
+  {"op":"tile.stamp","body":"Body 1","axis":"+y","uv":[3,2]},
+  {"op":"tile.stamp","body":"Body 1","axis":"+y","uv":[11,2]},
+  {"op":"dump"},
+
+  {"op":"tile.orient","rot":2,"flip":true},
+  {"op":"tile.stamp","body":"Body 1","axis":"+y","uv":[3,10]},
+  {"op":"dump"},
+
+  {"op":"tile.select","tile":3},
+  {"op":"tile.stamp","body":"Body 1","axis":"+y","uv":[16,0]},
+  {"op":"dump"},
+
+  {"op":"undo"},
+  {"op":"dump"},
+  {"op":"paint.exit"},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"shot","name":"tile_stamp"}
+]

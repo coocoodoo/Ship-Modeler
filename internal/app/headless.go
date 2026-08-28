@@ -660,7 +660,8 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		"paint.size", "paint.pixel", "paint.stroke", "paint.resample",
 		"paint.textures", "paint.faceview", "paint.color2", "paint.swap",
 		"paint.dither", "paint.shapefill", "paint.lock", "paint.unlock",
-		"paint.edges", "paint.edgewidth", "paint.creases", "paint.pickedge":
+		"paint.edges", "paint.edgewidth", "paint.creases", "paint.pickedge",
+		"tile.import", "tile.grid", "tile.select", "tile.orient", "tile.stamp":
 		if err := r.paintOp(op); err != nil {
 			return err
 		}
@@ -1364,6 +1365,33 @@ func (r *ScriptRunner) paintOp(op io.Op) error {
 			return op.Errorf("no sharp edges to pick")
 		}
 
+	case "tile.import":
+		if !a.ImportTileset(op.Path) {
+			return op.Errorf("the tileset would not load")
+		}
+
+	case "tile.grid":
+		if !a.SetTileGrid(op.TileW, op.TileH, op.TileMargin, op.TileSpacing) {
+			return op.Errorf("the grid was refused")
+		}
+
+	case "tile.select":
+		if !a.SelectTile(op.Tile) {
+			return op.Errorf("no tile %d", op.Tile)
+		}
+
+	case "tile.orient":
+		a.SetTileOrientation(paint.Orientation{Rot: uint8(op.Rot % 4), FlipX: op.FlipTile})
+
+	case "tile.stamp":
+		f, err := r.faceByIndex(op)
+		if err != nil {
+			return err
+		}
+		if !a.StampTileAt(f.body.ID, f.uid, image.Point{X: op.UV[0], Y: op.UV[1]}, op.Alt) {
+			return op.Errorf("the stamp was refused")
+		}
+
 	case "paint.pickedge":
 		// The click path, minus the pixel hunt: toggling an edge into the
 		// tool's selection the same way pickPaintEdge does, chain and all.
@@ -1785,6 +1813,13 @@ func (r *ScriptRunner) dumpPaint() {
 		boolBit(st.fillShape), st.slot, boolBit(!st.hideTextures),
 		boolBit(st.locked), st.lockFace.Seq(), stickyTargetSeq(a),
 		boolBit(st.awaitingLock))
+
+	if ts := st.tiles.set; ts != nil {
+		fmt.Printf("tileset sheet=%dx%d grid=%dx%d+%d+%d tiles=%d sel=%d rot=%d flip=%d\n",
+			ts.Img.Bounds().Dx(), ts.Img.Bounds().Dy(),
+			ts.TileW, ts.TileH, ts.Margin, ts.Spacing,
+			ts.Count(), st.tiles.sel, st.tiles.orient.Rot, boolBit(st.tiles.orient.FlipX))
+	}
 
 	if h := st.hover; h.ok && h.paint != nil {
 		fmt.Printf("painthover body=%d face=%d texel=%d,%d res=%d allocated=%d oblique=%.1f\n",

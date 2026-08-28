@@ -112,6 +112,9 @@ type paintState struct {
 	// takes its own buttons with it. Those controls read this instead.
 	sticky paintHover
 
+	// tiles is the tile stamp's state (Tile_paint.md).
+	tiles tilePaintState
+
 	// prov caches the mapping an unpainted face *would* get, so the texel
 	// cursor can show the grid before the first stroke commits to it. It is
 	// rebuilt only when the face or the resolution chip changes — an Allocate

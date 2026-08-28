@@ -73,6 +73,17 @@ type Op struct {
 	Points [][2]int `json:"points,omitempty"`
 	Size   int      `json:"size,omitempty"`
 
+	// Tile ops (Tile_paint.md TP2). Path is shared with the file ops below;
+	// Tile is the selected tile's index in the sheet, named so because the
+	// parser owns the field called Index.
+	TileW       int  `json:"tileW,omitempty"`
+	TileH       int  `json:"tileH,omitempty"`
+	TileMargin  int  `json:"tileMargin,omitempty"`
+	TileSpacing int  `json:"tileSpacing,omitempty"`
+	Tile        int  `json:"tile,omitempty"`
+	Rot         int  `json:"rot,omitempty"`
+	FlipTile    bool `json:"flip,omitempty"`
+
 	// Modifier keys held for the next pointer op. They matter as much as the
 	// position does: Shift adds to a selection, Ctrl snaps fine, Alt is free.
 	Shift bool `json:"shift,omitempty"`
@@ -184,6 +195,8 @@ var knownOps = map[string]bool{
 	"paint.color": true, "paint.tool": true, "paint.size": true,
 	"paint.pixel": true, "paint.stroke": true, "paint.resample": true,
 	"paint.pickedge": true,
+	"tile.import":    true, "tile.grid": true, "tile.select": true,
+	"tile.orient": true, "tile.stamp": true,
 	"paint.textures": true, "paint.faceview": true,
 	"paint.color2": true, "paint.swap": true, "paint.dither": true,
 	"paint.shapefill": true, "paint.lock": true, "paint.unlock": true,
@@ -244,6 +257,18 @@ func (o Op) validate() error {
 	case "drag":
 		if o.From == nil || o.To == nil {
 			return o.Errorf("needs from [x,y] and to [x,y] in window pixels")
+		}
+	case "tile.import":
+		if o.Path == "" {
+			return o.Errorf("needs a path")
+		}
+	case "tile.grid":
+		if o.TileW <= 0 || o.TileH <= 0 {
+			return o.Errorf("needs tileW and tileH")
+		}
+	case "tile.stamp":
+		if o.UV == nil {
+			return o.Errorf("needs uv [x,y]")
 		}
 	case "marker.move":
 		if o.Delta == nil {
