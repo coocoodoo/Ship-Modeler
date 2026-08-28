@@ -25,7 +25,11 @@ const (
 	SnapGlyphSizePx  = 11.0
 	CloseRingSizePx  = 13.0
 	VertexDotSizePx  = 4.0
-	SketchGridHalf   = 40.0
+	// SketchGridHalf matches the plane exactly (V-129): the grid is the
+	// plane's graph paper, and paper that sprawled 3x past its sheet was the
+	// single biggest reason the sketch view read as scale soup. Drawing past
+	// the sheet is still allowed — the grid just does not follow you there.
+	SketchGridHalf   = PlaneHalfSize
 	RegionFillAlpha  = 0x33
 	RegionHoverAlpha = 0x4D
 	// IdleSketchAlpha fades a sketch that is not being edited.

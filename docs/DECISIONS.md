@@ -1287,3 +1287,33 @@ index, so each stroke was scaled by `faceLongestSide × newChip / oldChip` and
 the goldens regenerated. The sample ship came back within 99.9% of its old
 render, which is the check that the conversion was arithmetic rather than
 guesswork.
+
+**V-129 · One scale to rule the sheet: planes are 32 u, the grid is the plane,
+and both get out of the way when you are not using them.** "Can you fix the
+scale of pixels, grid, models and planes" — and each pair disagreed somewhere.
+The sketch grid ran 80 u across a 24 u plane, so the paper sprawled more than
+three times past its sheet and the plane you had clicked was indistinguishable
+from anywhere else. The other two planes crossed that paper edge-on as
+coloured bands with their labels stranded mid-grid. The plane edge (±12)
+missed the 8 u major lines (±8). Zoomed to a part, the planes became
+translucent walls across the whole viewport. And a new ship kept whatever
+zoom the last document ended at.
+
+The contract now: PlaneHalfSize is 16, so a plane is 4×4 major cells and its
+edges are major lines at every grid step; SketchGridHalf *is* PlaneHalfSize —
+the plane is the graph paper, drawn alone while sketching (a face sketch shows
+no origin planes at all), framed whole with 10% margin on entry; planes fade
+with zoom (full at ≤1.5× the view height, gone at 3×, unpickable on the way —
+hovered or selected planes never fade); and New ship goes Home. Pixels were
+already coherent since V-128 (a texel is 1/Res u everywhere) — this pass fixed
+the frames of reference around them.
+
+One bug worth keeping: PlaneDraw.Fade first treated its zero value as "unset,
+draw opaque" — so a fully faded plane (fade 0) drew at full strength, visible
+only by measuring pixels across builds. Zero now means invisible and every
+constructor sets the field. A sentinel that equals a legal value is not a
+sentinel.
+
+Every golden with planes or sketch mode in frame regenerated (the sample ship
+golden did not move — paint mode already hid planes, which is its own small
+proof the contract holds together).

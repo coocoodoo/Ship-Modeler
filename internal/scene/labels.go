@@ -37,6 +37,14 @@ func DrawPlaneLabels(cam render.Camera, vp render.Viewport, planes []render.Plan
 		} else if p.Hovered {
 			col = ui.ColorText
 		}
+		// The label fades with its plane; a name floating over a quad that is
+		// no longer visible labels nothing.
+		if p.Fade <= 0.01 {
+			continue
+		}
+		if p.Fade < 1 {
+			col = ui.Fade(col, p.Fade)
+		}
 		fonts.DrawCentered(fonts.Small, p.Label,
 			float32(corner.X+float64(vp.X)), float32(corner.Y+float64(vp.Y)),
 			ui.FontSizeSmall, col)

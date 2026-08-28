@@ -58,6 +58,14 @@ type PlaneDraw struct {
 	Hovered  bool
 	Selected bool
 	Pickable bool
+	// Fade scales the plane's fill, border and label, 0..1, and every
+	// constructor must set it — zero means invisible, not "unset", because a
+	// sentinel that happens to equal a legal value is how the first version of
+	// this drew fully-faded planes at full strength instead. The app fades
+	// planes out as the camera zooms in past them (V-129): a reference plane
+	// whose boundary is far outside the view is not a reference any more, it
+	// is a translucent wall across everything you are actually looking at.
+	Fade float64
 }
 
 // GridDraw is the sketch-mode grid: minor and major lines on a frame, fading

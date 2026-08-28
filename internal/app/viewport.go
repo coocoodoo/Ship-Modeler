@@ -1,6 +1,8 @@
 package app
 
 import (
+	"math"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"modeler/internal/geom"
@@ -125,16 +127,38 @@ func (a *App) BuildScene() render.Scene {
 }
 
 // buildPlaneDraws turns plane visibility, selection and hover into draw specs.
+//
+// Sketch mode shows only the plane being sketched on (V-129). The other two
+// arrive edge-on — coloured bands crossing the graph paper, with their labels
+// stranded mid-grid — and an edge-on reference plane references nothing. A
+// face sketch shows none: its sheet belongs to the body, not to the origin.
 func (a *App) buildPlaneDraws() []render.PlaneDraw {
 	doc := a.Doc()
+	only, limited := geom.PlaneKind(0), false
+	if a.InSketch() {
+		sk := a.ActiveSketch()
+		if sk == nil || sk.OnFace {
+			return nil
+		}
+		only, limited = sk.Plane, true
+	}
+	fade := a.planeZoomFade()
 	out := make([]render.PlaneDraw, 0, geom.PlaneCount)
 	for i := 0; i < geom.PlaneCount; i++ {
 		k := geom.PlaneKind(i)
-		if !doc.PlaneVisible(k) {
+		if !doc.PlaneVisible(k) || (limited && k != only) {
 			continue
 		}
 		hovered := (a.TreeHover.Kind == model.SelPlane && a.TreeHover.Plane == k) ||
 			(a.Hover.Hit && a.Hover.Kind == render.PickPlane && a.Hover.Plane == k)
+		selected := a.Sel.Contains(model.PlaneRef(k))
+		f := fade
+		if hovered || selected {
+			// A plane the user is pointing at or has picked shows itself
+			// whatever the zoom: fading the thing being asked about would
+			// answer the hover with nothing.
+			f = 1
+		}
 		out = append(out, render.PlaneDraw{
 			Kind:     k,
 			Frame:    geom.PlaneFrame(k),
@@ -142,11 +166,38 @@ func (a *App) buildPlaneDraws() []render.PlaneDraw {
 			Color:    ui.WithAlpha(scene.PlaneColor(k), scene.PlaneTintAlpha),
 			Label:    k.String(),
 			Hovered:  hovered,
-			Selected: a.Sel.Contains(model.PlaneRef(k)),
-			Pickable: true,
+			Selected: selected,
+			Pickable: f > 0.15,
+			Fade:     f,
 		})
 	}
 	return out
+}
+
+// planeZoomFade is how visible the default planes are at the current zoom
+// (V-129). Zoomed out, a plane is a bounded sheet whose edges you can see;
+// zoomed in past it, the same quad is a translucent wall across the entire
+// view, washing over the model that is actually being worked on. It starts
+// fading once the plane spans twice the view height and is gone by four times
+// — and it stops being pickable on the way, because an invisible wall that
+// still eats clicks would be worse than the wall.
+func (a *App) planeZoomFade() float64 {
+	viewH := a.Camera.OrthoScale
+	if a.Camera.Perspective {
+		viewH = 2 * a.Camera.Dist * math.Tan(render.PerspectiveFOV*math.Pi/360)
+	}
+	if viewH <= 0 {
+		return 1
+	}
+	k := 2 * scene.PlaneHalfSize / viewH
+	switch {
+	case k <= 1.5:
+		return 1
+	case k >= 3:
+		return 0
+	default:
+		return (3 - k) / 1.5
+	}
 }
 
 // viewportHoverRef maps the pick result into a document reference, so the tree

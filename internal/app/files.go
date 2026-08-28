@@ -203,6 +203,10 @@ func (a *App) NewDocument() {
 	// nothing: it replaced empty with empty and the card stayed up.
 	a.dismissWelcome()
 	a.clearAutosave()
+	// A new ship starts at the home view, not at whatever zoom the last one
+	// ended on (V-129): planes seen from 200 u away and planes filling the
+	// window are both wrong answers to "where do I start".
+	a.GoHome(a.layout.RenderViewport())
 	a.Toast(ui.Toast{Text: "New ship"})
 }
 

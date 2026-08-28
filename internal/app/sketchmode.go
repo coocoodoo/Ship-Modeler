@@ -129,7 +129,10 @@ func (a *App) enterSketch(s *model.Sketch) {
 		to.Azimuth, to.Elevation = render.PlaneView(s.Plane)
 	}
 	to.Target = frame.O
-	to.OrthoScale = 24
+	// Frame the whole sheet with a little air (V-129). The old 24 was the
+	// plane's exact height back when planes were 24 u — an edge-to-edge fit
+	// with no margin, which stopped being either once the numbers moved.
+	to.OrthoScale = 2 * scene.PlaneHalfSize * 1.1
 	a.Anim.Start(a.Camera, to)
 }
 

@@ -2,10 +2,37 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **SK1-SK5 done, plus the edge-line paint tool.** Sixteen sketch tools in eight groups,
-construction geometry, and the modify tools: fillet, chamfer, offset, mirror
-and both patterns. Suite green (16 packages), exe rebuilt. Suite green (15 packages), exe
-rebuilt. **Next: SK6 (image underlay) needs your go-ahead per the plan.**
+**Current state:** SK1–SK5 done, edge lines, pixel density (V-128) and the
+scale contract (V-129): planes, grid, camera and zoom finally agree. Suite
+green (16 packages), exe rebuilt. **Next: SK6 (image underlay) still needs
+your go-ahead.**
+
+---
+
+## 2026-08-27 (fix) — The scale contract: planes, grid, camera and zoom agree now
+
+"Can you fix the scale of pixels, grid, models and planes, they are a
+clusterfukk." Rendered four probe shots and looked: every pair disagreed
+somewhere. The sketch grid ran 80 u across a 24 u plane — paper sprawling
+three times past its sheet, with the plane you clicked indistinguishable from
+open space. The other two planes crossed that paper edge-on as coloured bands,
+labels stranded mid-grid. Plane edges (±12) missed the major lines (±8).
+Zoomed to a part, the planes were translucent walls over everything. New ship
+kept the last document's zoom. Pixels themselves were already right (V-128) —
+it was the frames of reference around them fighting.
+
+The contract (V-129): planes are 32 u across so their edges are 8 u majors at
+every grid step; the sketch grid's extent IS the plane, drawn alone while
+sketching and framed whole on entry; planes fade out as the camera zooms past
+them (and stop being pickable before they are invisible); New ship goes Home.
+
+The bug found on the way is the recordable one: PlaneDraw.Fade used zero to
+mean "unset, draw opaque" — so a *fully faded* plane drew at full strength,
+caught only by measuring wall pixels across builds when the eyeball said
+"nothing changed". Zero means invisible now and every constructor sets the
+field. Thirty goldens regenerated after eyeballing sk2_curves and m3_straight;
+the sample-ship golden did not move, because paint mode already hid planes —
+the contract holding on its own.
 
 ---
 

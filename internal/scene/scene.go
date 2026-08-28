@@ -9,8 +9,17 @@ import (
 )
 
 // PlaneHalfSize is half the edge length of a default plane's quad: the planes
-// are drawn as 24x24 u bounded rectangles centred at the origin (SPEC-UX §5).
-const PlaneHalfSize = 12.0
+// are drawn as 32x32 u bounded rectangles centred at the origin (SPEC-UX §5).
+//
+// Sixteen, because the whole scale system is built on eights and this is the
+// one number that ties it together (V-129): the sketch grid's major line falls
+// every 8 minors, so a plane's edges land exactly on major lines at every grid
+// step — ±16 at step 1, ±16 at step 2 — and the sheet reads as 4x4 major
+// cells of graph paper rather than a quad that happens to end somewhere. The
+// sketch grid has the same extent (SketchGridHalf), so "the plane" and "the
+// paper you draw on" are one thing, which they never were when the grid ran
+// more than three times past the plane it sat on.
+const PlaneHalfSize = 16.0
 
 // PlaneTintAlpha and PlaneBorderAlpha are the fill and border opacities of a
 // default plane (SPEC-UX §3).
@@ -63,6 +72,7 @@ func BuildPlaneDraws(vis PlaneVisibility, hovered, selected geom.PlaneKind, hasH
 			Hovered:  hasHover && hovered == k,
 			Selected: hasSel && selected == k,
 			Pickable: true,
+			Fade:     1,
 		})
 	}
 	return out

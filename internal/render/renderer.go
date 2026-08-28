@@ -256,6 +256,13 @@ func (r *Renderer) drawPlanes(s *Scene, vp Viewport) {
 			fill = fadeAlpha(fill, dim)
 			border = fadeAlpha(border, dim)
 		}
+		if p.Fade <= 0.01 {
+			continue
+		}
+		if p.Fade < 1 {
+			fill = fadeAlpha(fill, p.Fade)
+			border = fadeAlpha(border, p.Fade)
+		}
 		drawPolyFan(quad[:], fill)
 		for k := 0; k < 4; k++ {
 			r.drawRibbon(c, quad[k], quad[(k+1)%4], width, border, 1)
