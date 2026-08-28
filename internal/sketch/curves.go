@@ -206,3 +206,34 @@ func EllipseThrough(c, major, p geom.Vec2i, segs int) (model.Entity, bool) {
 func EndpointNear(p geom.Vec2i, ents []model.Entity, radius int64) (geom.Vec2i, geom.Vec2i, bool) {
 	return endpointNear(p, ents, radius)
 }
+
+// slotCapSegments is how many segments each rounded end of a slot gets. Eight
+// is enough that a cap reads as round at working zoom and few enough that a
+// row of portholes does not bury the region engine (Sketch_func.md §3).
+const slotCapSegments = 8
+
+// slotThrough builds a capsule between two centres, as wide across as p lies
+// from the line joining them.
+//
+// The width is measured perpendicular, so sliding the third click along the
+// track does not change the slot — only moving it across does, which is what
+// the gesture looks like it should do.
+func slotThrough(a, b, p geom.Vec2i) (model.Entity, bool) {
+	d := b.Sub(a)
+	l := d.Len()
+	if l == 0 {
+		return model.Entity{}, false
+	}
+	nx, ny := -float64(d.Y)/l, float64(d.X)/l
+	half := math.Abs(float64(p.X-a.X)*nx + float64(p.Y-a.Y)*ny)
+	w := int64(math.Round(half))
+	if w <= 0 {
+		return model.Entity{}, false
+	}
+	e := model.NewSlot(a, b, w, slotCapSegments)
+	return e, !e.Degenerate()
+}
+
+// SlotThrough is slotThrough for the script op, so a scripted slot is the same
+// shape a clicked one is.
+func SlotThrough(a, b, p geom.Vec2i) (model.Entity, bool) { return slotThrough(a, b, p) }

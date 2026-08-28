@@ -305,6 +305,10 @@ func (a *App) handleSketchKeys(in InputFrame) {
 		a.cycleToolGroup(sketch.GroupCircle)
 	case in.KeyPressed(rl.KeyA):
 		a.cycleToolGroup(sketch.GroupArc)
+	case in.KeyPressed(rl.KeyP):
+		a.cycleToolGroup(sketch.GroupPolygon)
+	case in.KeyPressed(rl.KeyO):
+		a.cycleToolGroup(sketch.GroupSlot)
 	case in.KeyPressed(rl.KeyPeriod):
 		a.cycleToolGroup(sketch.GroupPoint)
 	case in.KeyPressed(rl.KeyQ):
@@ -586,3 +590,52 @@ func plural(n int, one, many string) string {
 // SelectedRegionCount is how many regions are picked, which M3's extrude gate
 // reads.
 func (a *App) SelectedRegionCount() int { return len(a.sketch.selectedRegions) }
+
+// PolygonSideCounts are the side counts the card offers. Three through eight
+// covers every shape a hull actually uses, plus twelve for a hatch ring;
+// anything rounder is a circle, and the circle tool has the segment control.
+var PolygonSideCounts = []int{3, 4, 5, 6, 8, 12}
+
+// polygonSidesTarget reports the side count the card should show, and whether
+// to show the row at all: while a polygon tool is armed, or while exactly one
+// polygon is selected.
+func (a *App) polygonSidesTarget(s *model.Sketch, sess *sketch.Session) (int, bool) {
+	if i, ok := a.selectedPolygon(s, sess); ok {
+		return s.Entities[i].Segs, true
+	}
+	switch sess.Tool {
+	case sketch.ToolPolygon, sketch.ToolPolygonCirc:
+		return sess.Sides, true
+	}
+	return 0, false
+}
+
+// selectedPolygon returns the index of the single selected polygon, if that is
+// what the selection is.
+func (a *App) selectedPolygon(s *model.Sketch, sess *sketch.Session) (int, bool) {
+	if len(sess.Selected) != 1 {
+		return 0, false
+	}
+	i := sess.Selected[0]
+	if i < 0 || i >= len(s.Entities) || s.Entities[i].Kind != model.EntPolygon {
+		return 0, false
+	}
+	return i, true
+}
+
+// setPolygonSides arms the count for new polygons and, when one is selected,
+// rebuilds it — the same two-jobs-one-control shape the circle segments row
+// has had since M2.
+func (a *App) setPolygonSides(s *model.Sketch, sess *sketch.Session, n int) {
+	sess.Sides = n
+	if i, ok := a.selectedPolygon(s, sess); ok {
+		e := s.Entities[i]
+		a.Run(&model.ReplaceEntities{
+			Sketch: s.ID,
+			Remove: []int{i},
+			Add:    []model.Entity{model.NewPolygon(e.C, e.A, n)},
+			Label:  "Change polygon sides",
+		})
+		sess.ClearSelection()
+	}
+}

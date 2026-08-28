@@ -36,7 +36,32 @@ const (
 	// EntEllipse is a closed oval: centre C, major-axis endpoint A, semi-minor
 	// axis W. The angle of A about C is the rotation.
 	EntEllipse
+	// EntPolygon is a regular n-gon: centre C, first vertex A, sides in Segs.
+	// A circumscribed polygon is stored as its inscribed equivalent, so there
+	// is one kind and no variant flag (Sketch_func.md §2).
+	EntPolygon
+	// EntSlot is a capsule: a track from centre A to centre B, W across.
+	EntSlot
 )
+
+// Polygon side-count limits (Sketch_func.md §3). The ceiling is lower than a
+// circle's because past it a polygon is a circle, and the circle tool is the
+// one with the segment control.
+const (
+	MinPolygonSides     = 3
+	MaxPolygonSides     = 24
+	DefaultPolygonSides = 6
+)
+
+func clampSides(n int) int {
+	if n < MinPolygonSides {
+		return MinPolygonSides
+	}
+	if n > MaxPolygonSides {
+		return MaxPolygonSides
+	}
+	return n
+}
 
 func (k EntityKind) String() string {
 	switch k {
@@ -50,6 +75,10 @@ func (k EntityKind) String() string {
 		return "arc"
 	case EntEllipse:
 		return "ellipse"
+	case EntPolygon:
+		return "polygon"
+	case EntSlot:
+		return "slot"
 	default:
 		return "line"
 	}
@@ -123,6 +152,42 @@ func NewEllipse(c, major geom.Vec2i, minor int64, segs int) Entity {
 	return Entity{Kind: EntEllipse, C: c, A: major, W: minor, Segs: clampSegs(segs)}
 }
 
+// NewPolygon builds a regular n-gon with a vertex at the given point: the
+// clicked corner is a corner of the result.
+func NewPolygon(c, vertex geom.Vec2i, sides int) Entity {
+	return Entity{Kind: EntPolygon, C: c, A: vertex, Segs: clampSides(sides)}
+}
+
+// NewCircumscribedPolygon builds the n-gon whose flat sides — rather than its
+// corners — touch the given radius, which is how a nut or a bolt head is
+// measured.
+//
+// It is stored as an ordinary polygon with the corner radius that produces
+// that: r / cos(pi/n). One kind, no variant flag to carry through
+// serialization, selection and every later tool (Sketch_func.md §2).
+func NewCircumscribedPolygon(c, midSide geom.Vec2i, sides int) Entity {
+	n := clampSides(sides)
+	d := midSide.Sub(c)
+	r := d.Len() / math.Cos(math.Pi/float64(n))
+	// The first vertex sits at the same angle the clicked point did, so the
+	// polygon is oriented the way the drag was.
+	a := math.Atan2(float64(d.Y), float64(d.X))
+	vertex := geom.Vec2i{
+		X: c.X + int64(math.Round(r*math.Cos(a))),
+		Y: c.Y + int64(math.Round(r*math.Sin(a))),
+	}
+	return NewPolygon(c, vertex, n)
+}
+
+// NewSlot builds a capsule from centre to centre, half is its half-width.
+// caps is how many segments each rounded end is drawn with.
+func NewSlot(a, b geom.Vec2i, half int64, caps int) Entity {
+	if caps < 2 {
+		caps = 2
+	}
+	return Entity{Kind: EntSlot, A: a, B: b, W: half, Segs: caps}
+}
+
 // CCW reports an arc's sweep direction.
 func (e Entity) CCW() bool { return e.R >= 0 }
 
@@ -159,6 +224,12 @@ func (e Entity) Degenerate() bool {
 		return e.A == e.C
 	case EntEllipse:
 		return e.A == e.C || e.W <= 0
+	case EntPolygon:
+		return e.A == e.C
+	case EntSlot:
+		// Both a width and two distinct centres. A slot whose centres coincide
+		// is a circle, and the circle tool draws those.
+		return e.W <= 0 || e.A == e.B
 	default:
 		return e.A == e.B
 	}
@@ -195,6 +266,10 @@ func (e Entity) Points() []geom.Vec2i {
 		return e.arcPoints()
 	case EntEllipse:
 		return e.ellipsePoints()
+	case EntPolygon:
+		return e.polygonPoints()
+	case EntSlot:
+		return e.slotPoints()
 	default:
 		return []geom.Vec2i{e.A, e.B}
 	}
@@ -246,6 +321,66 @@ func (e Entity) arcPoints() []geom.Vec2i {
 	// made of them.
 	pts[0] = e.A
 	pts[n] = e.B
+	return pts
+}
+
+// polygonPoints walks a regular n-gon from its placed vertex.
+func (e Entity) polygonPoints() []geom.Vec2i {
+	n := clampSides(e.Segs)
+	d := e.A.Sub(e.C)
+	r := d.Len()
+	if r <= 0 {
+		return []geom.Vec2i{e.A}
+	}
+	start := math.Atan2(float64(d.Y), float64(d.X))
+	pts := make([]geom.Vec2i, n)
+	for i := 0; i < n; i++ {
+		a := start + 2*math.Pi*float64(i)/float64(n)
+		pts[i] = geom.Vec2i{
+			X: e.C.X + int64(math.Round(r*math.Cos(a))),
+			Y: e.C.Y + int64(math.Round(r*math.Sin(a))),
+		}
+	}
+	// The clicked corner is exactly the clicked corner (V-99).
+	pts[0] = e.A
+	return pts
+}
+
+// slotPoints walks a capsule: down one side, round the far cap, back up the
+// other side, round the near cap.
+//
+// The caps are half-circles centred on A and B, so the outline is what a
+// router bit of that width would actually leave — which is the shape a slot
+// is for.
+func (e Entity) slotPoints() []geom.Vec2i {
+	d := e.B.Sub(e.A)
+	l := d.Len()
+	if l <= 0 || e.W <= 0 {
+		return []geom.Vec2i{e.A}
+	}
+	// The axis and its perpendicular, as unit vectors.
+	ux, uy := float64(d.X)/l, float64(d.Y)/l
+	w := float64(e.W)
+	axis := math.Atan2(uy, ux)
+
+	caps := e.Segs
+	if caps < 2 {
+		caps = 2
+	}
+	pts := make([]geom.Vec2i, 0, 2*caps+2)
+	// The far cap sweeps from one side of B round to the other, and the near
+	// cap does the same about A half a turn later.
+	arcAbout := func(c geom.Vec2i, from float64) {
+		for i := 0; i <= caps; i++ {
+			a := from + math.Pi*float64(i)/float64(caps)
+			pts = append(pts, geom.Vec2i{
+				X: c.X + int64(math.Round(w*math.Cos(a))),
+				Y: c.Y + int64(math.Round(w*math.Sin(a))),
+			})
+		}
+	}
+	arcAbout(e.B, axis-math.Pi/2)
+	arcAbout(e.A, axis+math.Pi/2)
 	return pts
 }
 

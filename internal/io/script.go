@@ -159,6 +159,7 @@ var knownOps = map[string]bool{
 	"sketch.point": true, "sketch.midline": true, "sketch.centerrect": true,
 	"sketch.alignedrect": true, "sketch.construction": true,
 	"sketch.circle3": true, "sketch.arc": true, "sketch.ellipse": true,
+	"sketch.polygon": true, "sketch.slot": true,
 	"pushpull": true,
 	"extrude": true, "extrude.begin": true, "extrude.commit": true,
 	"extrude.cancel": true,

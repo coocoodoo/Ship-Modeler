@@ -755,6 +755,30 @@ func (a *App) buildSketchCard(viewport rl.Rectangle) {
 		}
 	}
 
+	// Polygons have sides rather than segments, and the row only appears when
+	// there is a polygon in hand or selected — a card full of controls for
+	// tools you are not holding is a card nobody reads.
+	if sides, ok := a.polygonSidesTarget(s, sess); ok {
+		body.Y += a.px(6)
+		body.Height -= a.px(6)
+		row, body = ui.SplitTop(body, line)
+		a.UI.Text(row, "Sides", ui.FontSizeSmall, ui.ColorTextDim)
+
+		row, body = ui.SplitTop(body, a.px(24))
+		sideLabels := make([]string, len(PolygonSideCounts))
+		sideSel := -1
+		for i, v := range PolygonSideCounts {
+			sideLabels[i] = itoa(v)
+			if v == sides {
+				sideSel = i
+			}
+		}
+		if pick, changed := a.UI.ChipGroup(ui.MakeID("sketch.sides"), row, sideLabels, sideSel,
+			ui.ChipGroupOpts{Tooltip: "Sides of a new polygon"}); changed {
+			a.setPolygonSides(s, sess, PolygonSideCounts[pick])
+		}
+	}
+
 	body.Y += a.px(6)
 	body.Height -= a.px(6)
 

@@ -2,10 +2,40 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** **SK1 and SK2 done.** Tool groups, construction geometry,
-points, line and rectangle variants, ReplaceEntities; then arcs (three
-gestures), ellipses and the 3-point circle. Suite green (15 packages), exe
-rebuilt. **Next: SK3 — polygons and slots.**
+**Current state:** **SK1, SK2 and SK3 done.** Tool groups, construction
+geometry, points, line and rectangle variants, ReplaceEntities; arcs (three
+gestures), ellipses, the 3-point circle; polygons and slots. Suite green (15 packages), exe
+rebuilt. **Next: SK4 — splines and beziers.**
+
+---
+
+## 2026-08-27 (SK3) — Polygons and slots
+
+The smallest milestone, and the one with the most direct payoff: `EntPolygon`
+and `EntSlot`, two toolbar groups (`P` and `O`), a Sides row on the card that
+appears only when it applies, and the shape a slot exists for.
+
+**The acceptance.** A slot, a hexagon and a circumscribed octagon cut clean
+through a 16×8×2 plate: **256 → 172.6577**, against 172.66 computed from the
+polygon-area formulas for each shape. The octagon is the one that matters —
+circumscribed normalization could be wrong and still produce an octagon, just
+the wrong size, and only a number catches that (V-105).
+
+**Two design calls.** A circumscribed polygon is stored as its inscribed
+equivalent, so there is one kind and no variant flag anywhere downstream. A
+slot's width is measured perpendicular to its axis, so sliding the third click
+along the track does not fatten it (V-106).
+
+**One thing the script taught me.** The first draft put the hexagon's top edge
+exactly on the slot's bottom edge, and the extrude refused — correctly:
+touching regions have been refused since M3, and M3 has a golden for it. The
+script was wrong, not the program. Moved them apart.
+
+The sketch toolbar now carries eight groups and still fits its labels at the
+1280 px minimum; below that `sketchToolbarFitsLabels` drops to icons, measured
+rather than guessed.
+
+**Next:** SK4 — splines and beziers.
 
 ---
 

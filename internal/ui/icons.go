@@ -550,3 +550,44 @@ func DrawArcCenterIcon(cx, cy, size float64, col color.RGBA) {
 	line(v2(cx, cyy), v2(cx+math.Cos(from)*r, cyy+math.Sin(from)*r), w, Fade(col, 0.5))
 	line(v2(cx, cyy), v2(cx+math.Cos(to)*r, cyy+math.Sin(to)*r), w, Fade(col, 0.5))
 }
+
+// DrawPolygonIcon is a hexagon with a corner marked: the inscribed variant is
+// measured to a corner.
+func DrawPolygonIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	pts := make([]rl.Vector2, 6)
+	for i := 0; i < 6; i++ {
+		a := 2*math.Pi*float64(i)/6 - math.Pi/2
+		pts[i] = v2(cx+math.Cos(a)*h*0.85, cy+math.Sin(a)*h*0.85)
+	}
+	closedPoly(w, col, pts...)
+	rl.DrawCircleV(pts[0], float32(h*0.2), col)
+}
+
+// DrawPolygonCircIcon is a hexagon with a flat side marked: the circumscribed
+// variant is measured to a side.
+func DrawPolygonCircIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	pts := make([]rl.Vector2, 6)
+	for i := 0; i < 6; i++ {
+		a := 2*math.Pi*float64(i)/6 - math.Pi/2
+		pts[i] = v2(cx+math.Cos(a)*h*0.85, cy+math.Sin(a)*h*0.85)
+	}
+	closedPoly(w, col, pts...)
+	mid := rl.Vector2{X: (pts[0].X + pts[1].X) / 2, Y: (pts[0].Y + pts[1].Y) / 2}
+	rl.DrawCircleV(mid, float32(h*0.2), col)
+}
+
+// DrawSlotIcon is a capsule lying on its side.
+func DrawSlotIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	r := h * 0.45
+	left, right := cx-h*0.45, cx+h*0.45
+	line(v2(left, cy-r), v2(right, cy-r), w, col)
+	line(v2(left, cy+r), v2(right, cy+r), w, col)
+	arcSweep(right, cy, r, -math.Pi/2, math.Pi/2, w, col)
+	arcSweep(left, cy, r, math.Pi/2, 3*math.Pi/2, w, col)
+}

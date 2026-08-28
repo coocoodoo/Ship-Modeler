@@ -1005,3 +1005,26 @@ toolbar with no obvious use in a low-poly hull that the arc and ellipse
 already shipped do not cover, and each needs its own entity kind, gesture and
 tessellation. Deferred, not refused: the kinds are reserved in the enum order
 of Sketch_func.md §3 and can be appended without disturbing anything.
+
+**V-105 · A circumscribed polygon is an inscribed one with a bigger radius.**
+The two variants are two gestures, not two shapes: the click means "a corner"
+or "the middle of a flat side", and the second is normalized to the first by
+r / cos(π/n) at creation. One `EntPolygon`, no variant flag to thread through
+serialization, selection, the Sides control and every SK5 modify tool. The
+test measures what normalization must preserve — the side midpoints sit at the
+radius the user gave — rather than the stored number, because that is the
+property a user would notice.
+
+**V-106 · A slot's width is perpendicular.** The third click gives the width,
+measured across the axis rather than as a distance from a centre, so sliding
+it along the track leaves the slot alone. That is what the gesture looks like
+it should do, and it makes the common case — dragging out along the track and
+then out sideways — behave.
+
+**V-107 · Polygon sides are capped at 24, lower than a circle's 64.** Past two
+dozen sides a polygon is a circle, and the circle tool is the one with the
+segment control and the resolution to spend. The card's Sides row offers
+3/4/5/6/8/12 — every shape a hull actually uses, plus a hatch ring — and the
+row only appears while a polygon tool is armed or a polygon is selected,
+because a card full of controls for tools you are not holding is a card nobody
+reads.

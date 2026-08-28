@@ -352,6 +352,39 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return err
 		}
 
+	case "sketch.polygon":
+		if op.C == nil || op.A == nil {
+			return op.Errorf("sketch.polygon needs c (centre) and a (a corner, or a side midpoint when circumscribed)")
+		}
+		sides := op.Segs
+		if sides == 0 {
+			sides = model.DefaultPolygonSides
+		}
+		var poly model.Entity
+		switch op.Kind {
+		case "", "inscribed":
+			poly = model.NewPolygon(vec(op.C), vec(op.A), sides)
+		case "circumscribed":
+			poly = model.NewCircumscribedPolygon(vec(op.C), vec(op.A), sides)
+		default:
+			return op.Errorf("polygon kind %q is not inscribed or circumscribed", op.Kind)
+		}
+		if err := r.addEntity(op, poly); err != nil {
+			return err
+		}
+
+	case "sketch.slot":
+		if op.A == nil || op.B == nil || op.C == nil {
+			return op.Errorf("sketch.slot needs a and b (the two ends) and c (a point across the track)")
+		}
+		slot, ok := sketch.SlotThrough(vec(op.A), vec(op.B), vec(op.C))
+		if !ok {
+			return op.Errorf("those points make no slot")
+		}
+		if err := r.addEntity(op, slot); err != nil {
+			return err
+		}
+
 	case "sketch.ellipse":
 		if op.C == nil || op.A == nil || op.B == nil {
 			return op.Errorf("sketch.ellipse needs c (centre), a (long axis) and b (a point across it)")

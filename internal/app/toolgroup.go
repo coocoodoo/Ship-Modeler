@@ -163,6 +163,12 @@ func sketchToolIcon(t sketch.Tool) ui.IconFunc {
 		return ui.DrawArcTangentIcon
 	case sketch.ToolArcCenter:
 		return ui.DrawArcCenterIcon
+	case sketch.ToolPolygon:
+		return ui.DrawPolygonIcon
+	case sketch.ToolPolygonCirc:
+		return ui.DrawPolygonCircIcon
+	case sketch.ToolSlot:
+		return ui.DrawSlotIcon
 	case sketch.ToolPoint:
 		return ui.DrawPointToolIcon
 	default:

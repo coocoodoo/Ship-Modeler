@@ -17,12 +17,17 @@ const (
 	GroupRect
 	GroupCircle
 	GroupArc
+	GroupPolygon
+	GroupSlot
 	GroupPoint
 )
 
 // Groups lists the groups in toolbar order.
 func Groups() []ToolGroup {
-	return []ToolGroup{GroupSelect, GroupLine, GroupRect, GroupCircle, GroupArc, GroupPoint}
+	return []ToolGroup{
+		GroupSelect, GroupLine, GroupRect, GroupCircle, GroupArc,
+		GroupPolygon, GroupSlot, GroupPoint,
+	}
 }
 
 // Tools are the group's members, in the order the flyout lists them and the
@@ -37,6 +42,10 @@ func (g ToolGroup) Tools() []Tool {
 		return []Tool{ToolCircle, ToolCircle3, ToolEllipse}
 	case GroupArc:
 		return []Tool{ToolArc3, ToolArcTangent, ToolArcCenter}
+	case GroupPolygon:
+		return []Tool{ToolPolygon, ToolPolygonCirc}
+	case GroupSlot:
+		return []Tool{ToolSlot}
 	case GroupPoint:
 		return []Tool{ToolPoint}
 	default:
@@ -55,6 +64,10 @@ func (g ToolGroup) Name() string {
 		return "Circle"
 	case GroupArc:
 		return "Arc"
+	case GroupPolygon:
+		return "Polygon"
+	case GroupSlot:
+		return "Slot"
 	case GroupPoint:
 		return "Point"
 	default:

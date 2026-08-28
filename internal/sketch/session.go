@@ -40,6 +40,12 @@ const (
 	ToolArc3
 	// ToolArcTangent continues an existing entity smoothly.
 	ToolArcTangent
+	// ToolPolygon draws a regular n-gon with a corner where you click.
+	ToolPolygon
+	// ToolPolygonCirc draws one whose flat sides touch where you click.
+	ToolPolygonCirc
+	// ToolSlot draws a capsule: a track with rounded ends.
+	ToolSlot
 )
 
 // AllTools lists every tool in toolbar order, which is what the group layout
@@ -48,7 +54,8 @@ func AllTools() []Tool {
 	return []Tool{
 		ToolSelect, ToolLine, ToolMidLine, ToolRect, ToolCenterRect,
 		ToolAlignedRect, ToolCircle, ToolCircle3, ToolEllipse,
-		ToolArcCenter, ToolArc3, ToolArcTangent, ToolPoint,
+		ToolArcCenter, ToolArc3, ToolArcTangent,
+		ToolPolygon, ToolPolygonCirc, ToolSlot, ToolPoint,
 	}
 }
 
@@ -78,6 +85,12 @@ func (t Tool) String() string {
 		return "3 point arc"
 	case ToolArcTangent:
 		return "Tangent arc"
+	case ToolPolygon:
+		return "Inscribed polygon"
+	case ToolPolygonCirc:
+		return "Circumscribed polygon"
+	case ToolSlot:
+		return "Slot"
 	default:
 		return "Select"
 	}
@@ -95,6 +108,10 @@ func (t Tool) Shortcut() string {
 		return "C"
 	case ToolArcCenter, ToolArc3, ToolArcTangent:
 		return "A"
+	case ToolPolygon, ToolPolygonCirc:
+		return "P"
+	case ToolSlot:
+		return "O"
 	case ToolPoint:
 		return "."
 	default:
@@ -106,7 +123,8 @@ func (t Tool) Shortcut() string {
 // is what makes Esc step back a point instead of dropping the gesture.
 func (t Tool) staged() bool {
 	switch t {
-	case ToolAlignedRect, ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3:
+	case ToolAlignedRect, ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3,
+		ToolSlot:
 		return true
 	}
 	return false
@@ -140,6 +158,12 @@ func (t Tool) Hint() string {
 		return "Click the arc's start, then its end, then a point it passes through"
 	case ToolArcTangent:
 		return "Click a loose endpoint to continue from, then where the arc ends"
+	case ToolPolygon:
+		return "Click the centre, then a corner - the side count is in the card"
+	case ToolPolygonCirc:
+		return "Click the centre, then the middle of a flat side"
+	case ToolSlot:
+		return "Click the two ends of the track, then how wide it is"
 	default:
 		return "Click an entity to select it · Del removes the selection · Esc clears it"
 	}
@@ -153,6 +177,8 @@ type Session struct {
 	Tool Tool
 	// CircleSegs is the segment count new circles are created with.
 	CircleSegs int
+	// Sides is how many a new polygon gets.
+	Sides int
 
 	// Selected holds the entity indices the Select tool has picked.
 	Selected []int
@@ -183,7 +209,12 @@ func (s *Session) SetContext(ents []model.Entity) { s.context = ents }
 // NewSession starts editing a sketch with the Line tool ready, which is the
 // tool a first-time user needs first.
 func NewSession(sketchID uint32) *Session {
-	return &Session{SketchID: sketchID, Tool: ToolLine, CircleSegs: model.DefaultCircleSegs}
+	return &Session{
+		SketchID:   sketchID,
+		Tool:       ToolLine,
+		CircleSegs: model.DefaultCircleSegs,
+		Sides:      model.DefaultPolygonSides,
+	}
 }
 
 // Drawing reports whether anything is half-placed, which is what Esc unwinds
@@ -200,11 +231,13 @@ func (s *Session) Anchor() (geom.Vec2i, bool) { return s.anchor, s.hasAnchor }
 // is in progress. It is also what the inference guides work against.
 func (s *Session) RubberFrom() *geom.Vec2i {
 	switch s.Tool {
-	case ToolLine, ToolAlignedRect, ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3:
+	case ToolLine, ToolAlignedRect, ToolCircle3, ToolEllipse, ToolArcCenter,
+		ToolArc3, ToolSlot:
 		if n := len(s.chain); n > 0 {
 			return &s.chain[n-1]
 		}
-	case ToolRect, ToolCircle, ToolMidLine, ToolCenterRect, ToolArcTangent:
+	case ToolRect, ToolCircle, ToolMidLine, ToolCenterRect, ToolArcTangent,
+		ToolPolygon, ToolPolygonCirc:
 		if s.hasAnchor {
 			return &s.anchor
 		}
@@ -318,8 +351,10 @@ func (s *Session) Click(p geom.Vec2i) ClickResult {
 		return s.clickCenterRect(p)
 	case ToolAlignedRect:
 		return s.clickAlignedRect(p)
-	case ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3:
+	case ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3, ToolSlot:
 		return s.clickThreePoint(p)
+	case ToolPolygon, ToolPolygonCirc:
+		return s.clickPolygon(p)
 	case ToolArcTangent:
 		return s.clickTangentArc(p)
 	default:
@@ -367,8 +402,40 @@ func (s *Session) buildThreePoint(a, b, c geom.Vec2i) (model.Entity, bool) {
 	case ToolArc3:
 		// Start, end, then a point on the way: the third click is the bulge.
 		return arcThrough(a, c, b, s.CircleSegs)
+	case ToolSlot:
+		return slotThrough(a, b, c)
 	}
 	return model.Entity{}, false
+}
+
+// clickPolygon takes a centre and then a size, the second click meaning a
+// corner or the middle of a flat side depending on the variant.
+func (s *Session) clickPolygon(p geom.Vec2i) ClickResult {
+	if !s.hasAnchor {
+		s.anchor, s.hasAnchor = p, true
+		return ClickResult{}
+	}
+	e, ok := s.buildPolygon(s.anchor, p)
+	s.hasAnchor = false
+	if !ok {
+		return ClickResult{Rejected: s.Tool.refusal()}
+	}
+	return ClickResult{Entity: e, Commit: true}
+}
+
+// buildPolygon makes the n-gon the active variant asks for.
+func (s *Session) buildPolygon(c, p geom.Vec2i) (model.Entity, bool) {
+	sides := s.Sides
+	if sides == 0 {
+		sides = model.DefaultPolygonSides
+	}
+	var e model.Entity
+	if s.Tool == ToolPolygonCirc {
+		e = model.NewCircumscribedPolygon(c, p, sides)
+	} else {
+		e = model.NewPolygon(c, p, sides)
+	}
+	return e, !e.Degenerate()
 }
 
 // clickTangentArc hangs an arc off a loose endpoint so it leaves smoothly.
@@ -412,6 +479,10 @@ func (t Tool) refusal() string {
 		return "An arc needs a centre, a start and a sweep"
 	case ToolEllipse:
 		return "An ellipse needs width across its long axis"
+	case ToolSlot:
+		return "A slot needs two ends and a width across them"
+	case ToolPolygon, ToolPolygonCirc:
+		return "A polygon needs a size - click away from the centre"
 	}
 	return "That does not make a shape"
 }
@@ -667,7 +738,16 @@ func (s *Session) PreviewAt(p geom.Vec2i) Preview {
 			}
 			return Preview{Kind: model.EntLine, Entities: lines, Show: true}
 		}
-	case ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3:
+	case ToolPolygon, ToolPolygonCirc:
+		if !s.hasAnchor {
+			return Preview{}
+		}
+		e, ok := s.buildPolygon(s.anchor, p)
+		if !ok {
+			return Preview{}
+		}
+		return Preview{Kind: model.EntPolygon, Entity: e, Show: true}
+	case ToolCircle3, ToolEllipse, ToolArcCenter, ToolArc3, ToolSlot:
 		switch len(s.chain) {
 		case 1:
 			// One point placed: a guide line to the cursor, so the gesture is
