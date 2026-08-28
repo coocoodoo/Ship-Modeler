@@ -720,11 +720,20 @@ func (a *App) ResampleFace(bodyID uint32, uid mesh.FaceUID, res int) bool {
 		return false
 	}
 	a.Toast(ui.Toast{
-		Text:     fmt.Sprintf("Resampled the face to %d px", res),
+		Text:     fmt.Sprintf("Resampled the face to %d px/u", res),
 		Action:   "Undo",
 		OnAction: func() { a.Undo() },
 	})
 	return true
+}
+
+// sameDensity reports whether a picture's texel size is the one a chip asks
+// for. It compares the texel rather than the Res field so a ship saved before
+// V-128 — whose Res meant texels across the face — is judged by what it
+// actually has.
+func sameDensity(texel float64, res int) bool {
+	want := 1 / float64(res)
+	return math.Abs(texel-want) <= want*1e-9
 }
 
 // SetPaintRes arms a resolution chip. It never touches an existing texture:
@@ -893,7 +902,7 @@ func (a *App) paintHint() string {
 	}
 	if st.tool == paint.ToolEdge {
 		if n := len(st.edges); n > 0 {
-			return fmt.Sprintf("%s picked · press Paint to bake the line · Esc clears", 
+			return fmt.Sprintf("%s picked · press Paint to bake the line · Esc clears",
 				plural(n, "edge", "edges"))
 		}
 		return "Click edges to draw a line along · All corners picks them for you"
@@ -911,11 +920,12 @@ func (a *App) paintHint() string {
 	if a.UI.In.Alt || st.tool == paint.ToolPick {
 		return "Click to pick up the colour under the cursor"
 	}
-	if h.allocated && h.paint.Res != st.res {
-		return fmt.Sprintf("This face is %d px — painting it stays %d px", h.paint.Res, h.paint.Res)
+	if h.allocated && !sameDensity(h.paint.Texel, st.res) {
+		d := paint.Density(h.paint)
+		return fmt.Sprintf("This face is %.3g px/u — painting it stays %.3g px/u", d, d)
 	}
 	if !h.allocated {
-		return fmt.Sprintf("Paint this face at %d px · texel %d,%d", st.res, h.texel.X, h.texel.Y)
+		return fmt.Sprintf("Paint this face at %d px/u · texel %d,%d", st.res, h.texel.X, h.texel.Y)
 	}
 	if st.tool.TwoPoint() {
 		return fmt.Sprintf("%s · drag from here · Shift constrains it",

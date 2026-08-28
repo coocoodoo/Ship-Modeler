@@ -21,7 +21,7 @@ func hardBrush(c color.RGBA, size int) Brush {
 }
 
 func TestRectOutlineDrawsFourWallsAndNoMiddle(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	DrawRect(p, hardBrush(red, 1), image.Point{X: 2, Y: 2}, image.Point{X: 8, Y: 6}, false)
 
 	for x := 2; x <= 8; x++ {
@@ -48,7 +48,7 @@ func TestRectOutlineDrawsFourWallsAndNoMiddle(t *testing.T) {
 }
 
 func TestRectFilledCoversItsBox(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	r := DrawRect(p, hardBrush(red, 1), image.Point{X: 8, Y: 6}, image.Point{X: 2, Y: 2}, true)
 
 	// Dragged up and to the left: the corners still come out the same box.
@@ -68,7 +68,7 @@ func TestRectFilledCoversItsBox(t *testing.T) {
 }
 
 func TestEllipseIsSymmetricInBothAxes(t *testing.T) {
-	p := testPaint(t, 128)
+	p := testPaint(t, 16)
 	// An odd-sized box so there is a true centre row and column.
 	a, z := image.Point{X: 10, Y: 10}, image.Point{X: 30, Y: 24}
 	DrawEllipse(p, hardBrush(red, 1), a, z, false)
@@ -89,7 +89,7 @@ func TestEllipseIsSymmetricInBothAxes(t *testing.T) {
 }
 
 func TestEllipseTouchesEachSideOfItsBoxExactlyOnce(t *testing.T) {
-	p := testPaint(t, 128)
+	p := testPaint(t, 16)
 	a, z := image.Point{X: 10, Y: 10}, image.Point{X: 30, Y: 24}
 	DrawEllipse(p, hardBrush(red, 1), a, z, false)
 
@@ -128,7 +128,7 @@ func TestEllipseTouchesEachSideOfItsBoxExactlyOnce(t *testing.T) {
 }
 
 func TestFilledEllipseHasNoHoles(t *testing.T) {
-	p := testPaint(t, 128)
+	p := testPaint(t, 16)
 	a, z := image.Point{X: 10, Y: 10}, image.Point{X: 30, Y: 24}
 	DrawEllipse(p, hardBrush(red, 1), a, z, true)
 
@@ -151,7 +151,7 @@ func TestFilledEllipseHasNoHoles(t *testing.T) {
 
 func TestShapesOfOneTexelDegradeToADab(t *testing.T) {
 	for _, name := range []string{"rect", "ellipse"} {
-		p := testPaint(t, 32)
+		p := testPaint(t, 4)
 		at := image.Point{X: 5, Y: 5}
 		if name == "rect" {
 			DrawRect(p, hardBrush(red, 1), at, at, false)
@@ -171,7 +171,7 @@ func TestShapesOfOneTexelDegradeToADab(t *testing.T) {
 // texel you pressed on is the first colour, the texel you released on is the
 // second, and everything between is on the way.
 func TestGradientRunsFromOneColourToTheOther(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	region := image.Rect(0, 0, 32, 11)
 	a, z := image.Point{X: 0, Y: 5}, image.Point{X: 31, Y: 5}
 	Gradient(p, region, a, z, red, blue, DitherNone)
@@ -197,7 +197,7 @@ func TestGradientRunsFromOneColourToTheOther(t *testing.T) {
 }
 
 func TestGradientIsPerpendicularToItsDrag(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	region := image.Rect(0, 0, 32, 11)
 	Gradient(p, region, image.Point{X: 0, Y: 5}, image.Point{X: 31, Y: 5}, red, blue, DitherNone)
 
@@ -218,7 +218,7 @@ func TestGradientIsPerpendicularToItsDrag(t *testing.T) {
 // entire reason a pixel artist reaches for it.
 func TestDitheredGradientUsesOnlyTheTwoColours(t *testing.T) {
 	for _, d := range []Dither{Dither2x2, Dither4x4, Dither8x8} {
-		p := testPaint(t, 32)
+		p := testPaint(t, 4)
 		region := image.Rect(0, 0, 32, 11)
 		Gradient(p, region, image.Point{X: 0, Y: 5}, image.Point{X: 31, Y: 5}, red, blue, d)
 
@@ -249,7 +249,7 @@ func TestDitheredGradientUsesOnlyTheTwoColours(t *testing.T) {
 }
 
 func TestGradientOfZeroLengthFillsWithTheSecondColour(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	region := image.Rect(0, 0, 8, 8)
 	at := image.Point{X: 4, Y: 4}
 	Gradient(p, region, at, at, red, blue, DitherNone)
@@ -269,7 +269,7 @@ func TestGradientOfZeroLengthFillsWithTheSecondColour(t *testing.T) {
 // body colour, not over the paint already on the face, so a half-alpha texel
 // laid over existing paint would show the body through it.
 func TestSoftBrushFadesIntoWhatIsUnderIt(t *testing.T) {
-	p := testPaint(t, 128)
+	p := testPaint(t, 16)
 	b := hardBrush(red, 16)
 	b.Soft = true
 	centre := image.Point{X: 40, Y: 40}
@@ -302,13 +302,13 @@ func TestSoftBrushFadesIntoWhatIsUnderIt(t *testing.T) {
 func TestSoftBrushIsRoundAndHardBrushIsSquare(t *testing.T) {
 	corner := image.Point{X: 40, Y: 40}
 
-	hard := testPaint(t, 128)
+	hard := testPaint(t, 16)
 	Stroke(hard, hardBrush(red, 8), corner, corner)
 	if got := At(hard, corner); got != red {
 		t.Fatalf("the hard brush left %v in its own corner", got)
 	}
 
-	soft := testPaint(t, 128)
+	soft := testPaint(t, 16)
 	b := hardBrush(red, 8)
 	b.Soft = true
 	Stroke(soft, b, corner, corner)
@@ -323,7 +323,7 @@ func TestSoftBrushIsRoundAndHardBrushIsSquare(t *testing.T) {
 // TestDitheredSoftBrushStaysOnOneColour is the pixel-native half of softness:
 // the falloff becomes a pattern of whole texels rather than a blend.
 func TestDitheredSoftBrushStaysOnOneColour(t *testing.T) {
-	p := testPaint(t, 128)
+	p := testPaint(t, 16)
 	b := hardBrush(red, 16)
 	b.Soft, b.Dither = true, Dither4x4
 	centre := image.Point{X: 40, Y: 40}

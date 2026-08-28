@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"strings"
 	"testing"
 
 	"modeler/internal/geom"
@@ -32,21 +33,23 @@ func faceAlong(m *mesh.Mesh, n geom.Vec3) int {
 	panic("no face along that normal")
 }
 
-func TestAllocateFixesDensityFromTheFaceBBox(t *testing.T) {
+func TestAllocateTakesItsDensityFromTheChipAlone(t *testing.T) {
 	m, fi := plate()
-	p, err := Allocate(m, fi, 32)
+	p, err := Allocate(m, fi, 4)
 	if err != nil {
 		t.Fatalf("allocate: %v", err)
 	}
-	// "32" means the face is 32 texels across at its widest (GEOM §8.2).
-	if want := 8.0 / 32; math.Abs(p.Texel-want) > 1e-12 {
+	// "4" means four texels to the unit — a density, not a count, so the face's
+	// own size has no say in it (GEOM §8.2, V-128).
+	if want := 1.0 / 4; math.Abs(p.Texel-want) > 1e-12 {
 		t.Errorf("texel size = %v, want %v", p.Texel, want)
 	}
-	if p.Res != 32 {
-		t.Errorf("res = %d, want 32", p.Res)
+	if p.Res != 4 {
+		t.Errorf("res = %d, want 4", p.Res)
 	}
 	// The image covers the face's bbox plus a one-texel margin all round.
 	b := p.Img.Bounds()
+	// The face is 8 x 4 units, so at four texels to the unit it is 32 x 16.
 	if b.Dx() != 34 || b.Dy() != 18 {
 		t.Errorf("image is %dx%d, want 34x18 (32x16 plus a texel each side)", b.Dx(), b.Dy())
 	}
@@ -63,7 +66,7 @@ func TestAllocateFixesDensityFromTheFaceBBox(t *testing.T) {
 
 func TestUVRoundTripsThroughWorld(t *testing.T) {
 	m, fi := plate()
-	p, err := Allocate(m, fi, 32)
+	p, err := Allocate(m, fi, 4)
 	if err != nil {
 		t.Fatalf("allocate: %v", err)
 	}
@@ -89,7 +92,7 @@ func TestUVRoundTripsThroughWorld(t *testing.T) {
 
 func TestTexelSizeSurvivesTranslateAndQuarterTurn(t *testing.T) {
 	m, fi := plate()
-	p, err := Allocate(m, fi, 32)
+	p, err := Allocate(m, fi, 4)
 	if err != nil {
 		t.Fatalf("allocate: %v", err)
 	}
@@ -120,7 +123,7 @@ func TestTexelSizeSurvivesTranslateAndQuarterTurn(t *testing.T) {
 
 func TestGrowKeepsExistingPixelsWhereTheyAre(t *testing.T) {
 	m, fi := plate()
-	p, err := Allocate(m, fi, 32)
+	p, err := Allocate(m, fi, 4)
 	if err != nil {
 		t.Fatalf("allocate: %v", err)
 	}
@@ -156,7 +159,7 @@ func TestGrowKeepsExistingPixelsWhereTheyAre(t *testing.T) {
 
 func TestGrowRefusesBeyondTheCap(t *testing.T) {
 	m, fi := plate()
-	p, err := Allocate(m, fi, 32)
+	p, err := Allocate(m, fi, 4)
 	if err != nil {
 		t.Fatalf("allocate: %v", err)
 	}
@@ -187,7 +190,7 @@ func TestAllocateOnASlantedFace(t *testing.T) {
 	m := mesh.Box(geom.Vec3{X: -3, Y: -3, Z: -3}, geom.Vec3{X: 3, Y: 3, Z: 3}, 1)
 	mesh.Transform(m, geom.RotateY(0.7).Mul(geom.RotateZ(0.4)))
 	fi := 0
-	p, err := Allocate(m, fi, 16)
+	p, err := Allocate(m, fi, 2)
 	if err != nil {
 		t.Fatalf("allocate: %v", err)
 	}
@@ -207,7 +210,7 @@ func TestAllocateOnASlantedFace(t *testing.T) {
 
 func TestFaceRectCoversTheFaceAndNotTheMargin(t *testing.T) {
 	m, fi := plate()
-	p, err := Allocate(m, fi, 32)
+	p, err := Allocate(m, fi, 4)
 	if err != nil {
 		t.Fatalf("allocate: %v", err)
 	}
@@ -238,7 +241,7 @@ func TestFaceRectCoversTheFaceAndNotTheMargin(t *testing.T) {
 
 func TestFaceRectFollowsAGrownImage(t *testing.T) {
 	m, fi := plate()
-	p, _ := Allocate(m, fi, 32)
+	p, _ := Allocate(m, fi, 4)
 	before := FaceRect(m, fi, p)
 	// Painting far outside grows the image; the face has not moved, so the
 	// rectangle the face occupies must not move either.
@@ -256,4 +259,54 @@ func clampInt(v, lo, hi int) int {
 		return hi
 	}
 	return v
+}
+
+// The point of the whole exercise (V-128): a pixel is the same size on every
+// face, so an edge line is the same thickness on both faces it touches and a
+// texel is a texel wherever you look.
+//
+// Before this, texel size was the face's longest side over the chip, so the
+// short faces of any box that was not a cube had smaller pixels than the long
+// ones — and nothing on screen said so.
+func TestEveryFaceGetsThePixelSizeTheChipAsksFor(t *testing.T) {
+	// Deliberately not a cube: 12 x 2 x 8 has three different face sizes, which
+	// under the old rule gave three different pixel sizes.
+	m := mesh.Box(geom.Vec3{X: -6, Y: -1, Z: -4}, geom.Vec3{X: 6, Y: 1, Z: 4}, 1)
+	const res = 8
+	want := 1.0 / res
+	for fi := range m.Faces {
+		p, err := Allocate(m, fi, res)
+		if err != nil {
+			t.Fatalf("allocating face %d: %v", fi, err)
+		}
+		if math.Abs(p.Texel-want) > 1e-12 {
+			t.Errorf("face %d has %v-unit texels, want %v — a pixel has to be "+
+				"the same size on every face", fi, p.Texel, want)
+		}
+		if d := Density(p); math.Abs(d-res) > 1e-9 {
+			t.Errorf("face %d reports %v px/u, want %d", fi, d, res)
+		}
+	}
+}
+
+// A density means the picture grows with the face, so a big enough face can ask
+// for more than the cap allows. That has to be refused rather than clamped: a
+// clamped picture would not cover the face, and a face silently painted at some
+// other density is the exact thing the density was brought in to stop.
+func TestAFaceTooBigForItsChipIsRefusedWithAChipThatFits(t *testing.T) {
+	// 400 units across at 32 px/u would be 12800 px, well past the 1024 cap.
+	m := mesh.Box(geom.Vec3{X: -200, Y: -1, Z: -200}, geom.Vec3{X: 200, Y: 1, Z: 200}, 1)
+	fi := faceAlong(m, geom.Vec3{X: 0, Y: 1, Z: 0})
+
+	_, err := Allocate(m, fi, 32)
+	if err == nil {
+		t.Fatal("a 400-unit face was allocated at 32 px/u, past the texture cap")
+	}
+	// The refusal has to name a chip that works, or it is a dead end.
+	if !strings.Contains(err.Error(), "try 2 px/u") {
+		t.Errorf("the refusal does not say what would fit: %v", err)
+	}
+	if _, err := Allocate(m, fi, 2); err != nil {
+		t.Errorf("the chip it recommended does not itself fit: %v", err)
+	}
 }

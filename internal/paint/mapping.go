@@ -19,13 +19,19 @@ import (
 	"modeler/internal/geom/mesh"
 )
 
-// Resolutions are the chips of SPEC-UX §13.1. A chip means "this face is N
-// texels across at its widest", which is why the density it produces depends on
-// the face and is then fixed for good.
-var Resolutions = []int{16, 32, 128, 256, 512}
+// Resolutions are the chips of SPEC-UX §13.1, in texels per unit.
+//
+// A chip is a density, not a count. At 8, one texel is an eighth of a unit on
+// every face of every body in the document — so a pixel is the same physical
+// size wherever it is painted, an edge line is the same thickness on both faces
+// it touches, and pushing a face bigger does not make its pixels bigger. The
+// chip used to mean "this face is N texels across at its widest", which made a
+// pixel a different real size on every face (V-128).
+var Resolutions = []int{1, 2, 4, 8, 16, 32}
 
-// DefaultRes is the chip a fresh session starts on.
-const DefaultRes = 32
+// DefaultRes is the chip a fresh session starts on: eight texels to the unit,
+// which puts a pixel on the eighth-unit grid.
+const DefaultRes = 8
 
 // MaxTextureSize caps a face's image on either axis (SPEC-GEOMETRY §8.3).
 // Painting past it is refused rather than allowed to eat memory unbounded.
@@ -34,6 +40,19 @@ const MaxTextureSize = 1024
 // Margin is how many texels of slack the first allocation leaves around the
 // face's bounding box, so a stroke along the very edge has somewhere to land.
 const Margin = 1
+
+// Density is how many texels to the unit a picture actually has.
+//
+// For anything allocated since V-128 that is simply its chip, but a ship saved
+// before then stored a texel size worked out from its face's longest side, so
+// the honest answer comes from the texel rather than from the field. The panel
+// reports this, not Res, so an old file describes itself truthfully.
+func Density(p *mesh.FacePaint) float64 {
+	if p == nil || p.Texel <= 0 {
+		return 0
+	}
+	return 1 / p.Texel
+}
 
 // ValidRes reports whether res is one of the chips.
 func ValidRes(res int) bool {
@@ -50,9 +69,11 @@ func ValidRes(res int) bool {
 //
 // The frame is the face's canonical frame with its origin moved to the
 // bounding-box corner, so texel (0,0) is a corner of the face rather than
-// somewhere in the middle of it. Texel size comes from the longest bbox side
-// and never changes afterwards: constant pixel density is the whole pixel-art
-// contract, and a texture that silently rescales when the face grows breaks it.
+// somewhere in the middle of it. Texel size is one over the chip and nothing
+// else — not the face's size, not its shape — which is what makes a pixel the
+// same thing everywhere in the document (V-128). It never changes afterwards
+// either: a texture that silently rescaled when the face grew would break the
+// pixel-art contract from the other direction.
 func Allocate(m *mesh.Mesh, fi int, res int) (*mesh.FacePaint, error) {
 	if !ValidRes(res) {
 		return nil, fmt.Errorf("%d is not a paint resolution", res)
@@ -69,7 +90,7 @@ func Allocate(m *mesh.Mesh, fi int, res int) (*mesh.FacePaint, error) {
 	if longest <= 0 {
 		return nil, fmt.Errorf("that face has no area to paint on")
 	}
-	texel := longest / float64(res)
+	texel := 1 / float64(res)
 
 	// Origin on the bbox corner: uv(lo) is now exactly (0,0).
 	frame.O = frame.ToWorld(lo)
@@ -77,6 +98,16 @@ func Allocate(m *mesh.Mesh, fi int, res int) (*mesh.FacePaint, error) {
 	// Texels 0..ceil(extent/texel)-1 cover the face; the margin adds one ring.
 	w := int(math.Ceil((hi.X-lo.X)/texel-1e-9)) + 2*Margin
 	h := int(math.Ceil((hi.Y-lo.Y)/texel-1e-9)) + 2*Margin
+
+	// A density makes the picture grow with the face, so unlike a fixed texel
+	// count this can ask for more than the cap allows. Refuse, and name the chip
+	// that would fit: clamping would hand back a picture too small to cover the
+	// face, and a face quietly painted at a density other than the chosen one is
+	// exactly the thing the density was introduced to stop.
+	if w > MaxTextureSize || h > MaxTextureSize {
+		return nil, fmt.Errorf("that face is %.4g u across, which needs %d px at %d px/u — past the %d limit; try %d px/u",
+			longest, maxInt(w, h)-2*Margin, res, MaxTextureSize, largestResFor(longest))
+	}
 	w, h = clampSize(w), clampSize(h)
 
 	return &mesh.FacePaint{
@@ -130,6 +161,18 @@ func faceExtent(m *mesh.Mesh, fi int, frame geom.Frame) (lo, hi geom.Vec2, ok bo
 		}
 	}
 	return lo, hi, true
+}
+
+// largestResFor is the finest chip whose picture still fits the cap for a face
+// that long, so a refusal can say what to do rather than only what went wrong.
+func largestResFor(longest float64) int {
+	best := Resolutions[0]
+	for _, r := range Resolutions {
+		if int(math.Ceil(longest*float64(r)-1e-9))+2*Margin <= MaxTextureSize {
+			best = r
+		}
+	}
+	return best
 }
 
 func clampSize(v int) int {

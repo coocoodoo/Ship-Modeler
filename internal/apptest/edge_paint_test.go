@@ -35,7 +35,7 @@ func TestPaintingEveryEdgeOfABox(t *testing.T) {
 	// the chosen pixel count came to in real size. That number is the answer to
 	// "one pixel is still too thick": the face's resolution decides how big a
 	// pixel is, and the tool cannot draw a finer one (V-126).
-	if !hasToast(after.toasts, "Painted 12 edges, 2 pixels wide (0.75 u)") {
+	if !hasToast(after.toasts, "Painted 12 edges, 2 pixels wide (0.5 u)") {
 		t.Errorf("the bake did not report its width in pixels and in units:\n%q",
 			after.toasts)
 	}

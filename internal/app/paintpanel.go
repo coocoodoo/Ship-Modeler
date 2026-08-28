@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"image/color"
+	"math"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
@@ -345,8 +346,8 @@ func (a *App) paintResRow(label, chips rl.Rectangle) {
 		note, _ := ui.SplitRight(label, a.px(120))
 		text := fmt.Sprintf("%.3f u / texel", h.paint.Texel)
 		col := ui.ColorTextDim
-		if h.allocated && h.paint.Res != st.res {
-			text = fmt.Sprintf("this face is %d px", h.paint.Res)
+		if h.allocated && !sameDensity(h.paint.Texel, st.res) {
+			text = fmt.Sprintf("this face is %.3g px/u", paint.Density(h.paint))
 			col = ui.ColorWarn
 		}
 		a.UI.Text(note, text, ui.FontSizeSmall, ui.Fade(col, 0.9))
@@ -362,7 +363,7 @@ func (a *App) paintResRow(label, chips rl.Rectangle) {
 	}
 	if pick, changed := a.UI.ChipGroup(ui.MakeID("paint.res"), chips, labels, sel,
 		ui.ChipGroupOpts{
-			Tooltip: "How many texels across a face is at its widest, set when it is first painted",
+			Tooltip: "Texels per unit — the same pixel size on every face, fixed when a face is first painted",
 		}); changed {
 		a.SetPaintRes(paint.Resolutions[pick])
 	}
@@ -375,10 +376,24 @@ func (a *App) paintResMismatch() (bool, int) {
 	// panel, and reading the live hover would take them away as you reached for
 	// them.
 	h, ok := a.stickyFace()
-	if !ok || !h.allocated || h.paint == nil || h.paint.Res == a.paint.res {
+	if !ok || !h.allocated || h.paint == nil || sameDensity(h.paint.Texel, a.paint.res) {
 		return false, 0
 	}
-	return true, h.paint.Res
+	return true, nearestRes(paint.Density(h.paint))
+}
+
+// nearestRes is the chip closest to a density, which for anything painted since
+// V-128 is that density exactly. A ship saved before it can hold a face at a
+// density no chip produces, and the offer to match it has to name a chip the
+// brush can actually be set to.
+func nearestRes(d float64) int {
+	best, gap := paint.Resolutions[0], math.Inf(1)
+	for _, r := range paint.Resolutions {
+		if g := math.Abs(float64(r) - d); g < gap {
+			best, gap = r, g
+		}
+	}
+	return best
 }
 
 // paintMismatchPrompt is the inline offer of SPEC-UX §13.2: match the face, or
@@ -390,12 +405,16 @@ func (a *App) paintMismatchPrompt(text, buttons rl.Rectangle, faceRes int) {
 	// measures and truncates a whole string, so a second line inside one would
 	// be cut off rather than wrapped.
 	first, second := ui.SplitTop(text, text.Height/2)
-	a.UI.Text(first, fmt.Sprintf("This face is %d px — switch the", faceRes),
+	h, _ := a.stickyFace()
+	shown := float64(faceRes)
+	if h.paint != nil {
+		shown = paint.Density(h.paint)
+	}
+	a.UI.Text(first, fmt.Sprintf("This face is %.3g px/u — switch the", shown),
 		ui.FontSizeSmall, ui.ColorWarn)
 	a.UI.Text(second, fmt.Sprintf("brush to %d, or resample it to %d?", faceRes, a.paint.res),
 		ui.FontSizeSmall, ui.ColorWarn)
 
-	h, _ := a.stickyFace()
 	gap := a.px(6)
 	w := (buttons.Width - gap) / 2
 	left := ui.Rect(buttons.X, buttons.Y, w, buttons.Height)

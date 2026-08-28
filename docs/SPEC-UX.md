@@ -255,7 +255,7 @@ Face selected → its normal arrow drag **re-extrudes the face**: drag out = Add
 Paint ──────────────────────────
 Tools  [✏ Pencil][◻ Eraser][▨ Fill][💧 Pick]
 Size   (1)(2)(4)
-Res    (16)(32)(128)(256)(512)
+Res    (1)(2)(4)(8)(16)(32)      texels per unit
 Palette  [32 swatches, 8×4]
          [+ custom] [recents ×8]
 [Import .hex]      [Textures 👁]

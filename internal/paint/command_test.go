@@ -49,7 +49,7 @@ func at(t *testing.T, b *model.Body, fi int, x, y int) color.RGBA {
 
 func TestFirstStrokeAllocatesAtTheChosenResolution(t *testing.T) {
 	bus, b, uid, fi := painted(t)
-	cmd := stroke(b.ID, uid, 32, ToolPencil, red, image.Point{X: 4, Y: 4})
+	cmd := stroke(b.ID, uid, 4, ToolPencil, red, image.Point{X: 4, Y: 4})
 	if err := bus.Run(cmd); err != nil {
 		t.Fatalf("stroke: %v", err)
 	}
@@ -57,8 +57,8 @@ func TestFirstStrokeAllocatesAtTheChosenResolution(t *testing.T) {
 	if p == nil {
 		t.Fatal("the face is still unpainted after a stroke")
 	}
-	if p.Res != 32 {
-		t.Errorf("res = %d, want 32", p.Res)
+	if p.Res != 4 {
+		t.Errorf("res = %d, want 4", p.Res)
 	}
 	if got := at(t, b, fi, 4, 4); got != red {
 		t.Errorf("texel (4,4) = %v, want %v", got, red)
@@ -70,7 +70,7 @@ func TestFirstStrokeAllocatesAtTheChosenResolution(t *testing.T) {
 
 func TestUndoOfTheFirstStrokeLeavesTheFaceUnpainted(t *testing.T) {
 	bus, b, uid, fi := painted(t)
-	if err := bus.Run(stroke(b.ID, uid, 32, ToolPencil, red, image.Point{X: 4, Y: 4})); err != nil {
+	if err := bus.Run(stroke(b.ID, uid, 4, ToolPencil, red, image.Point{X: 4, Y: 4})); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := bus.Undo(); !ok {
@@ -85,10 +85,10 @@ func TestUndoOfTheFirstStrokeLeavesTheFaceUnpainted(t *testing.T) {
 
 func TestUndoOfALaterStrokeRestoresOnlyItsOwnRect(t *testing.T) {
 	bus, b, uid, fi := painted(t)
-	if err := bus.Run(stroke(b.ID, uid, 32, ToolPencil, red, image.Point{X: 2, Y: 2})); err != nil {
+	if err := bus.Run(stroke(b.ID, uid, 4, ToolPencil, red, image.Point{X: 2, Y: 2})); err != nil {
 		t.Fatal(err)
 	}
-	if err := bus.Run(stroke(b.ID, uid, 32, ToolPencil, blue, image.Point{X: 9, Y: 9})); err != nil {
+	if err := bus.Run(stroke(b.ID, uid, 4, ToolPencil, blue, image.Point{X: 9, Y: 9})); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := bus.Undo(); !ok {
@@ -104,7 +104,7 @@ func TestUndoOfALaterStrokeRestoresOnlyItsOwnRect(t *testing.T) {
 
 func TestRedoRepaintsTheSameTexels(t *testing.T) {
 	bus, b, uid, fi := painted(t)
-	if err := bus.Run(stroke(b.ID, uid, 32, ToolPencil, red,
+	if err := bus.Run(stroke(b.ID, uid, 4, ToolPencil, red,
 		image.Point{X: 3, Y: 3}, image.Point{X: 7, Y: 3})); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestRedoRepaintsTheSameTexels(t *testing.T) {
 func TestStrokeInterpolatesBetweenItsSamples(t *testing.T) {
 	bus, b, uid, fi := painted(t)
 	// Two samples eight texels apart, as a fast drag would deliver.
-	if err := bus.Run(stroke(b.ID, uid, 32, ToolPencil, red,
+	if err := bus.Run(stroke(b.ID, uid, 4, ToolPencil, red,
 		image.Point{X: 2, Y: 2}, image.Point{X: 10, Y: 2})); err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestAStrokeOnOneFragmentShowsOnItsSiblings(t *testing.T) {
 	// the picture the others are reading — copying it here would be the bug,
 	// not the fix.
 	bus, b, uid, fi := painted(t)
-	if err := bus.Run(stroke(b.ID, uid, 32, ToolPencil, red, image.Point{X: 4, Y: 4})); err != nil {
+	if err := bus.Run(stroke(b.ID, uid, 4, ToolPencil, red, image.Point{X: 4, Y: 4})); err != nil {
 		t.Fatal(err)
 	}
 	shared := b.Mesh.Faces[fi].Paint
@@ -148,7 +148,7 @@ func TestAStrokeOnOneFragmentShowsOnItsSiblings(t *testing.T) {
 	other := faceAlong(b.Mesh, geom.Vec3{X: 0, Y: -1, Z: 0})
 	b.Mesh.Faces[other].Paint = shared
 
-	if err := bus.Run(stroke(b.ID, b.Mesh.Faces[fi].ID, 32, ToolPencil, blue,
+	if err := bus.Run(stroke(b.ID, b.Mesh.Faces[fi].ID, 4, ToolPencil, blue,
 		image.Point{X: 6, Y: 6})); err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestAStrokeOnOneFragmentShowsOnItsSiblings(t *testing.T) {
 func TestFillStopsAtTheEdgeOfTheFace(t *testing.T) {
 	bus, b, uid, fi := painted(t)
 	if err := bus.Run(&StrokeFace{
-		Body: b.ID, Face: uid, Res: 32, Tool: ToolFill, Color: red, Size: 1,
+		Body: b.ID, Face: uid, Res: 4, Tool: ToolFill, Color: red, Size: 1,
 		Points: []image.Point{{X: 5, Y: 5}},
 	}); err != nil {
 		t.Fatalf("fill: %v", err)
@@ -183,12 +183,12 @@ func TestFillStopsAtTheEdgeOfTheFace(t *testing.T) {
 func TestEraserClearsBackToTheBody(t *testing.T) {
 	bus, b, uid, fi := painted(t)
 	if err := bus.Run(&StrokeFace{
-		Body: b.ID, Face: uid, Res: 32, Tool: ToolFill, Color: red, Size: 1,
+		Body: b.ID, Face: uid, Res: 4, Tool: ToolFill, Color: red, Size: 1,
 		Points: []image.Point{{X: 5, Y: 5}},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := bus.Run(stroke(b.ID, uid, 32, ToolEraser, color.RGBA{},
+	if err := bus.Run(stroke(b.ID, uid, 4, ToolEraser, color.RGBA{},
 		image.Point{X: 5, Y: 5})); err != nil {
 		t.Fatalf("erase: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestAStrokeThatChangesNothingIsRefused(t *testing.T) {
 	// An eraser on a face that was never painted has nothing to rub out. It
 	// must not allocate a texture, and it must not land in the history — an
 	// undo step that undoes nothing is worse than no step at all.
-	err := bus.Run(stroke(b.ID, uid, 32, ToolEraser, color.RGBA{}, image.Point{X: 4, Y: 4}))
+	err := bus.Run(stroke(b.ID, uid, 4, ToolEraser, color.RGBA{}, image.Point{X: 4, Y: 4}))
 	if err == nil {
 		t.Fatal("erasing bare geometry was accepted")
 	}
@@ -218,12 +218,12 @@ func TestADragCoalescesIntoOneHistoryStep(t *testing.T) {
 	// What the app does per frame: replace the pending command with a longer
 	// version of the same stroke.
 	pts := []image.Point{{X: 2, Y: 2}}
-	if err := bus.BeginDrag(stroke(b.ID, uid, 32, ToolPencil, red, pts...)); err != nil {
+	if err := bus.BeginDrag(stroke(b.ID, uid, 4, ToolPencil, red, pts...)); err != nil {
 		t.Fatal(err)
 	}
 	for x := 3; x <= 8; x++ {
 		pts = append(pts, image.Point{X: x, Y: 2})
-		if err := bus.UpdateDrag(stroke(b.ID, uid, 32, ToolPencil, red, pts...)); err != nil {
+		if err := bus.UpdateDrag(stroke(b.ID, uid, 4, ToolPencil, red, pts...)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -247,7 +247,7 @@ func TestADragCoalescesIntoOneHistoryStep(t *testing.T) {
 func TestResampleKeepsPixelsWhereTheyAreInTheWorld(t *testing.T) {
 	bus, b, uid, fi := painted(t)
 	if err := bus.Run(&StrokeFace{
-		Body: b.ID, Face: uid, Res: 32, Tool: ToolFill, Color: red, Size: 1,
+		Body: b.ID, Face: uid, Res: 4, Tool: ToolFill, Color: red, Size: 1,
 		Points: []image.Point{{X: 5, Y: 5}},
 	}); err != nil {
 		t.Fatal(err)
@@ -261,12 +261,12 @@ func TestResampleKeepsPixelsWhereTheyAreInTheWorld(t *testing.T) {
 		before[i] = At(p, Texel(p, q))
 	}
 
-	if err := bus.Run(&ResampleFace{Body: b.ID, Face: uid, Res: 128}); err != nil {
+	if err := bus.Run(&ResampleFace{Body: b.ID, Face: uid, Res: 16}); err != nil {
 		t.Fatalf("resample: %v", err)
 	}
 	q := b.Mesh.Faces[fi].Paint
-	if q.Res != 128 {
-		t.Fatalf("res = %d after resample, want 128", q.Res)
+	if q.Res != 16 {
+		t.Fatalf("res = %d after resample, want 16", q.Res)
 	}
 	if q.Texel >= p.Texel {
 		t.Errorf("texel size did not shrink: %v then %v", p.Texel, q.Texel)
@@ -286,7 +286,7 @@ func TestResampleKeepsPixelsWhereTheyAreInTheWorld(t *testing.T) {
 
 func TestStrokeReportsWhatTheRendererHasToReupload(t *testing.T) {
 	bus, b, uid, _ := painted(t)
-	cmd := stroke(b.ID, uid, 32, ToolPencil, red,
+	cmd := stroke(b.ID, uid, 4, ToolPencil, red,
 		image.Point{X: 4, Y: 4}, image.Point{X: 6, Y: 4})
 	cmd.Size = 2
 	if err := bus.Run(cmd); err != nil {
@@ -314,7 +314,7 @@ func TestAShapeRubberBandsRatherThanAccumulating(t *testing.T) {
 	bus, b, uid, fi := painted(t)
 	shape := func(pts ...image.Point) *StrokeFace {
 		return &StrokeFace{
-			Body: b.ID, Face: uid, Res: 32,
+			Body: b.ID, Face: uid, Res: 4,
 			Tool: ToolRect, Color: red, Size: 1, Points: pts,
 		}
 	}
@@ -352,7 +352,7 @@ func TestAFilledShapeIsOneUndoStep(t *testing.T) {
 	bus, b, uid, fi := painted(t)
 	depth := bus.UndoDepth()
 	err := bus.Run(&StrokeFace{
-		Body: b.ID, Face: uid, Res: 32, Tool: ToolCircle,
+		Body: b.ID, Face: uid, Res: 4, Tool: ToolCircle,
 		Color: blue, Size: 1, Fill: true,
 		Points: []image.Point{{X: 4, Y: 4}, {X: 20, Y: 18}},
 	})
@@ -377,7 +377,7 @@ func TestAFilledShapeIsOneUndoStep(t *testing.T) {
 func TestAGradientRunsBetweenTheTwoArmedColours(t *testing.T) {
 	bus, b, uid, fi := painted(t)
 	err := bus.Run(&StrokeFace{
-		Body: b.ID, Face: uid, Res: 32, Tool: ToolGradient,
+		Body: b.ID, Face: uid, Res: 4, Tool: ToolGradient,
 		Color: red, ColorB: blue, Size: 1,
 		Points: []image.Point{{X: 0, Y: 8}, {X: 31, Y: 8}},
 	})
@@ -402,7 +402,7 @@ func TestAGradientRunsBetweenTheTwoArmedColours(t *testing.T) {
 func TestTheSoftBrushBlendsIntoTheBodyColour(t *testing.T) {
 	bus, body, uid, fi := painted(t)
 	err := bus.Run(&StrokeFace{
-		Body: body.ID, Face: uid, Res: 128, Tool: ToolBrush,
+		Body: body.ID, Face: uid, Res: 16, Tool: ToolBrush,
 		Color: red, Size: 16,
 		Points: []image.Point{{X: 40, Y: 40}},
 	})
@@ -446,7 +446,7 @@ func TestRubberBandReplaceKeepsAMirrorTrue(t *testing.T) {
 
 	// The face must already carry paint: a drag that allocates emits a full
 	// rebuild every frame, which hides exactly the bug this is pinning.
-	if err := bus.Run(stroke(b.ID, uid, 32, ToolPencil, red, image.Point{X: 0, Y: 0})); err != nil {
+	if err := bus.Run(stroke(b.ID, uid, 4, ToolPencil, red, image.Point{X: 0, Y: 0})); err != nil {
 		t.Fatalf("first dab: %v", err)
 	}
 
@@ -484,10 +484,10 @@ func TestRubberBandReplaceKeepsAMirrorTrue(t *testing.T) {
 	// one texel and nowhere else, so nearly all of the first line has to be
 	// erased — and announced.
 	a := image.Point{X: 2, Y: 2}
-	if err := bus.BeginDrag(stroke(b.ID, uid, 32, ToolLine, red, a, image.Point{X: 2, Y: 12})); err != nil {
+	if err := bus.BeginDrag(stroke(b.ID, uid, 4, ToolLine, red, a, image.Point{X: 2, Y: 12})); err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	if err := bus.UpdateDrag(stroke(b.ID, uid, 32, ToolLine, red, a, image.Point{X: 12, Y: 2})); err != nil {
+	if err := bus.UpdateDrag(stroke(b.ID, uid, 4, ToolLine, red, a, image.Point{X: 12, Y: 2})); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 

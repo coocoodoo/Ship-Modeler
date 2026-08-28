@@ -31,9 +31,10 @@ To build one yourself:
    intersected with what it reaches.
 4. **Click a flat face** and press `S` to sketch on it, or drag its arrow to
    push and pull it directly.
-5. **Press `P`** to paint. Pick a resolution, pick a colour, and draw on the
-   model. The texels under the brush are outlined on the surface, so you always
-   know which pixel you are about to hit.
+5. **Press `P`** to paint. Pick a resolution — **Res** is in texels per unit, so
+   8 means eight pixels to the unit on every face — then pick a colour and draw
+   on the model. The texels under the brush are outlined on the surface, so you
+   always know which pixel you are about to hit.
 6. **Ctrl+S** to save, **Ctrl+E** to export.
 
 The hint bar at the bottom always says what to do next. If a control is greyed
@@ -67,14 +68,13 @@ sides of the cut is still exactly where it was.
 
 The **Edge tool** (`K`) paints a band along edges you pick — panel seams,
 plating lines, an outlined hull. **All corners** takes every sharp edge of a
-body at once. The width slider is in pixels, 1 to 16, on each face the edge
-touches; the panel shows what that comes to in units beside it, because a pixel
-is a different size on faces of different resolutions — one pixel is the
-thinnest a face can draw, and if it is still too thick the answer is a higher
-Res for that face. The band is laid inside each face and meets its other half at
-the corner, so it reads as one line rather than two that nearly line up, and it
-is baked into the faces own pictures: it saves, exports and can be painted over
-like anything else you drew.
+body at once. The width slider is in pixels, 1 to 16, and the panel shows what
+that comes to in units beside it — at Res 8 a one-pixel line is 0.125 u, and it
+is that same 0.125 u on every face it touches. If one pixel is still thicker
+than you want, raise the Res. The band is laid inside each face and meets its
+other half at the corner, so it reads as one line rather than two that nearly
+line up, and it is baked into the faces own pictures: it saves, exports and can
+be painted over like anything else you drew.
 
 The **dither modes** (2×2, 4×4, 8×8 Bayer) are how a gradient or a soft brush
 gets a middle without leaving the palette: the shading is spent on how many

@@ -1251,3 +1251,39 @@ the one on screen before you press the button.
 its own width; the brush square does nothing for it. A control that does
 nothing is worse than an absent one, and the panel already hides the dither and
 fill rows on the same principle.
+
+**V-128 · A paint resolution is a density — texels per unit — not a count of
+texels across the face.** Asked whether one unit was one pixel, the honest
+answer was no, and the reason was worth calling a disaster: `Texel` was the
+face's longest bounding-box side divided by the chip, so on the test box one
+pixel was 0.375 u on the 12-unit faces and 0.250 on the 8-unit ones. The same
+chip meant a different physical pixel on every face, and nothing on screen said
+so. It is why an edge line was thicker on one side of a corner than the other,
+and it would have made a pixel resize whenever a face was resized and repainted.
+
+The chips are now 1, 2, 4, 8, 16 and 32 texels to the unit, and `Texel = 1/Res`
+— the face's own size has no say in it. A pixel is the same thing everywhere in
+the document, both halves of an edge band match, and `1 px/u` means literally
+one pixel to the unit.
+
+Three consequences, all accepted deliberately:
+
+*The picture now grows with the face,* where before it was always about Res
+texels on a side. So an allocation can exceed the 1024 cap, and it is refused —
+naming a chip that would fit — rather than clamped. A clamped picture would not
+cover its face, and a face quietly painted at some other density is the exact
+thing this change exists to prevent.
+
+*Old ships still load, and still look right.* The `.ship` format stores each
+face's `Texel` beside its `Res`, so a pre-V-128 file keeps the pixel size it was
+painted at. Its `Res` field is the one that goes stale, so nothing reads it for
+display: `paint.Density` reports `1/Texel`, and the mismatch prompt offers the
+nearest chip. A stored *setting* of 16 or 32 survives as a valid density and a
+128, 256 or 512 falls back to the default — no settings migration, because
+every outcome is a legal chip.
+
+*Fixture artwork was re-scaled, not re-drawn.* The scripts address texels by
+index, so each stroke was scaled by `faceLongestSide × newChip / oldChip` and
+the goldens regenerated. The sample ship came back within 99.9% of its old
+render, which is the check that the conversion was arithmetic rather than
+guesswork.

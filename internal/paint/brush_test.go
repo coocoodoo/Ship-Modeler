@@ -29,7 +29,7 @@ func testPaint(t *testing.T, res int) *mesh.FacePaint {
 }
 
 func TestStrokeJoinsUpItsSamples(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	b := Brush{Color: red, Size: 1}
 	// Two samples ten texels apart: a stroke has to fill the gap.
 	Stroke(p, b, image.Point{X: 2, Y: 2}, image.Point{X: 12, Y: 2})
@@ -44,7 +44,7 @@ func TestStrokeJoinsUpItsSamples(t *testing.T) {
 }
 
 func TestStrokeInterpolatesDiagonally(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	Stroke(p, Brush{Color: red, Size: 1}, image.Point{X: 0, Y: 0}, image.Point{X: 6, Y: 3})
 	// Every step of the walk is 8-connected to the last, so no row between the
 	// endpoints may be empty.
@@ -63,7 +63,7 @@ func TestStrokeInterpolatesDiagonally(t *testing.T) {
 
 func TestBrushSizePaintsASquare(t *testing.T) {
 	for _, size := range BrushSizes {
-		p := testPaint(t, 128)
+		p := testPaint(t, 16)
 		Stroke(p, Brush{Color: red, Size: size}, image.Point{X: 40, Y: 40}, image.Point{X: 40, Y: 40})
 		painted := 0
 		// The window has to hold the largest brush with room to spare, or it
@@ -82,7 +82,7 @@ func TestBrushSizePaintsASquare(t *testing.T) {
 }
 
 func TestEraserClearsToUnpainted(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	Stroke(p, Brush{Color: red, Size: 4}, image.Point{X: 8, Y: 8}, image.Point{X: 8, Y: 8})
 	Stroke(p, Brush{Erase: true, Size: 1}, image.Point{X: 8, Y: 8}, image.Point{X: 8, Y: 8})
 	if got := At(p, image.Point{X: 8, Y: 8}); got.A != 0 {
@@ -95,7 +95,7 @@ func TestEraserClearsToUnpainted(t *testing.T) {
 }
 
 func TestFillSpreadsOverMatchingTexelsOnly(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	// A vertical wall of red splits the face in two.
 	Stroke(p, Brush{Color: red, Size: 1}, image.Point{X: 10, Y: 0}, image.Point{X: 10, Y: 15})
 	n := Fill(p, image.Rect(0, 0, 32, 16), image.Point{X: 4, Y: 8}, blue)
@@ -118,7 +118,7 @@ func TestFillSpreadsOverMatchingTexelsOnly(t *testing.T) {
 }
 
 func TestFillStaysInsideTheRegionItIsGiven(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	// The region is the face; the image is bigger because of its margin. A
 	// fill that ignores the region floods the margin too, and the margin is
 	// exactly the band that is not on the face at all.
@@ -132,7 +132,7 @@ func TestFillStaysInsideTheRegionItIsGiven(t *testing.T) {
 }
 
 func TestPickSamplesWhatYouSee(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	body := color.RGBA{R: 0x8E, G: 0xA3, B: 0xB0, A: 255}
 	Stroke(p, Brush{Color: red, Size: 1}, image.Point{X: 5, Y: 5}, image.Point{X: 5, Y: 5})
 
@@ -150,7 +150,7 @@ func TestPickSamplesWhatYouSee(t *testing.T) {
 }
 
 func TestStrokeReportsTheRectItTouched(t *testing.T) {
-	p := testPaint(t, 32)
+	p := testPaint(t, 4)
 	dirty := Stroke(p, Brush{Color: red, Size: 2}, image.Point{X: 4, Y: 4}, image.Point{X: 9, Y: 4})
 	if dirty.Empty() {
 		t.Fatal("a stroke that painted something reported an empty dirty rect")
@@ -170,7 +170,7 @@ func TestStrokeReportsTheRectItTouched(t *testing.T) {
 
 func TestResampleRebuildsAtTheNewResolution(t *testing.T) {
 	m, fi := plate()
-	p, err := Allocate(m, fi, 32)
+	p, err := Allocate(m, fi, 4)
 	if err != nil {
 		t.Fatalf("allocate: %v", err)
 	}
@@ -178,14 +178,14 @@ func TestResampleRebuildsAtTheNewResolution(t *testing.T) {
 	Stroke(p, Brush{Color: red, Size: 1}, image.Point{X: 0, Y: 0}, image.Point{X: 31, Y: 0})
 	probe := World(p, image.Point{X: 10, Y: 0})
 
-	out, err := Resample(m, fi, p, 128)
+	out, err := Resample(m, fi, p, 16)
 	if err != nil {
 		t.Fatalf("resample: %v", err)
 	}
-	if out.Res != 128 {
-		t.Errorf("res = %d, want 128", out.Res)
+	if out.Res != 16 {
+		t.Errorf("res = %d, want 16", out.Res)
 	}
-	if want := 8.0 / 128; out.Texel != want {
+	if want := 1.0 / 16; out.Texel != want {
 		t.Errorf("texel = %v, want %v", out.Texel, want)
 	}
 	// Nearest resampling: the colour at a world point is what it was before.
@@ -199,7 +199,7 @@ func TestResampleRebuildsAtTheNewResolution(t *testing.T) {
 
 func TestStrokeBetweenWorldPointsReachesBothEnds(t *testing.T) {
 	m, fi := plate()
-	p, err := Allocate(m, fi, 32)
+	p, err := Allocate(m, fi, 4)
 	if err != nil {
 		t.Fatalf("allocate: %v", err)
 	}

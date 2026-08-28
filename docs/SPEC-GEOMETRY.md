@@ -150,8 +150,8 @@ After a sub-body edit, each touched face re-checks planarity (max point-plane di
 ### 8.1 Storage
 ```go
 type FacePaint struct {
-    Res   int         // 16|32|128|256|512 (chip at creation)
-    Texel float64     // world units per texel, FIXED at creation
+    Res   int         // 1|2|4|8|16|32 texels per unit (chip at creation)
+    Texel float64     // world units per texel = 1/Res, FIXED at creation
     Frame Frame       // persistent paint anchor
     Img   *image.RGBA // alpha 0 = unpainted (body color shows through)
     Off   image.Point // texel index of Img origin (allows growth)
@@ -160,7 +160,9 @@ type FacePaint struct {
 `paint` owns the RGBA source of truth; `render` mirrors it into GPU textures (nearest filter) with dirty-rect uploads.
 
 ### 8.2 Creation
-On first stroke: Frame = face frame (§3 convention) with O = bbox-min corner of the face in that frame; `Texel = longestBBoxSide / Res` (chips mean "this face is N pixels across at its widest"); Img covers the face bbox +1 texel margin. **Texel never rescales implicitly** — constant pixel density is the pixel-art contract. Explicit resample (UX §13.2) rebuilds at a new Res via nearest.
+On first stroke: Frame = face frame (§3 convention) with O = bbox-min corner of the face in that frame; `Texel = 1 / Res`. A chip is a **density**, not a count: at 8, a texel is an eighth of a unit on every face of every body, so a pixel is the same physical size wherever it is painted (V-128). Img covers the face bbox +1 texel margin, so its size now grows with the face — an allocation that would exceed the §8.3 cap is **refused**, naming a chip that fits, rather than clamped to a picture too small to cover the face. **Texel never rescales implicitly** — constant pixel density is the pixel-art contract, from both directions. Explicit resample (UX §13.2) rebuilds at a new Res via nearest.
+
+A ship saved before V-128 stores a `Texel` worked out from its face's longest side, and keeps it: the file loads and renders exactly as it did. Only its `Res` field is then stale, so the program reports a picture's density as `1/Texel` rather than reading that field.
 
 ### 8.3 Mapping & painting
 `uv(p) = ((p−O)·U / Texel, (p−O)·V / Texel)` → floor to texel ints. Cursor→texel: pick pass gives FaceUID; ray ∩ face plane → p → uv. Strokes rasterize brush squares in texel space with UV-space line interpolation between input samples. Painting outside Img grows it (adjusting Off) up to a 1024² cap (toast if capped). Renderer samples the same mapping — one source of truth in `paint/mapping.go`, unit-tested round-trip (uv→world→uv identity).

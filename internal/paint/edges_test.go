@@ -50,7 +50,7 @@ func countPainted(m *mesh.Mesh, fi int) int {
 // are not on the face at all — invisible, and half the thickness that was
 // asked for.
 func TestAnEdgeBandLandsOnItsFace(t *testing.T) {
-	m := paintedCube(t, 32)
+	m := paintedCube(t, 4)
 	topo := m.Topo()
 	if len(topo.Edges) == 0 {
 		t.Fatal("a box has no edges")
@@ -85,7 +85,7 @@ func TestAnEdgeBandLandsOnItsFace(t *testing.T) {
 // Both faces of the edge get the line, and each hugs the shared edge. That is
 // the whole reason the feature exists: one press, one line, round the corner.
 func TestAnEdgeBandReachesBothItsFaces(t *testing.T) {
-	m := paintedCube(t, 32)
+	m := paintedCube(t, 4)
 	topo := m.Topo()
 	e := topo.Edges[0]
 
@@ -104,7 +104,7 @@ func TestAnEdgeBandReachesBothItsFaces(t *testing.T) {
 // The band sits against the edge rather than somewhere in the middle of the
 // face: every painted texel is within the band's width of the edge.
 func TestAnEdgeBandHugsItsEdge(t *testing.T) {
-	m := paintedCube(t, 32)
+	m := paintedCube(t, 4)
 	topo := m.Topo()
 	e := topo.Edges[0]
 	fi := e.Uses[0].Face
@@ -133,8 +133,8 @@ func TestAnEdgeBandHugsItsEdge(t *testing.T) {
 
 // A wider setting paints more.
 func TestAWiderEdgeBandPaintsMore(t *testing.T) {
-	thin := paintedCube(t, 32)
-	thick := paintedCube(t, 32)
+	thin := paintedCube(t, 4)
+	thick := paintedCube(t, 4)
 	for _, tc := range []struct {
 		m    *mesh.Mesh
 		size int
@@ -203,7 +203,7 @@ func TestPaintingEdgesIsOneUndoStep(t *testing.T) {
 	m := b.Mesh
 	edges := []int{0, 1, 2}
 
-	cmd := &StrokeEdges{Body: b.ID, Edges: edges, Color: red, Size: 2, Res: 32}
+	cmd := &StrokeEdges{Body: b.ID, Edges: edges, Color: red, Size: 2, Res: 4}
 	if err := bus.Run(cmd); err != nil {
 		t.Fatalf("StrokeEdges: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestPaintingEdgesOverPaintRestoresIt(t *testing.T) {
 	}
 
 	if err := bus.Run(&StrokeEdges{
-		Body: b.ID, Edges: []int{edge}, Color: red, Size: 2, Res: 32,
+		Body: b.ID, Edges: []int{edge}, Color: red, Size: 2, Res: 4,
 	}); err != nil {
 		t.Fatalf("StrokeEdges: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestPaintingEdgesOverPaintRestoresIt(t *testing.T) {
 
 func TestPaintingNoEdgesIsRefused(t *testing.T) {
 	bus, b, _, _ := painted(t)
-	if err := bus.Run(&StrokeEdges{Body: b.ID, Color: red, Size: 1, Res: 32}); err == nil {
+	if err := bus.Run(&StrokeEdges{Body: b.ID, Color: red, Size: 1, Res: 4}); err == nil {
 		t.Error("painting an empty edge selection was accepted")
 	}
 }

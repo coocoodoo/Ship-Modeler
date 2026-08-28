@@ -9,7 +9,7 @@
   {"op":"dump"},
 
   {"op":"paint.begin"},
-  {"op":"paint.res","res":32},
+  {"op":"paint.res","res":4},
   {"op":"paint.size","size":2},
   {"op":"paint.color","hex":"FFA51E"},
   {"op":"drag","from":[600,400],"to":[900,460],"kind":"hold","segs":12},

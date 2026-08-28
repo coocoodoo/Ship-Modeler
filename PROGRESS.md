@@ -9,6 +9,39 @@ rebuilt. **Next: SK6 (image underlay) needs your go-ahead per the plan.**
 
 ---
 
+## 2026-08-27 (fix) — A pixel is now the same size everywhere
+
+"So 1 u = 1 pixel correct?" No — and finding out why was worth the whole day.
+`Texel` was the face's longest side over the chip, so on the test box one pixel
+was 0.375 u on the 12-unit faces and 0.250 on the 8-unit ones. The same chip
+meant a different physical pixel on every face. That is the root of the edge
+line being thicker on one side of a corner than the other; the edge tool was
+only where it first became visible.
+
+**The chip is a density now** — 1, 2, 4, 8, 16 or 32 texels to the unit, and
+`Texel = 1/Res` with the face's size given no say (V-128). One pixel is one
+pixel anywhere in the document.
+
+**What it cost.** The picture grows with the face now, so an allocation can
+exceed the 1024 cap; it is refused and names a chip that fits, rather than
+clamped to a picture too small to cover its face. Old ships are safe — the
+format stores each face's `Texel`, so a pre-V-128 file keeps the pixel size it
+was painted at, and the program reports density as `1/Texel` rather than
+trusting the now-stale `Res` field.
+
+**Goldens.** Every paint fixture addresses texels by index, so each stroke was
+scaled by `faceLongestSide x newChip / oldChip` and the baselines regenerated
+after review. The sample ship came back within 99.9% of its old render, which
+is the evidence the conversion was arithmetic and not guesswork. Two brush
+sizes moved to keep a stroke's *world* thickness (a size-3 brush does not
+exist; m7_persist went to 4 because a pixel probe rides on that line).
+
+The visible proof is the edge_paint corner: the old baseline has a fat top band
+meeting a thin side band in a stepped notch, and the new one has one continuous
+trim line.
+
+---
+
 ## 2026-08-27 (fix) — The edge line's width control
 
 "Why is my edge line crappy compared to yours? My edge paint is way thick even
