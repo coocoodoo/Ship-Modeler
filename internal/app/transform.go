@@ -57,10 +57,29 @@ func (a *App) armTransform() {
 	}
 	if t := a.transform.tool; t != nil {
 		t.Pivot = pivot
+		a.forceMoveForMarkers(t)
 		return
 	}
 	a.transform.tool = tools.NewTransformTool(pivot)
+	a.forceMoveForMarkers(a.transform.tool)
 }
+
+// forceMoveForMarkers keeps the gizmo on Move while dots are selected. A dot is
+// a point: spinning one about itself changes nothing, so offering the ring and
+// then doing nothing when it is dragged would be the gizmo lying about what it
+// can do.
+func (a *App) forceMoveForMarkers(t *tools.TransformTool) {
+	if t == nil || t.Dragging() {
+		return
+	}
+	if len(a.selectedMarkers()) > 0 {
+		t.Mode = tools.GizmoMove
+	}
+}
+
+// markerGizmo reports whether the armed gizmo is anchored to dots rather than
+// to geometry, which changes what the card offers.
+func (a *App) markerGizmo() bool { return len(a.selectedMarkers()) > 0 }
 
 // gizmoView bundles what the scene helpers need.
 func (a *App) gizmoView(vp render.Viewport) scene.GizmoView {
@@ -207,6 +226,14 @@ func (a *App) applyTransformLive() {
 
 // transformCommand builds the command for the gizmo's current state.
 func (a *App) transformCommand(t *tools.TransformTool) model.Command {
+	// Dots move on their own terms: they have no vertices, and a rotation
+	// about their own centre would be a no-op dressed up as an edit.
+	if idx := a.selectedMarkers(); len(idx) > 0 {
+		if t.Mode == tools.GizmoRotate {
+			return nil
+		}
+		return &model.MoveMarkers{Indices: idx, Delta: t.Delta}
+	}
 	verts := a.Sel.VertIndices(a.Doc())
 	if len(verts) == 0 {
 		return nil
@@ -330,7 +357,7 @@ func (a *App) handleTransformKeys(in InputFrame) {
 	if in.Ctrl {
 		return
 	}
-	if in.KeyPressed(rl.KeyR) && a.transform.tool != nil {
+	if in.KeyPressed(rl.KeyR) && a.transform.tool != nil && !a.markerGizmo() {
 		// R toggles the gizmo between move and rotate, which is the card's tab
 		// without reaching for it.
 		t := a.transform.tool
@@ -365,6 +392,12 @@ func (a *App) transformHint() string {
 	}
 	if t.Dragging() {
 		return t.Hint()
+	}
+	if a.markerGizmo() {
+		// R and Ctrl+D do nothing to a dot, so they are not offered. A hint
+		// listing keys that do nothing is worse than a shorter one.
+		return "Drag the gizmo to move " + a.Sel.Describe(a.Doc()) +
+			" · Ctrl for quarter units · Del removes it"
 	}
 	return "Drag the gizmo to " + strings.ToLower(t.Mode.String()) +
 		" · R switches move and rotate · Ctrl+D duplicates · Del removes"
@@ -433,9 +466,15 @@ func (a *App) buildTransformCard(viewport rl.Rectangle) {
 	}
 
 	modes := []tools.GizmoMode{tools.GizmoMove, tools.GizmoRotate}
+	opts := ui.ChipGroupOpts{Tooltip: "R switches these"}
+	if a.markerGizmo() {
+		opts = ui.ChipGroupOpts{
+			PerChipDisabled: []bool{false, true},
+			PerChipWhy:      []string{"", "A dot is a point — there is nothing to turn"},
+		}
+	}
 	if pick, changed := a.UI.ChipGroup(ui.MakeID("transform.mode"), row(a.px(24)),
-		[]string{"Move", "Rotate"}, int(t.Mode),
-		ui.ChipGroupOpts{Tooltip: "R switches these"}); changed {
+		[]string{"Move", "Rotate"}, int(t.Mode), opts); changed {
 		t.Mode = modes[pick]
 	}
 

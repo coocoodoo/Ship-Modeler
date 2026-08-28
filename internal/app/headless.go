@@ -291,6 +291,20 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return op.Errorf("place the marker: %v", err)
 		}
 
+	case "marker.move":
+		// Moves the selected dots by a delta through the same command the gizmo
+		// builds, so a script exercises the real edit rather than a shortcut.
+		idx := a.selectedMarkers()
+		if len(idx) == 0 {
+			return op.Errorf("no dot is selected")
+		}
+		if err := a.Bus.Run(&model.MoveMarkers{
+			Indices: idx,
+			Delta:   geom.Vec3{X: op.Delta[0], Y: op.Delta[1], Z: op.Delta[2]},
+		}); err != nil {
+			return op.Errorf("move the dot: %v", err)
+		}
+
 	case "marker.clear":
 		for len(a.Doc().Markers) > 0 {
 			if err := a.Bus.Run(&model.DeleteMarker{Index: 0}); err != nil {
@@ -826,6 +840,14 @@ func (r *ScriptRunner) selectOp(op io.Op) error {
 			return op.Errorf("no sketch named %q", op.Sketch)
 		}
 		a.Sel.Set(model.SketchRef(sk.ID))
+	case "marker", "dot":
+		// Face doubles as the index: a marker has no name of its own, and
+		// adding a second index field for one op would be worse.
+		if op.Face < 0 || op.Face >= len(a.Doc().Markers) {
+			return op.Errorf("no marker %d — the document has %d",
+				op.Face, len(a.Doc().Markers))
+		}
+		a.Sel.Set(model.MarkerRef(op.Face))
 	default:
 		return op.Errorf("cannot select %q yet", op.Kind)
 	}
@@ -1698,6 +1720,20 @@ func (r *ScriptRunner) dump() {
 		}
 	}
 	r.dumpPaint()
+	// Where every dot is, and whether it is selected or hovered. A dot is a
+	// few pixels in a shot, so a golden cannot tell a moved one from a still
+	// one; these numbers can.
+	for i, m := range doc.Markers {
+		// The dot's screen pixel comes along, for the same reason the push/pull
+		// arrow's does: a scripted click has to aim where a person would, and a
+		// test that guesses at coordinates passes by accident.
+		vp := a.Viewport(r.Size.W, r.Size.H)
+		px, _ := a.Camera.WorldToViewport(m.At, float64(vp.W), float64(vp.H))
+		fmt.Printf("marker %d kind=%q at=%.4f,%.4f,%.4f dir=%.4f,%.4f,%.4f sel=%d hover=%d px=%.0f,%.0f\n",
+			i, m.Kind.String(), m.At.X, m.At.Y, m.At.Z, m.Dir.X, m.Dir.Y, m.Dir.Z,
+			boolBit(a.Sel.Contains(model.MarkerRef(i))), boolBit(a.markers.hover == i),
+			px.X+float64(vp.X), px.Y+float64(vp.Y))
+	}
 	fmt.Printf("sel count=%d desc=%q\n", a.Sel.Len(), a.Sel.Describe(doc))
 	fmt.Printf("hint %q\n", a.HintText())
 	for _, t := range a.UI.Toasts() {

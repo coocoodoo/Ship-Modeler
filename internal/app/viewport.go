@@ -207,6 +207,11 @@ func (a *App) planeZoomFade() float64 {
 // viewportHoverRef maps the pick result into a document reference, so the tree
 // can highlight the row for whatever the cursor is over in 3D.
 func (a *App) viewportHoverRef() model.Ref {
+	// A dot wins here for the same reason it wins a click: it is drawn over
+	// everything and it is what you can see there.
+	if a.markers.hover >= 0 {
+		return model.MarkerRef(a.markers.hover)
+	}
 	// A sketch under the pointer wins, for the same reason a click does: it is
 	// drawn over everything, so it is what you can see there.
 	if a.hoverSketch != nil {
@@ -362,6 +367,13 @@ func (a *App) selectionBounds(s *render.Scene) geom.AABB {
 					box = box.Union(s.Bodies[i].GPU.Bounds.Transform(s.Bodies[i].Transform))
 				}
 			}
+		case model.SelMarker:
+			if ref.Marker >= 0 && ref.Marker < len(a.Doc().Markers) {
+				// A point has no size, so frame a small box around it or the
+				// camera would try to fit nothing and zoom to infinity.
+				at := a.Doc().Markers[ref.Marker].At
+				box = box.Union(geom.AABBOf([]geom.Vec3{at}).Expand(1.5))
+			}
 		case model.SelPlane:
 			f := geom.PlaneFrame(ref.Plane)
 			h := scene.PlaneHalfSize
@@ -425,6 +437,19 @@ func (a *App) handleViewportClick(in InputFrame, vp render.Viewport) {
 	a.Renderer.SetFramebuffer(in.WindowW, in.WindowH)
 	hit := a.Renderer.Pick(&s, vp, in.MouseX, in.MouseY)
 	a.Hover = hit
+
+	// A placed dot outranks everything under it (the user's request,
+	// 2026-08-28). It is the smallest thing in the viewport and it is drawn on
+	// top of all of it, so a click that lands on one is unambiguous — and
+	// unless it wins, a dot sitting on a hull could never be grabbed at all,
+	// because the face behind it always would. Placing a new dot still comes
+	// first: an armed pick was promised the next click.
+	if !a.markers.armed {
+		if i := a.markerAt(in.MouseX, in.MouseY, vp); i >= 0 {
+			a.selectMarker(i)
+			return
+		}
+	}
 
 	// A visible sketch wins over anything behind it, including a body.
 	//
@@ -638,6 +663,13 @@ func (a *App) hideSelection() {
 			a.Run(&model.SetBodyVisible{ID: ref.Body, Visible: false})
 		case model.SelSketch:
 			a.Run(&model.SetSketchVisible{ID: ref.Sketch, Visible: false})
+		case model.SelMarker:
+			// A dot has no eye of its own: it is the answer to "which way is
+			// forward", and an answer you cannot see is worse than none.
+			a.Toast(ui.Toast{
+				Text: "Dots can't be hidden — Del removes one",
+				Kind: ui.ToastWarn,
+			})
 		}
 	}
 }
@@ -662,7 +694,15 @@ func (a *App) updateHover(in InputFrame, vp render.Viewport) {
 		a.orbiting || a.panning || a.cubeDrag {
 		a.Hover = render.PickResult{}
 		a.hoverSketch = nil
+		a.markers.hover = -1
 		return
+	}
+	// A dot under the pointer swells and takes the hint bar, which is how you
+	// learn it can be grabbed before you try. Not while a gizmo handle is under
+	// the cursor: the handle was there first and owns the click.
+	a.markers.hover = -1
+	if !a.grabbedGizmo() {
+		a.markers.hover = a.markerAt(in.MouseX, in.MouseY, vp)
 	}
 	a.hoverSketch = a.sketchAt(in.MouseX, in.MouseY, vp)
 	a.pickCooldown -= in.DeltaMillis

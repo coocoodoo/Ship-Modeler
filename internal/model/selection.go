@@ -21,6 +21,7 @@ const (
 	SelVert
 	SelPlane
 	SelSketch
+	SelMarker
 )
 
 func (k SelKind) String() string {
@@ -37,6 +38,8 @@ func (k SelKind) String() string {
 		return "plane"
 	case SelSketch:
 		return "sketch"
+	case SelMarker:
+		return "dot"
 	default:
 		return "nothing"
 	}
@@ -51,6 +54,10 @@ type Ref struct {
 	Vert   int
 	Plane  geom.PlaneKind
 	Sketch uint32
+	// Marker is an index into Document.Markers. Markers have no stable id of
+	// their own, so this shifts when one is deleted — which is why Prune
+	// checks it, exactly as it does for edge and vertex indices.
+	Marker int
 }
 
 // BodyRef, PlaneRef and SketchRef are the constructors the tree panel uses.
@@ -60,6 +67,7 @@ func SketchRef(id uint32) Ref              { return Ref{Kind: SelSketch, Sketch:
 func FaceRef(b uint32, f mesh.FaceUID) Ref { return Ref{Kind: SelFace, Body: b, Face: f} }
 func EdgeRef(b uint32, e int) Ref          { return Ref{Kind: SelEdge, Body: b, Edge: e} }
 func VertRef(b uint32, v int) Ref          { return Ref{Kind: SelVert, Body: b, Vert: v} }
+func MarkerRef(i int) Ref                  { return Ref{Kind: SelMarker, Marker: i} }
 
 // Selection is an ordered set of references. Order matters: the first entry is
 // the primary selection, which is what the boolean tool keeps and what a gizmo
@@ -180,6 +188,10 @@ func (s *Selection) Prune(doc *Document) {
 			if r.Plane < 0 || int(r.Plane) >= geom.PlaneCount {
 				continue
 			}
+		case SelMarker:
+			if r.Marker < 0 || r.Marker >= len(doc.Markers) {
+				continue
+			}
 		case SelNone:
 			continue
 		}
@@ -213,6 +225,8 @@ func (s *Selection) Describe(doc *Document) string {
 			if b := doc.BodyByID(r.Body); b != nil {
 				return "a face of " + b.Name
 			}
+		case SelMarker:
+			return doc.MarkerLabel(r.Marker)
 		}
 		return r.Kind.String()
 	default:
@@ -230,6 +244,8 @@ func pluralWord(k SelKind) string {
 		return "bodies"
 	case SelVert:
 		return "vertices"
+	case SelMarker:
+		return "dots"
 	default:
 		return k.String() + "s"
 	}

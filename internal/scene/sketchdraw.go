@@ -17,14 +17,14 @@ import (
 
 // Stroke widths and glyph sizes in screen pixels.
 const (
-	EntityWidthPx    = 1.8
-	SelectedWidthPx  = 3.0
-	PreviewWidthPx   = 1.8
-	GuideWidthPx     = 1.2
-	OpenEndSizePx    = 10.0
-	SnapGlyphSizePx  = 11.0
-	CloseRingSizePx  = 13.0
-	VertexDotSizePx  = 4.0
+	EntityWidthPx   = 1.8
+	SelectedWidthPx = 3.0
+	PreviewWidthPx  = 1.8
+	GuideWidthPx    = 1.2
+	OpenEndSizePx   = 10.0
+	SnapGlyphSizePx = 11.0
+	CloseRingSizePx = 13.0
+	VertexDotSizePx = 4.0
 	// SketchGridHalf matches the plane exactly (V-129): the grid is the
 	// plane's graph paper, and paper that sprawled 3x past its sheet was the
 	// single biggest reason the sketch view read as scale soup. Drawing past

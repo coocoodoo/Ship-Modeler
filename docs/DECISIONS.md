@@ -1379,3 +1379,33 @@ run against the sample .pxm the Modeler generates into the game repo — the
 reader is tested against the real writer's bytes. Also by the owner's
 instruction, this repo now pushes to github.com/coocoodoo/Iron-Drift-Modeler,
 lifting the plan's local-only default.
+
+**V-132 · Placed dots are selectable and movable, and win the click over the
+face they sit on** (the user's request, 2026-08-28). Markers gained a selection
+kind of their own (`SelMarker`, indexed like edges and vertices and pruned the
+same way), a `MoveMarkers` command that the existing transform gizmo drives, and
+a screen-space hit test.
+
+Three choices worth recording. **The hit test is screen-space, not the ID pass.**
+A dot is an overlay glyph drawn with the depth test off, so it has no geometry in
+the pick render and cannot acquire any without giving the pick table a fourth
+kind of pickable thing; projecting each dot and taking the nearest within nine
+scaled pixels is the same answer for a handful of points, and it is the answer
+that agrees with what is drawn. **A dot outranks everything under it in the click
+order**, above sketches and immediately below an armed marker placement. Dots are
+authored *on* faces — the front dot in the test sits exactly on the hull's +X
+face — so a dot that did not outrank the face behind it could never be clicked at
+all; this is the same rule, and the same reasoning, as V-12's "a visible sketch
+wins over the body behind it". **The gizmo is move-only on dots.** A marker is a
+point: rotating one about its own centre is a no-op, so the Rotate chip is
+disabled with a reason and `R` does not toggle, rather than offering a handle that
+silently does nothing. `Dir` is never touched by a move — a thruster's exhaust
+direction is authored by the face it was placed on, and re-placing from the tree
+is what changes it.
+
+Known and deliberately left alone: **the gizmo does not travel with the selection
+during a drag.** `armTransform` freezes the pivot while `Dragging()`, so the dot
+visibly separates from its handles until release, when it re-arms in the new
+place. That is pre-existing behaviour shared by every selection kind (vertices,
+faces, bodies), not something dots introduced, and changing it would move
+mid-drag pixels in the M6 baselines. Worth revisiting as a polish item.

@@ -2,9 +2,11 @@ package app
 
 import (
 	"fmt"
+	"sort"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"modeler/internal/geom"
 	"modeler/internal/model"
 	"modeler/internal/render"
 	"modeler/internal/ui"
@@ -23,6 +25,11 @@ type markerState struct {
 	// awaiting is the kind the next viewport click will place.
 	awaiting model.MarkerKind
 	armed    bool
+	// hover is the index of the dot under the pointer, or -1. Markers are
+	// overlay glyphs rather than geometry, so the ID pass cannot report them
+	// and this is resolved in screen space instead — the same answer, and the
+	// same reason, as a sketch under the cursor (V-12).
+	hover int
 }
 
 // AwaitingMarker reports whether a marker pick is armed.
@@ -93,6 +100,71 @@ func markerColor(k model.MarkerKind) rl.Color {
 	}
 }
 
+// MarkerPickRadiusPx is how close the pointer must come to a dot's centre to
+// grab it. Generous, because a dot is a few pixels across and a target you have
+// to hunt for is a target that feels broken.
+const MarkerPickRadiusPx = 9.0
+
+// markerAt reports the index of the dot under the cursor, or -1.
+//
+// Dots are drawn in the overlay pass with no depth test, so one behind the hull
+// is still visible and must still be clickable: what you can see is what you
+// get. Nearest-to-the-cursor wins, and ties go to the one nearest the camera.
+func (a *App) markerAt(mouseX, mouseY float64, vp render.Viewport) int {
+	if a.Mode != ModeIdle || len(a.Doc().Markers) == 0 {
+		return -1
+	}
+	radius := MarkerPickRadiusPx * a.Scale
+	local := geom.Vec2{X: mouseX - float64(vp.X), Y: mouseY - float64(vp.Y)}
+	eye := a.Camera.Eye()
+
+	best, bestScore, bestDepth := -1, radius*radius, 0.0
+	for i, m := range a.Doc().Markers {
+		p, ok := a.Camera.WorldToViewport(m.At, float64(vp.W), float64(vp.H))
+		if !ok {
+			continue
+		}
+		d := p.Sub(local).LenSq()
+		if d > bestScore {
+			continue
+		}
+		depth := m.At.Sub(eye).LenSq()
+		if best >= 0 && d == bestScore && depth >= bestDepth {
+			continue
+		}
+		best, bestScore, bestDepth = i, d, depth
+	}
+	return best
+}
+
+// selectMarker puts the selection on a dot, honouring the click modifiers the
+// tree and the viewport already share.
+func (a *App) selectMarker(i int) {
+	a.selectRef(model.MarkerRef(i))
+}
+
+// selectedMarkers is the dots the gizmo is anchored to.
+func (a *App) selectedMarkers() []int { return a.Sel.MarkerIndices(a.Doc()) }
+
+// deleteSelectedMarkers removes the selected dots, highest index first so the
+// earlier ones do not shift out from under the loop.
+func (a *App) deleteSelectedMarkers() bool {
+	idx := a.selectedMarkers()
+	if len(idx) == 0 {
+		return false
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(idx)))
+	names := a.Sel.Describe(a.Doc())
+	for _, i := range idx {
+		if !a.Run(&model.DeleteMarker{Index: i}) {
+			return true
+		}
+	}
+	a.Sel.Clear()
+	a.toastWithUndo("Deleted " + names)
+	return true
+}
+
 // buildMarkerOverlay draws the placed dots: a filled square each, in the
 // kind's colour, with a short tick along a thruster's exhaust direction.
 // Idle only — the working modes have their own overlays to keep legible.
@@ -101,11 +173,24 @@ func (a *App) buildMarkerOverlay() *render.Overlay {
 		return nil
 	}
 	d := &render.Overlay{}
-	for _, m := range a.Doc().Markers {
+	for i, m := range a.Doc().Markers {
 		col := markerColor(m.Kind)
 		size := 9.0
 		if m.Kind == model.MarkerThruster {
 			size = 8
+		}
+		// A selected dot wears a ring in the accent, so it reads as "this is
+		// what the gizmo will move" without losing the colour that says which
+		// kind it is. Hovering swells it, which is the affordance that tells
+		// you it can be grabbed at all.
+		selected := a.Sel.Contains(model.MarkerRef(i))
+		if selected {
+			d.Markers = append(d.Markers, render.OverlayMarker{
+				P: m.At, Kind: render.MarkerVertex,
+				Color: ui.ColorAccent, SizePx: size + 7,
+			})
+		} else if a.markers.hover == i {
+			size += 3
 		}
 		d.Markers = append(d.Markers, render.OverlayMarker{
 			P: m.At, Kind: render.MarkerVertex, Color: col, SizePx: size,
@@ -134,17 +219,28 @@ func (a *App) buildMarkerRows(row func() rl.Rectangle, open bool) {
 			thruster++
 			label = fmt.Sprintf("Thruster %d", thruster)
 		}
+		ref := model.MarkerRef(i)
 		res := a.UI.TreeRow(ui.MakeID("tree.marker."+itoa(i)), row(), ui.TreeRowSpec{
 			Label:     label,
 			Icon:      ui.DrawMarkerIcon,
 			CanDelete: true,
+			Selected:  a.Sel.Contains(ref),
 			Indent:    1,
 		})
-		if res.ClickedDelete {
+		if res.Hovered {
+			a.tree.hovered = ref
+		}
+		switch {
+		case res.ClickedDelete:
 			idx := i
 			if a.Run(&model.DeleteMarker{Index: idx}) {
+				a.Sel.Remove(ref)
 				a.toastWithUndo("Deleted the " + m.Kind.String() + " dot")
 			}
+		case res.Clicked:
+			// Selecting the row arms the gizmo on that dot, which is the same
+			// thing clicking it in the viewport does.
+			a.selectMarker(i)
 		}
 	}
 

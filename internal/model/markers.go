@@ -178,3 +178,91 @@ func (c *DeleteMarker) Undo(doc *Document) {
 func (c *DeleteMarker) Events() []Event {
 	return []Event{{Kind: EvMarkersChanged}}
 }
+
+// MarkerLabel names a marker the way the tree does, so the hint bar, the toast
+// and the row all call the same dot by the same name. Thrusters are numbered
+// in placement order, counting only thrusters.
+func (d *Document) MarkerLabel(i int) string {
+	if i < 0 || i >= len(d.Markers) {
+		return "dot"
+	}
+	m := d.Markers[i]
+	if m.Kind != MarkerThruster {
+		return m.Kind.Label() + " dot"
+	}
+	n := 0
+	for _, x := range d.Markers[:i+1] {
+		if x.Kind == MarkerThruster {
+			n++
+		}
+	}
+	return fmt.Sprintf("Thruster %d", n)
+}
+
+// MoveMarkers slides the selected dots by a delta (the user's request,
+// 2026-08-28).
+//
+// It is a delta rather than a destination because that is what a coalesced drag
+// hands it: the bus undoes the previous frame before running the next, so every
+// frame applies its total offset to the original positions and the drag lands
+// as one step (SPEC-DATA §3.2).
+//
+// Dir is deliberately left alone. A marker's direction is the normal of the
+// face it was authored on, and for a thruster that is where the exhaust plays;
+// sliding the dot a little along a hull must not silently repoint it. Changing
+// the face a dot belongs to is what re-placing it from the tree is for.
+type MoveMarkers struct {
+	Indices []int
+	Delta   geom.Vec3
+
+	prev  []geom.Vec3
+	label string
+}
+
+// NewMoveMarker is the single-dot case, which is what the gizmo usually has.
+func NewMoveMarker(index int, delta geom.Vec3) *MoveMarkers {
+	return &MoveMarkers{Indices: []int{index}, Delta: delta}
+}
+
+func (c *MoveMarkers) Name() string {
+	if c.label == "" {
+		return "Move dot"
+	}
+	return "Move " + c.label
+}
+
+func (c *MoveMarkers) Do(doc *Document) error {
+	if len(c.Indices) == 0 {
+		return fmt.Errorf("no dot to move")
+	}
+	// Validate every index before touching any of them, so a bad one leaves
+	// the document exactly as it was (SPEC-DATA §3.1).
+	for _, i := range c.Indices {
+		if i < 0 || i >= len(doc.Markers) {
+			return fmt.Errorf("that dot is no longer there")
+		}
+	}
+	if len(c.Indices) == 1 {
+		c.label = doc.MarkerLabel(c.Indices[0])
+	} else {
+		c.label = plural(len(c.Indices), "dot", "dots")
+	}
+	c.prev = c.prev[:0]
+	for _, i := range c.Indices {
+		c.prev = append(c.prev, doc.Markers[i].At)
+		doc.Markers[i].At = doc.Markers[i].At.Add(c.Delta)
+	}
+	return nil
+}
+
+func (c *MoveMarkers) Undo(doc *Document) {
+	for k, i := range c.Indices {
+		if i >= 0 && i < len(doc.Markers) && k < len(c.prev) {
+			doc.Markers[i].At = c.prev[k]
+		}
+	}
+}
+
+func (c *MoveMarkers) Events() []Event {
+	return []Event{{Kind: EvMarkersChanged}}
+}

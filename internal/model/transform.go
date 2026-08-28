@@ -81,6 +81,11 @@ func (s *Selection) VertIndices(doc *Document) map[uint32][]int {
 // Pivot is the centre of a selection, which is where a gizmo sits and what a
 // rotation turns about.
 func (s *Selection) Pivot(doc *Document) (geom.Vec3, bool) {
+	// A marker has no vertices — it is a point in its own right, and the gizmo
+	// belongs exactly on it (the user's request, 2026-08-28).
+	if at, ok := s.markerPivot(doc); ok {
+		return at, true
+	}
 	verts := s.VertIndices(doc)
 	var sum geom.Vec3
 	var n float64
@@ -98,6 +103,40 @@ func (s *Selection) Pivot(doc *Document) (geom.Vec3, bool) {
 		return geom.Vec3{}, false
 	}
 	return sum.Mul(1 / n), true
+}
+
+// markerPivot averages the selected dots, when dots are what is selected. A
+// selection mixing dots with geometry has no single sensible pivot, so it
+// falls through to the vertex answer and the dots simply do not move.
+func (s *Selection) markerPivot(doc *Document) (geom.Vec3, bool) {
+	var sum geom.Vec3
+	n := 0.0
+	for _, r := range s.refs {
+		if r.Kind != SelMarker {
+			return geom.Vec3{}, false
+		}
+		if r.Marker < 0 || r.Marker >= len(doc.Markers) {
+			continue
+		}
+		sum = sum.Add(doc.Markers[r.Marker].At)
+		n++
+	}
+	if n == 0 {
+		return geom.Vec3{}, false
+	}
+	return sum.Mul(1 / n), true
+}
+
+// MarkerIndices lists the selected dots, which is what the gizmo moves when a
+// dot is what it is anchored to.
+func (s *Selection) MarkerIndices(doc *Document) []int {
+	var out []int
+	for _, r := range s.refs {
+		if r.Kind == SelMarker && r.Marker >= 0 && r.Marker < len(doc.Markers) {
+			out = append(out, r.Marker)
+		}
+	}
+	return out
 }
 
 // vertEdit is the shared machinery of every direct edit: apply a point map to a

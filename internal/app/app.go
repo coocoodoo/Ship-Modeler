@@ -145,6 +145,8 @@ func New(headless bool) *App {
 		Headless: headless,
 	}
 	a.tree.init(settings)
+	// No dot is under the pointer until one is, and index 0 is a real dot.
+	a.markers.hover = -1
 	a.initPaint()
 	a.restorePaint()
 	a.initFiles()
@@ -578,6 +580,8 @@ func (a *App) describeRef(r model.Ref) string {
 		return r.Plane.String() + " plane · click to select it"
 	case model.SelBody:
 		return a.bodyName(r.Body)
+	case model.SelMarker:
+		return a.Doc().MarkerLabel(r.Marker) + " · drag the gizmo to move it"
 	case model.SelSketch:
 		if s := a.Doc().SketchByID(r.Sketch); s != nil {
 			if len(s.Arrangement().Regions) > 0 {

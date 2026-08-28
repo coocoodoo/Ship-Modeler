@@ -135,8 +135,8 @@ type Entity struct {
 	B    geom.Vec2i `json:"b,omitempty"`
 	C    geom.Vec2i `json:"c,omitempty"`
 	// D is a fourth anchor, for the kinds that need one.
-	D    geom.Vec2i `json:"d,omitempty"`
-	R    int64      `json:"r,omitempty"`
+	D geom.Vec2i `json:"d,omitempty"`
+	R int64      `json:"r,omitempty"`
 	// W is a second scalar: a slot's half-width, an ellipse's semi-minor axis.
 	W    int64 `json:"w,omitempty"`
 	Segs int   `json:"segs,omitempty"`

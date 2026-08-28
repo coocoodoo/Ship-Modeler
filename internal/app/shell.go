@@ -563,6 +563,11 @@ func (a *App) deleteRef(ref model.Ref) {
 		if a.Run(&model.DeleteSketch{ID: ref.Sketch}) {
 			a.toastWithUndo("Deleted " + name)
 		}
+	case model.SelMarker:
+		if a.Run(&model.DeleteMarker{Index: ref.Marker}) {
+			a.Sel.Remove(ref)
+			a.toastWithUndo("Deleted the dot")
+		}
 	case model.SelFace, model.SelEdge, model.SelVert:
 		// Deleting part of a solid would leave a hole in it, which is not a
 		// solid any more. Say what to do instead of quietly doing nothing.
