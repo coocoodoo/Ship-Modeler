@@ -257,6 +257,7 @@ func (a *App) commitTransform() {
 	}
 	label := t.Label()
 	moved := a.transform.live
+	a.foldBentOnCommit(t)
 	a.warnIfBent()
 	a.warnIfOffGrid()
 	if _, ok := a.Bus.CommitDrag(); ok && moved {
@@ -265,6 +266,38 @@ func (a *App) commitTransform() {
 	a.transform.live = false
 	t.Reset()
 	a.armTransform()
+}
+
+// foldBentOnCommit swaps the drag's final command for one that also folds the
+// faces it bent (the user's request, 2026-08-28). On commit, not per frame:
+// the crease depends on where the drag ends, and re-cutting topology sixty
+// times a second would be churn in service of a line that is not decided yet.
+//
+// The bus makes the swap atomic — UpdateDrag undoes the unfolded state and
+// applies the folded one, and the whole drag still lands as a single undo
+// entry. If the folding version is refused, the unfolded result stands, which
+// is exactly what the previous frame already left in the document.
+func (a *App) foldBentOnCommit(t *tools.TransformTool) {
+	p, ok := a.Bus.Pending().(interface{ Bent() int })
+	if !ok || p.Bent() == 0 {
+		return
+	}
+	final := a.transformCommand(t)
+	switch c := final.(type) {
+	case *model.MoveVerts:
+		c.FoldBent = true
+	case *model.RotateVerts:
+		c.FoldBent = true
+	default:
+		return
+	}
+	if err := a.Bus.UpdateDrag(final); err != nil {
+		return
+	}
+	if f, ok := a.Bus.Pending().(interface{ Folded() int }); ok && f.Folded() > 0 {
+		a.Toast(ui.Toast{Text: "Folded " +
+			plural(f.Folded(), "bent face", "bent faces") + " along the crease"})
+	}
 }
 
 // CancelTransform abandons a live drag, putting everything back (SPEC-DATA §2).

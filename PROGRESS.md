@@ -2,13 +2,86 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Placed dots are selectable and draggable (V-132). .pxm
+**Current state:** Bent faces now fold into flat pieces along real creases
+(V-133), and the whole-corpus validity invariant is back from the dead. Placed
+dots are selectable and draggable (V-132). .pxm
 shipped end to end (V-131): markers in the modeler,
 game payload in the file, loader + basis correction + thruster anchors in
 Iron Drift. Both suites green. Repo now pushes to
 github.com/coocoodoo/Iron-Drift-Modeler by the owner's instruction.
 
 ---
+
+## 2026-08-28 — Bent faces fold along real creases (V-133)
+
+**Asked for:** "when I bend edge on left, is not generating new vertices and
+edges to move edges appropriately. I would like the program to best split edges
+and vertices based on nearest crease" — with screenshots of a face bent by an
+edge drag, folding along an arbitrary triangulation diagonal instead of the
+vertical reference line between the two existing crease vertices.
+
+**Done:**
+- `geom/mesh/fold.go` — `FoldBent(m, moved, nextID)`: splits every bent
+  single-loop face into planar pieces. Crease choice: the chord between the two
+  still vertices flanking the single contiguous run of moved ones (the user's
+  reference line); otherwise the diagonal leaving the flattest pair, recursing
+  to triangles. Pieces get fresh ids, SrcFace lineage and the shared FacePaint
+  pointer — the boolean-fragment convention. Holed faces decline and stay on
+  the old bent-warning path.
+- `model` — `vertEdit.FoldBent` flag on MoveVerts/RotateVerts; folding
+  snapshots the face list and the body's FaceSeq so undo is exact and redo
+  cannot mint colliding ids. Drag frames never fold; only the commit does.
+- `app` — `foldBentOnCommit` swaps the drag's final command for the folding
+  version through `UpdateDrag`, keeping the gesture one undo entry. Toast:
+  "Folded N bent faces along the crease". Headless `move`/`rotate` ops commit
+  through the same path, so scripts get folding for free.
+
+**Also fixed, found while wiring the tests:** the body dump line had lost its
+`valid=` field somewhere in the SK sessions — `TestEveryBodyIsAlwaysAValidSolid`
+matched nothing and **silently skipped every script**. The whole-corpus
+validity net was dead. Restored, plus a new `faces=` field (a quad folded into
+two triangles draws the same triangles — only the face count can tell). 53
+scripts are genuinely checked again; 5 dump no bodies and skip honestly.
+
+**Verified:**
+- build/vet/gofmt clean; full suite green including the resurrected invariant
+  over all 58 scripts. No existing golden moved — no script in the corpus bends
+  a face on commit today, so there was no baseline churn to review.
+- New: 8 mesh fold tests (seam-box scenario from the screenshots, corner pull
+  to triangles, planar no-op, paint/lineage inheritance, holed skip,
+  determinism, fixture validity), 4 model tests (fold, exact undo incl.
+  FaceSeq, one-undo drags, off-by-default), 2 apptest flow tests.
+- **Fail-checked:** with `foldBentOnCommit` disabled the flow test fails with
+  all three symptoms — 6 faces where 8 belong, no fold toast, and the old
+  "faces are now bent" warning firing in its place.
+- Golden `fold_bend.png` generated and read: the Wing pod's corner pulled up
+  with two crease edges drawn where the folds landed, "Folded 2 bent faces
+  along the crease" toasted. (2, not 3: the pod's rotation leaves one face's
+  plane containing world Y, so a Y-drag cannot bend it.)
+
+**Decisions/deviations:** V-133 in DECISIONS.md.
+
+**Open issues:**
+- Holed faces still just bend, with the old warning. Folding them means chords
+  that dodge holes — deferred until it is actually wanted.
+- A face-selection that folds loses its selection (pieces are new identities,
+  same as boolean fragments). Rare: folding usually starts from an edge or
+  vertex selection.
+
+**Next:** nothing outstanding on this request.
+
+**Try it (user):**
+```bash
+C:\Modeler\modeler.exe
+```
+1. Click an edge of a body (or box-select some verts) — the move gizmo appears.
+2. Drag the edge sideways so its face cannot stay flat.
+3. On release: the face splits along the crease nearest the bend — real edges,
+   flat pieces — and the toast says "Folded N bent faces along the crease".
+4. **Ctrl+Z** once: the whole thing — move, pieces, creases — comes back off.
+5. Bend the edge of a face whose neighbours already have a mid-edge vertex
+   (like your screenshots): the fold lands exactly on that reference line.
+
 
 ## 2026-08-28 — Dots you can click and drag (V-132)
 

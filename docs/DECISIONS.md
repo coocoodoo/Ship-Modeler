@@ -1409,3 +1409,33 @@ visibly separates from its handles until release, when it re-arms in the new
 place. That is pre-existing behaviour shared by every selection kind (vertices,
 faces, bodies), not something dots introduced, and changing it would move
 mid-drag pixels in the M6 baselines. Worth revisiting as a polish item.
+
+**V-133 · Bent faces fold into flat pieces along the moved/still crease** (the
+user's request, 2026-08-28). A direct edit that leaves a face non-planar now
+splits it into planar pieces joined by real crease edges, instead of flagging
+it "bent" and letting the triangulation fold it along an arbitrary diagonal —
+which drew a lighting seam nobody placed and no edge where the eye saw one.
+
+The crease is chosen from what the edit knows and geometry alone cannot: the
+set of vertices that moved. One contiguous run of moved vertices in a loop →
+the chord between the two still vertices flanking it, which is the reference
+line a person would draw. No such chord (everything moved, several runs, or
+the flanks are already neighbours) → the diagonal leaving the flattest pair of
+pieces, recursively, bottoming out at triangles, which are planar by
+definition. Faces with holes are left bent: a chord there must dodge the hole,
+and a wrong guess is worse than the bend, so they keep the old warning path.
+
+Folding runs on commit only, never per drag frame — the crease depends on
+where the drag ends. The commit path swaps the drag's final command for a
+folding one through the bus's own UpdateDrag, so the whole gesture is still
+one undo entry and a refused fold leaves the unfolded result standing. Pieces
+take fresh FaceUIDs with SrcFace lineage and share the source's FacePaint
+pointer, exactly the boolean-fragment convention; undo restores the face list
+and the per-body FaceSeq, so redo cannot mint colliding identities.
+
+Found while wiring the tests: the body dump line had lost its `valid=` field
+somewhere in the SK sessions, so TestEveryBodyIsAlwaysAValidSolid matched
+nothing and silently skipped every script — the whole-corpus validity net was
+dead. Restored, plus a `faces=` field (folding changes face count where
+triangle count cannot tell: a quad split into two triangles draws the same two
+triangles). 53 scripts are checked again; 5 dump no bodies and skip honestly.

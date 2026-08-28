@@ -145,6 +145,13 @@ type vertEdit struct {
 	// Verts is what moves, grouped by body.
 	Verts map[uint32][]int
 
+	// FoldBent asks the edit to split any face it bends into planar pieces
+	// along the crease between what moved and what stayed (the user's
+	// request, 2026-08-28). The commit path sets it; drag frames leave it
+	// off, because folding mid-drag would churn topology sixty times a
+	// second for a crease that only the final position can place.
+	FoldBent bool
+
 	// before holds the original positions so undo is exact rather than
 	// arithmetic run backwards — a rotation undone by rotating the other way
 	// accumulates error, and this does not.
@@ -152,12 +159,22 @@ type vertEdit struct {
 	// bentBefore remembers which faces were already flagged, so undo restores
 	// the flags rather than merely clearing them.
 	bentBefore map[uint32][]bool
-	bent       int
-	leftGrid   bool
+	// facesBefore and seqBefore snapshot what folding rewrites: the face list
+	// and the identity counter. Nil for bodies that did not fold.
+	facesBefore map[uint32][]mesh.Face
+	seqBefore   map[uint32]uint32
+	bent        int
+	folded      int
+	leftGrid    bool
 }
 
 // Bent is how many faces the edit left non-planar (SPEC-GEOMETRY §7.2).
+// With folding on, that is what remains after the fold — holed faces, or a
+// loop no chord could flatten.
 func (e *vertEdit) Bent() int { return e.bent }
+
+// Folded is how many bent faces the edit split into planar pieces.
+func (e *vertEdit) Folded() int { return e.folded }
 
 // LeftTheGrid reports that this edit took vertices off the subunit lattice —
 // that something which was on the grid no longer is.
@@ -197,7 +214,10 @@ func (e *vertEdit) apply(doc *Document, move func(geom.Vec3) geom.Vec3) error {
 
 	e.before = make(map[uint32][]geom.Vec3, len(targets))
 	e.bentBefore = make(map[uint32][]bool, len(targets))
+	e.facesBefore = make(map[uint32][]mesh.Face, len(targets))
+	e.seqBefore = make(map[uint32]uint32, len(targets))
 	e.bent = 0
+	e.folded = 0
 	e.leftGrid = false
 
 	for _, t := range targets {
@@ -220,7 +240,21 @@ func (e *vertEdit) apply(doc *Document, move func(geom.Vec3) geom.Vec3) error {
 		e.before[t.body.ID] = saved
 
 		m.InvalidateCaches()
-		e.bent += m.RecheckPlanarity()
+		bent := m.RecheckPlanarity()
+		if e.FoldBent && bent > 0 {
+			// Folding rewrites the face list and mints identities, so both
+			// are snapshotted first; the copies are safe because the fold
+			// only ever reads the old Face structs, never edits their loops.
+			e.facesBefore[t.body.ID] = append([]mesh.Face(nil), m.Faces...)
+			e.seqBefore[t.body.ID] = t.body.FaceSeq
+			movedSet := make(map[int]bool, len(t.verts))
+			for _, vi := range t.verts {
+				movedSet[vi] = true
+			}
+			e.folded += mesh.FoldBent(m, movedSet, t.body.NextFaceUID)
+			bent = m.RecheckPlanarity()
+		}
+		e.bent += bent
 	}
 	return nil
 }
@@ -231,6 +265,10 @@ func (e *vertEdit) undo(doc *Document) {
 		b := doc.BodyByID(id)
 		if b == nil || b.Mesh == nil {
 			continue
+		}
+		if faces := e.facesBefore[id]; faces != nil {
+			b.Mesh.Faces = faces
+			b.FaceSeq = e.seqBefore[id]
 		}
 		for i, vi := range e.Verts[id] {
 			if vi >= 0 && vi < len(b.Mesh.Verts) {
