@@ -33,132 +33,175 @@ import (
 // The band is laid *inside* the face rather than centred on the edge. An edge
 // is the boundary between two faces, so a brush centred on it spends half its
 // width on texels that are not on this face at all — invisible, and half the
-// thickness that was asked for. Offsetting inward by half the width gives the
-// full band on each face, and the two together read as one line round the
-// corner.
+// thickness that was asked for.
+//
+// The band is rasterized geometrically: every texel whose square overlaps the
+// edge swept inward by the width, however slightly, takes paint (V-135). It
+// used to be a Bresenham walk of square dabs, and on a slanted edge the walk
+// floored each dab to the grid — up to a whole texel away from the edge,
+// always toward the same side — leaving a stair-stepped sliver of bare body
+// colour exactly where the line was asked for. Overshoot past the edge is
+// safe by construction: the renderer clips a face's picture to the face, so
+// a partly-outside texel shows only its inside part, painted.
 func EdgeBand(m *mesh.Mesh, fi int, p *mesh.FacePaint, b Brush, worldA, worldB geom.Vec3) image.Rectangle {
-	if m == nil || p == nil || fi < 0 || fi >= len(m.Faces) {
+	g, ok := edgeBandGeom(m, fi, p, b.Size, worldA, worldB)
+	if !ok {
 		return image.Rectangle{}
 	}
-	size := b.Size
-	if size < 1 {
-		size = 1
-	}
-	b.Size = size
-	ta, tb := edgeBandLine(m, fi, p, size, worldA, worldB)
+	// Nothing may land off the face's rectangle: the margin around a face's
+	// picture exists so a brush can overrun without checking, but paint out
+	// there is paint nobody sees.
+	clip := g.bbox.Intersect(FaceRect(m, fi, p))
 
-	// Nothing may land off the face: the margin around a face's picture exists
-	// so a brush can overrun without checking, but paint out there is paint
-	// nobody sees, and here it would be the half of the band the user asked
-	// for and did not get.
-	return strokeClipped(p, b, ta, tb, FaceRect(m, fi, p))
-}
-
-// edgeBandLine is where the band's dabs are anchored: the edge, moved into the
-// face by half the width and pulled back by the dab's own offset.
-func edgeBandLine(m *mesh.Mesh, fi int, p *mesh.FacePaint, size int, worldA, worldB geom.Vec3) (image.Point, image.Point) {
-	if size < 1 {
-		size = 1
-	}
-
-	// The direction from the edge into this face, along the face's own plane.
-	// Taken in world space, where the face has a frame and a normal to project
-	// against; texel space would need the same work with worse names.
-	mid := worldA.Add(worldB).Mul(0.5)
-	toCentre := m.FaceCentroid(fi).Sub(mid)
-	along, ok := worldB.Sub(worldA).NormalizeOK()
-	if ok {
-		// Only the part of it square to the edge: the rest slides along the
-		// band rather than moving it inward.
-		toCentre = toCentre.Sub(along.Mul(toCentre.Dot(along)))
-	}
-	inward, ok := toCentre.NormalizeOK()
-	if !ok {
-		// A degenerate face: nothing sensible to offset toward, so lay the
-		// band on the edge and let it fall where it may.
-		inward = geom.Vec3{}
-	}
-
-	// Half the band's width, in world units. FacePaint.Texel is how much world
-	// one texel spans, which is what turns a thickness in texels into a
-	// distance to move.
-	shift := inward.Mul(p.Texel * float64(size) / 2)
-	ta := Texel(p, worldA.Add(shift))
-	tb := Texel(p, worldB.Add(shift))
-
-	// A dab covers [t, t+size), so its centre sits half a width past its
-	// anchor. Pulling the anchor back by half the width puts the band's centre
-	// on the line just computed instead of past it. Half the width exactly —
-	// size/2, not (size-1)/2: with the smaller pullback an even-width band sat
-	// one texel further from its edge than asked on min-side edges, and hung
-	// one texel *off the face* on max-side ones, where the clip then ate it —
-	// a 2 px band flush on one side of a box and 1 px thin on the other, with
-	// a bare notch at every corner (found by screenshot, 2026-08-28).
-	back := size / 2
-	ta = ta.Sub(image.Point{X: back, Y: back})
-	tb = tb.Sub(image.Point{X: back, Y: back})
-
-	// Extend an end that reaches the face's border by one texel, and let the
-	// face-rect clip trim whatever falls off. A vertex that sits off the texel
-	// lattice — anything moved with snapping suppressed, or produced by a
-	// boolean — can round its band's first dab a texel short of the face's
-	// corner, and two bands each a texel short of a shared corner leave a bare
-	// notch exactly where the eye expects the line to turn. Border ends only:
-	// an edge that ends *inside* a face — the base of a box unioned onto a
-	// plate — has no boundary there to clip against, and the same extension
-	// poked out past those corners as a nub (both found by screenshot,
-	// 2026-08-28).
-	const ext = 1
-	rect := FaceRect(m, fi, p)
-	nearBorder := func(t image.Point) bool {
-		return t.X <= rect.Min.X+size || t.Y <= rect.Min.Y+size ||
-			t.X >= rect.Max.X-size-1 || t.Y >= rect.Max.Y-size-1
-	}
-	d := tb.Sub(ta)
-	step := image.Point{X: intSign(d.X) * ext, Y: intSign(d.Y) * ext}
-	if nearBorder(ta) {
-		ta = ta.Sub(step)
-	}
-	if nearBorder(tb) {
-		tb = tb.Add(step)
-	}
-	return ta, tb
-}
-
-// intSign is -1, 0 or 1 by the sign of v.
-func intSign(v int) int {
-	switch {
-	case v > 0:
-		return 1
-	case v < 0:
-		return -1
-	}
-	return 0
-}
-
-// strokeClipped is Stroke with every dab confined to a rectangle.
-func strokeClipped(p *mesh.FacePaint, b Brush, from, to image.Point, clip image.Rectangle) image.Rectangle {
-	size := b.Size
-	if size < 1 {
-		size = 1
-	}
 	dirty := image.Rectangle{}
-	for _, t := range walk(from, to) {
-		for y := t.Y; y < t.Y+size; y++ {
-			for x := t.X; x < t.X+size; x++ {
-				at := image.Point{X: x, Y: y}
-				if !at.In(clip) {
-					continue
-				}
-				coverage := 1.0
-				if b.Soft {
-					coverage = softCoverage(at, t, size)
-				}
-				dirty = union(dirty, put(p, b, at, coverage))
+	for y := clip.Min.Y; y < clip.Max.Y; y++ {
+		for x := clip.Min.X; x < clip.Max.X; x++ {
+			at := image.Point{X: x, Y: y}
+			if !g.covers(at) {
+				continue
 			}
+			coverage := 1.0
+			if b.Soft {
+				coverage = g.softAt(at)
+			}
+			dirty = union(dirty, put(p, b, at, coverage))
 		}
 	}
 	return dirty
+}
+
+// bandGeom is an edge band as an oriented rectangle in continuous texel
+// space: the edge segment swept inward across the face by the band's width.
+type bandGeom struct {
+	a        geom.Vec2 // the edge's A end, in texels
+	dir, nrm geom.Vec2 // unit: along the edge, and inward across it
+	s0, s1   float64   // extent along dir, after any border extension
+	w        float64   // the width
+	bbox     image.Rectangle
+}
+
+// edgeBandGeom lays the band out for one face.
+func edgeBandGeom(m *mesh.Mesh, fi int, p *mesh.FacePaint, size int, worldA, worldB geom.Vec3) (bandGeom, bool) {
+	if m == nil || p == nil || fi < 0 || fi >= len(m.Faces) {
+		return bandGeom{}, false
+	}
+	if size < 1 {
+		size = 1
+	}
+	ua, ub := UV(p, worldA), UV(p, worldB)
+	d := ub.Sub(ua)
+	length := d.Len()
+	if length < 1e-9 {
+		return bandGeom{}, false
+	}
+	dir := d.Mul(1 / length)
+	// Inward is square to the edge, toward the face's centre.
+	nrm := geom.Vec2{X: -dir.Y, Y: dir.X}
+	if UV(p, m.FaceCentroid(fi)).Sub(ua).Dot(nrm) < 0 {
+		nrm = nrm.Mul(-1)
+	}
+	g := bandGeom{a: ua, dir: dir, nrm: nrm, s0: 0, s1: length, w: float64(size)}
+
+	// Extend an end that reaches the face's border by the band's own width,
+	// and let the face-rect clip trim the spill. Two bands meeting at a corner
+	// each stop where their edge does, which leaves the miter between them
+	// bare — the notch at every corner of the screenshots. Border ends only:
+	// an edge that ends *inside* a face — the base of a box unioned onto a
+	// plate — has no boundary there to clip against, and an extension there
+	// pokes out past the corner as a painted nub (found by screenshot,
+	// 2026-08-28, twice).
+	rect := FaceRect(m, fi, p)
+	near := func(q geom.Vec2) bool {
+		pad := g.w + 1
+		return q.X <= float64(rect.Min.X)+pad || q.Y <= float64(rect.Min.Y)+pad ||
+			q.X >= float64(rect.Max.X)-pad || q.Y >= float64(rect.Max.Y)-pad
+	}
+	if near(ua) {
+		g.s0 = -g.w
+	}
+	if near(ub) {
+		g.s1 = length + g.w
+	}
+
+	lo := geom.Vec2{X: math.Inf(1), Y: math.Inf(1)}
+	hi := geom.Vec2{X: math.Inf(-1), Y: math.Inf(-1)}
+	for _, c := range g.corners() {
+		lo.X, lo.Y = math.Min(lo.X, c.X), math.Min(lo.Y, c.Y)
+		hi.X, hi.Y = math.Max(hi.X, c.X), math.Max(hi.Y, c.Y)
+	}
+	g.bbox = image.Rect(
+		int(math.Floor(lo.X)), int(math.Floor(lo.Y)),
+		int(math.Ceil(hi.X)), int(math.Ceil(hi.Y)))
+	return g, true
+}
+
+// corners is the band rectangle's four corners in texel space.
+func (g *bandGeom) corners() [4]geom.Vec2 {
+	at := func(s, u float64) geom.Vec2 {
+		return g.a.Add(g.dir.Mul(s)).Add(g.nrm.Mul(u))
+	}
+	return [4]geom.Vec2{at(g.s0, 0), at(g.s1, 0), at(g.s1, g.w), at(g.s0, g.w)}
+}
+
+// covers reports whether a texel's unit square genuinely overlaps the band —
+// separating axes over the square's two and the band's two. Strictly: a
+// square that only touches the boundary takes no paint, which is what keeps a
+// lattice-aligned band exactly as many texels wide as asked.
+func (g *bandGeom) covers(t image.Point) bool {
+	const eps = 1e-6
+	// The square in the band's own coordinates: project its corners on dir
+	// and nrm and compare against [s0,s1] x [0,w].
+	sMin, sMax := math.Inf(1), math.Inf(-1)
+	uMin, uMax := math.Inf(1), math.Inf(-1)
+	for _, c := range [4]geom.Vec2{
+		{X: float64(t.X), Y: float64(t.Y)},
+		{X: float64(t.X) + 1, Y: float64(t.Y)},
+		{X: float64(t.X) + 1, Y: float64(t.Y) + 1},
+		{X: float64(t.X), Y: float64(t.Y) + 1},
+	} {
+		rel := c.Sub(g.a)
+		s, u := rel.Dot(g.dir), rel.Dot(g.nrm)
+		sMin, sMax = math.Min(sMin, s), math.Max(sMax, s)
+		uMin, uMax = math.Min(uMin, u), math.Max(uMax, u)
+	}
+	if math.Min(sMax, g.s1)-math.Max(sMin, g.s0) <= eps {
+		return false
+	}
+	if math.Min(uMax, g.w)-math.Max(uMin, 0) <= eps {
+		return false
+	}
+	// The band's corners against the square's own axes.
+	xMin, xMax := math.Inf(1), math.Inf(-1)
+	yMin, yMax := math.Inf(1), math.Inf(-1)
+	for _, c := range g.corners() {
+		xMin, xMax = math.Min(xMin, c.X), math.Max(xMax, c.X)
+		yMin, yMax = math.Min(yMin, c.Y), math.Max(yMax, c.Y)
+	}
+	if math.Min(xMax, float64(t.X)+1)-math.Max(xMin, float64(t.X)) <= eps {
+		return false
+	}
+	if math.Min(yMax, float64(t.Y)+1)-math.Max(yMin, float64(t.Y)) <= eps {
+		return false
+	}
+	return true
+}
+
+// softAt is the soft brush's coverage for a texel of the band: full through
+// the middle, fading toward both long sides, the same shape a soft dab gives
+// a stroke.
+func (g *bandGeom) softAt(t image.Point) float64 {
+	centre := geom.Vec2{X: float64(t.X) + 0.5, Y: float64(t.Y) + 0.5}
+	u := centre.Sub(g.a).Dot(g.nrm)
+	r := g.w/2 + 0.5
+	d := math.Abs(u - g.w/2)
+	if d >= r {
+		return 0
+	}
+	core := r * SoftCore
+	if d <= core {
+		return 1
+	}
+	return (r - d) / (r - core)
 }
 
 // EdgeEndsOf returns an edge's two world positions, and whether the index

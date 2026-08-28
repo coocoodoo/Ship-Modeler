@@ -287,12 +287,11 @@ func EdgeBandBounds(m *mesh.Mesh, fi int, p *mesh.FacePaint, size int, worldA, w
 	if size < 1 {
 		size = 1
 	}
-	ta, tb := edgeBandLine(m, fi, p, size, worldA, worldB)
-	box := image.Rectangle{
-		Min: image.Point{X: min(ta.X, tb.X), Y: min(ta.Y, tb.Y)},
-		Max: image.Point{X: max(ta.X, tb.X) + size, Y: max(ta.Y, tb.Y) + size},
+	g, ok := edgeBandGeom(m, fi, p, size, worldA, worldB)
+	if !ok {
+		return image.Rectangle{}
 	}
-	return box.Intersect(FaceRect(m, fi, p))
+	return g.bbox.Intersect(FaceRect(m, fi, p))
 }
 
 func min(a, b int) int {

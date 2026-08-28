@@ -2,7 +2,8 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Fold creases draw and pick at any angle (V-134); bent faces
+**Current state:** Edge paint bands reach their edges gap-free (V-135); fold
+creases draw and pick at any angle (V-134); bent faces
 fold into flat pieces along real creases (V-133), and the whole-corpus validity invariant is back from the dead. Placed
 dots are selectable and draggable (V-132). .pxm
 shipped end to end (V-131): markers in the modeler,
@@ -11,6 +12,51 @@ Iron Drift. Both suites green. Repo now pushes to
 github.com/coocoodoo/Iron-Drift-Modeler by the owner's instruction.
 
 ---
+
+## 2026-08-28 — Edge bands reach their edges (V-135)
+
+**Reported by the user** with three screenshots: 3 px edge paint leaving
+stair-stepped gaps along a slanted silhouette, a bare notch at a corner where
+two bands meet, and a thin bare line down a painted crease.
+
+**Recreated first, in a unit test:** the stepped-wedge profile face, whose
+slope is a true diagonal in texel space. A probe every half-percent along the
+edge, a sliver inside the face: **172 of 199 probes sat on bare texels.** The
+old rasterizer walked the band as Bresenham dabs anchored at floored texels —
+flush on lattice edges (the only kind ever tested), up to a whole texel short
+on diagonals, always toward the same side.
+
+**Fix:** the band is now the geometry it claims to be — the edge swept inward
+by the width, an oriented rectangle in continuous texel space — and every
+texel whose square genuinely overlaps it takes paint (strict separating-axis
+test, so lattice bands keep their exact width). Overshoot past the edge is
+invisible by construction: the renderer clips the picture to the face. Corner
+miters fill by extending border ends by the band width; interior ends still
+never extend (the union-seam nub rule). One visit per texel also removes the
+old walk's double-blend on overlapping dabs.
+
+**Verified:**
+- 4 new paint tests: no-gaps along the slant (fails 172/199 against the old
+  code), width honesty on the diagonal, corner turn, crease meeting. All 8
+  prior edge contracts still pass unchanged.
+- The lattice `edge_paint` golden did not move by a single pixel — the
+  rewrite reproduces the already-correct cases exactly.
+- New script `edge_slant` + golden: the wedge with 3 px creases; the zoomed
+  shot read and checked — outer side flush against the silhouette, stair-step
+  on the inner side only, corners filled.
+- Full suite green; build/vet/gofmt clean.
+
+**Next:** nothing outstanding on this report.
+
+**Try it (user):**
+```bash
+C:\Modeler\modeler.exe
+```
+1. Make a shape with a slanted edge (your wedge), enter Paint, pick the Edge
+   tool, width 3.
+2. Paint the slanted edges — the band now hugs the edge the whole way, gap-free.
+3. Corners where two bands meet are filled; creases show no bare line.
+
 
 ## 2026-08-28 — A shallow fold crease is still an edge (V-134)
 

@@ -1461,3 +1461,28 @@ The one existing golden that moved, fold_bend, moved by 16 pixels: the sliver
 of the second fold's crease visible past the pod's silhouette, previously
 hidden because that fold is under 25 degrees. The diff was read before the
 baseline was accepted; it is the bug, fixed.
+
+**V-135 · Edge bands rasterize geometrically, not as a dab walk** (the user's
+report, 2026-08-28: "Edge Painter is not working properly. Is leaving gaps,
+used 3px on edges"). The band was a Bresenham walk of square dabs anchored at
+floored texels. Along a lattice-aligned edge that lands flush, and every edge
+test ran along one; along a slanted edge — the stepped wedge's profile, a
+true diagonal in texel space — the floor pulled each dab up to a whole texel
+away from the edge, always toward the same side. The result was the
+screenshots: a stair-stepped sliver of bare body colour along the silhouette,
+a notch where two bands meet at a corner, and a thin bare line down a painted
+crease. The recreation test put a probe every half-percent along the slope
+and found 172 of 199 sitting on bare texels.
+
+Now the band is what it says it is: the edge segment swept inward by the
+width, an oriented rectangle in continuous texel space, and every texel whose
+square genuinely overlaps it takes paint (separating-axis test, strict, so a
+square that only touches the boundary stays bare — which is what keeps a
+lattice band exactly as many texels wide as asked). Overshoot past the edge
+is safe by construction: the renderer clips a face's picture to the face, so
+a boundary-straddling texel shows only its inside part, painted. Corner
+miters fill by extending border ends by the band's width instead of one
+texel; interior ends still do not extend, keeping the union-seam nub fix.
+Each texel is now visited once, which also removes the old walk's
+double-blend on overlapping dabs. The lattice-aligned goldens did not move by
+a pixel; the slanted-wedge golden is new and pins the flush silhouette.

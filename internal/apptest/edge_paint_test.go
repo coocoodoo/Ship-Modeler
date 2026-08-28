@@ -40,3 +40,13 @@ func TestPaintingEveryEdgeOfABox(t *testing.T) {
 			after.toasts)
 	}
 }
+
+// The user's report (2026-08-28): 3 px edge bands left stair-stepped gaps
+// along slanted edges — the band never reached the edge it was asked to
+// line. The stepped-wedge prism has diagonal profile edges on its front and
+// back faces; the golden pins their bands flush against the silhouette, with
+// the stair-step on the inner side only (V-135).
+func TestGoldenSlantedEdgeBands(t *testing.T) {
+	_, outDir := runScript(t, "edge_slant")
+	checkGolden(t, "edge_slant", outDir)
+}
