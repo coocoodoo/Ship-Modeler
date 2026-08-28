@@ -16,10 +16,16 @@ To build one yourself:
 
 1. **Click a plane** in the viewport or the tree — Top, Front or Right. The
    camera turns to face it and a grid appears.
-2. **Draw a closed profile** with Line (`L`), Rectangle (`R`) or Circle (`C`).
+2. **Draw a closed profile** with Line (`L`), Rectangle (`R`), Circle (`C`),
+   Arc (`A`), Polygon (`P`), Slot (`O`) or Spline (`S`) — sixteen tools in
+   eight groups, each group's chevron opening its variants.
    Closed shapes fill in; loose ends show as red rings, because only a closed
    profile can be pulled into a solid. The **Grid** chips on the sketch card
-   set the grid and snap spacing, from a quarter unit to two.
+   set the grid and snap spacing, from a quarter unit to two. `Q` marks
+   geometry as construction: guides that snap but close no region. With
+   something selected, the card's **Modify** section fillets and chamfers
+   corners, offsets a shape, mirrors about the sketch axes, and repeats a
+   selection in a linear or circular pattern.
 3. **Press `E`** and drag the arrow. The Extrude card sets the depth, a draft
    angle, and whether the result is a new body or is added to, cut out of, or
    intersected with what it reaches.
@@ -41,7 +47,9 @@ out, its tooltip says how to turn it on.
 | Right-drag / Middle-drag / Wheel | Orbit / Pan / Zoom to cursor |
 | `F` / `O` | Frame selection / Orthographic ⇄ perspective |
 | **Tools** | `S` sketch · `E` extrude · `B` boolean · `M` move · `P` paint |
-| **Sketch** | `V` select · `L` line · `R` rectangle · `C` circle |
+| **Sketch** | `V` select · `L` line · `R` rectangle · `C` circle · `A` arc |
+| | `P` polygon · `O` slot · `S` spline · `.` point · `Q` construction |
+| | a group's key again steps to its next variant (Line → Midpoint line) |
 | **Paint** | `D` pencil · `B` soft brush · `E` eraser · `G` fill · `I` pick |
 | | `L` line · `R` rectangle · `C` circle · `N` gradient · `X` swap colours |
 | **Files** | `Ctrl+N` new · `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Shift+S` save as · `Ctrl+E` export |
