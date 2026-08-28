@@ -401,10 +401,44 @@ func (a *App) paintResMismatch() (bool, int) {
 	// panel, and reading the live hover would take them away as you reached for
 	// them.
 	h, ok := a.stickyFace()
-	if !ok || !h.allocated || h.paint == nil || sameDensity(h.paint.Texel, a.paint.res) {
+	if !ok || h.paint == nil {
 		return false, 0
 	}
-	return true, nearestRes(paint.Density(h.paint))
+	if h.allocated {
+		if sameDensity(h.paint.Texel, a.paint.res) {
+			return false, 0
+		}
+		return true, nearestRes(paint.Density(h.paint))
+	}
+	// The face is bare, so the first stroke will allocate at the armed chip —
+	// and if the rest of the body paints at some other density, that stroke
+	// lands at a foreign pixel size with nothing having said so. This is the
+	// hole the user's giant stamp fell through (V-139): the slope carried
+	// 8 px/u from its edge bands, the chip sat on 1, and a 32 px tile on the
+	// bare top face came out 32 units wide. Painted faces already prompted;
+	// bare ones on a painted body now do too.
+	bodyRes, has := a.bodyPaintedRes(h.body)
+	if !has || bodyRes == a.paint.res {
+		return false, 0
+	}
+	return true, bodyRes
+}
+
+// bodyPaintedRes is the density the body's painted faces use, as a chip, or
+// false when nothing on the body is painted. Mixed densities answer with the
+// first painted face's — documents rarely mix, and one honest offer beats a
+// survey.
+func (a *App) bodyPaintedRes(bodyID uint32) (int, bool) {
+	b := a.Doc().BodyByID(bodyID)
+	if b == nil || b.Mesh == nil {
+		return 0, false
+	}
+	for i := range b.Mesh.Faces {
+		if p := b.Mesh.Faces[i].Paint; p != nil && p.Texel > 0 {
+			return nearestRes(paint.Density(p)), true
+		}
+	}
+	return 0, false
 }
 
 // nearestRes is the chip closest to a density, which for anything painted since
@@ -431,6 +465,24 @@ func (a *App) paintMismatchPrompt(text, buttons rl.Rectangle, faceRes int) {
 	// be cut off rather than wrapped.
 	first, second := ui.SplitTop(text, text.Height/2)
 	h, _ := a.stickyFace()
+	if !h.allocated {
+		// The bare-face variant: nothing to resample, one honest offer. The
+		// first stroke will land at the chip's density; the body's painted
+		// faces sit at another. Saying it here is what stops a 32 px tile
+		// arriving 32 units wide because the chip drifted to 1 (V-139).
+		a.UI.Text(first, fmt.Sprintf("New paint here lands at %d px/u —", a.paint.res),
+			ui.FontSizeSmall, ui.ColorWarn)
+		a.UI.Text(second, fmt.Sprintf("the rest of this body is %d px/u.", faceRes),
+			ui.FontSizeSmall, ui.ColorWarn)
+		if a.UI.Button(ui.MakeID("paint.matchbody"), buttons, fmt.Sprintf("Use %d px/u", faceRes),
+			ui.ButtonOpts{
+				Style:   ui.ButtonPrimary,
+				Tooltip: "Set the brush to match the body's painted faces",
+			}) {
+			a.SetPaintRes(faceRes)
+		}
+		return
+	}
 	shown := float64(faceRes)
 	if h.paint != nil {
 		shown = paint.Density(h.paint)

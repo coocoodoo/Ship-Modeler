@@ -989,6 +989,13 @@ func (a *App) paintHint() string {
 		if !a.TileReady() {
 			return "Import a tileset in the panel, then click a tile to arm it"
 		}
+		if h := st.hover; h.ok && !h.allocated {
+			if bodyRes, has := a.bodyPaintedRes(h.body); has && bodyRes != st.res {
+				return fmt.Sprintf(
+					"Stamps here land at %d px/u but the body is %d — the panel offers the switch",
+					st.res, bodyRes)
+			}
+		}
 		return "Click to stamp · drag for a trail · Alt places free of the grid"
 	}
 	if st.stroking {

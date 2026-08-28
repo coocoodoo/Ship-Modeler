@@ -82,3 +82,25 @@ func TestGoldenTilePanel(t *testing.T) {
 	_, outDir := runScript(t, "tile_panel")
 	checkGolden(t, "tile_panel", outDir)
 }
+
+// The giant-stamp trap (the user's report, 2026-08-28, with their .pxm and
+// settings attached): the res chip had drifted to 1, painted faces kept
+// their own 8 px/u, and the first stamp on a BARE face silently allocated at
+// the chip — a 32 px tile, 32 units wide. Painted faces already prompted on a
+// density mismatch; bare faces on a painted body now do too, and the tile
+// hint names the trap at the moment it matters.
+func TestABareFaceOnAPaintedBodyWarnsBeforeTheFirstStamp(t *testing.T) {
+	stdout, _ := runScript(t, "tile_resguard")
+	if !strings.Contains(stdout, "resprompt offer=8 armed=1") {
+		t.Error("hovering a bare face with the chip at 1 raised no prompt for the body's 8")
+	}
+	if !strings.Contains(stdout,
+		`hint "Stamps here land at 1 px/u but the body is 8 — the panel offers the switch"`) {
+		t.Error("the tile hint does not name the density trap")
+	}
+}
+
+func TestGoldenTileResGuard(t *testing.T) {
+	_, outDir := runScript(t, "tile_resguard")
+	checkGolden(t, "tile_resguard", outDir)
+}

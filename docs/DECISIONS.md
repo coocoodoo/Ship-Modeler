@@ -1550,3 +1550,24 @@ orientations with flip-then-rotate order, alpha-128 stamping that never
 erases, grid snap with Alt free placement, one undo step per trail, the
 sheet-as-settings contract, and the ghost preview drawing the armed tile's
 actual pixels on the face.
+
+**V-139 · A bare face on a painted body warns before its first paint** (the
+user's report, 2026-08-28: "really bad bug. when I stamp... on very top, it
+gets huge" — with their .pxm and settings attached). Their res chip had
+drifted to 1 px/u — a legal chip, one miss-click below the tool icons — while
+every painted face carried 8 px/u from the edge bands. Painted faces pin
+their own density, so stamping the slope stayed right; the bare top face
+allocated at the chip, and a 32 px tile arrived 32 units wide. The ghost
+previewed the disaster faithfully, which is how the user saw it before
+committing — but a preview is not a warning.
+
+The mismatch prompt existed for exactly this shape of surprise and only
+covered painted faces. It now also fires when the sticky face is BARE and
+the body's painted faces sit at a different density than the chip: "New
+paint here lands at N px/u — the rest of this body is M", with one primary
+button, Use M. Nothing to resample on a bare face, so no resample offer. The
+tile hint names the trap inline too. The chip's contract is untouched —
+first paint still allocates at the chip (SPEC-UX §13.2) — the change is
+that the chip and the body disagreeing is now said out loud where the user
+is looking. A mixed-density body answers with its first painted face's
+density; documents rarely mix, and one honest offer beats a survey.

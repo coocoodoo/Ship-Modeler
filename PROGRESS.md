@@ -2,7 +2,8 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Tile stamping shipped end to end — TP1-TP3 of Tile_paint.md
+**Current state:** Bare faces on painted bodies warn before first paint
+(V-139). Tile stamping shipped end to end — TP1-TP3 of Tile_paint.md
 (V-138). Edge bands land on the face side of their edge, decided by
 winding (V-137); edge picks follow the whole line through seam vertices
 (V-136); edge paint bands reach their edges gap-free (V-135); fold
@@ -15,6 +16,34 @@ Iron Drift. Both suites green. Repo now pushes to
 github.com/coocoodoo/Iron-Drift-Modeler by the owner's instruction.
 
 ---
+
+## 2026-08-28 — The giant stamp, and the warning that was missing (V-139)
+
+**Reported by the user** with their .pxm and screenshots: stamping the slope
+worked; on the bare top face the stamp "gets huge".
+
+**Diagnosed from their settings file:** `paint.res` sat at 1 px/u — a legal
+chip, one miss-click under the tool icons. Painted faces pin their own
+density (the slope stayed 8 px/u), but a bare face allocates at the chip, so
+a 32 px tile landed 32 units wide. The ghost previewed it honestly; nothing
+warned.
+
+**Fix:** the density-mismatch prompt — which already covered painted faces —
+now also fires for a bare face on a painted body: "New paint here lands at
+N px/u — the rest of this body is M", one button, Use M. The tile hint names
+the trap inline. The chip's first-paint contract is unchanged.
+
+**Verified:** the recreation script pins the prompt (`resprompt offer=8
+armed=1`) and the hint on a bare-face hover with the chip at 1;
+fail-checked — reverting the bare branch loses the prompt line. Golden read:
+the warn text and the Use 8 px/u button in the panel with the chip visibly
+on 1. Full suite green.
+
+**For the user's current file:** Ctrl+Z removes the giant stamp; click the
+Res chip 8 (or the new Use 8 px/u offer) and stamps land right everywhere.
+
+**Next:** nothing outstanding.
+
 
 ## 2026-08-28 — Tile stamping: TP1-TP3 in one sweep (V-138)
 

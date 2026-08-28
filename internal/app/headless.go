@@ -1814,6 +1814,10 @@ func (r *ScriptRunner) dumpPaint() {
 		boolBit(st.locked), st.lockFace.Seq(), stickyTargetSeq(a),
 		boolBit(st.awaitingLock))
 
+	if on, res := a.paintResMismatch(); on {
+		fmt.Printf("resprompt offer=%d armed=%d\n", res, st.res)
+	}
+
 	if ts := st.tiles.set; ts != nil {
 		fmt.Printf("tileset sheet=%dx%d grid=%dx%d+%d+%d tiles=%d sel=%d rot=%d flip=%d\n",
 			ts.Img.Bounds().Dx(), ts.Img.Bounds().Dy(),
