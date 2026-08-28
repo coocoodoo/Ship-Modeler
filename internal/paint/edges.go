@@ -87,10 +87,53 @@ func edgeBandLine(m *mesh.Mesh, fi int, p *mesh.FacePaint, size int, worldA, wor
 	tb := Texel(p, worldB.Add(shift))
 
 	// A dab covers [t, t+size), so its centre sits half a width past its
-	// anchor. Pulling the anchor back puts the band's centre on the line just
-	// computed instead of past it.
-	back := (size - 1) / 2
-	return ta.Sub(image.Point{X: back, Y: back}), tb.Sub(image.Point{X: back, Y: back})
+	// anchor. Pulling the anchor back by half the width puts the band's centre
+	// on the line just computed instead of past it. Half the width exactly —
+	// size/2, not (size-1)/2: with the smaller pullback an even-width band sat
+	// one texel further from its edge than asked on min-side edges, and hung
+	// one texel *off the face* on max-side ones, where the clip then ate it —
+	// a 2 px band flush on one side of a box and 1 px thin on the other, with
+	// a bare notch at every corner (found by screenshot, 2026-08-28).
+	back := size / 2
+	ta = ta.Sub(image.Point{X: back, Y: back})
+	tb = tb.Sub(image.Point{X: back, Y: back})
+
+	// Extend an end that reaches the face's border by one texel, and let the
+	// face-rect clip trim whatever falls off. A vertex that sits off the texel
+	// lattice — anything moved with snapping suppressed, or produced by a
+	// boolean — can round its band's first dab a texel short of the face's
+	// corner, and two bands each a texel short of a shared corner leave a bare
+	// notch exactly where the eye expects the line to turn. Border ends only:
+	// an edge that ends *inside* a face — the base of a box unioned onto a
+	// plate — has no boundary there to clip against, and the same extension
+	// poked out past those corners as a nub (both found by screenshot,
+	// 2026-08-28).
+	const ext = 1
+	rect := FaceRect(m, fi, p)
+	nearBorder := func(t image.Point) bool {
+		return t.X <= rect.Min.X+size || t.Y <= rect.Min.Y+size ||
+			t.X >= rect.Max.X-size-1 || t.Y >= rect.Max.Y-size-1
+	}
+	d := tb.Sub(ta)
+	step := image.Point{X: intSign(d.X) * ext, Y: intSign(d.Y) * ext}
+	if nearBorder(ta) {
+		ta = ta.Sub(step)
+	}
+	if nearBorder(tb) {
+		tb = tb.Add(step)
+	}
+	return ta, tb
+}
+
+// intSign is -1, 0 or 1 by the sign of v.
+func intSign(v int) int {
+	switch {
+	case v > 0:
+		return 1
+	case v < 0:
+		return -1
+	}
+	return 0
 }
 
 // strokeClipped is Stroke with every dab confined to a rectangle.

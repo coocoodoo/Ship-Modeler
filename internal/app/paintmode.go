@@ -360,8 +360,10 @@ func (a *App) canPaint() (bool, string) {
 // updatePaint runs one frame of paint mode with the pointer in the viewport.
 func (a *App) updatePaint(in InputFrame, vp render.Viewport) {
 	// The edge tool picks edges rather than painting texels, so it takes the
-	// pointer before any of the brush machinery runs.
-	if a.paint.tool == paint.ToolEdge {
+	// pointer before any of the brush machinery runs — except while the lock
+	// pick is armed: "Click a face…" has promised the next click chooses a
+	// face, and edges must not eat it.
+	if a.paint.tool == paint.ToolEdge && !a.paint.awaitingLock {
 		a.clearPaintHover(false)
 		a.pickPaintEdge(in, vp)
 		return
@@ -392,6 +394,21 @@ func (a *App) updatePaint(in InputFrame, vp render.Viewport) {
 	a.beginStroke()
 }
 
+// setPaintTool switches the armed tool, finishing any live stroke first.
+//
+// Every switch path — the keyboard, the panel, a script — goes through here,
+// because a switch mid-drag used to leave the old stroke's drag open on the
+// bus. Switching to the edge tool was the worst case: its update path never
+// reaches the stroke machinery, so the drag stayed open indefinitely — and an
+// open drag silently disables undo, redo, and every command after it,
+// including the edge bake the user switched over to do.
+func (a *App) setPaintTool(t paint.Tool) {
+	if t != a.paint.tool {
+		a.finishStroke()
+	}
+	a.paint.tool = t
+}
+
 // paintChromeFrame runs the parts of paint mode that must keep running while
 // the pointer is over the chrome: a stroke that ends off the viewport still
 // ends, rather than staying open until the pointer wanders back.
@@ -400,6 +417,10 @@ func (a *App) updatePaint(in InputFrame, vp render.Viewport) {
 // is still armed when you reach it.
 func (a *App) paintChromeFrame(in InputFrame) {
 	a.clearPaintHover(false)
+	// The hovered edge is a viewport thing too: left stale it kept its accent
+	// glow while the pointer was over the panel, pointing at nothing.
+	a.paint.hoverEdge = -1
+	a.paint.hoverEdgeBody = 0
 	if a.paint.stroking && !in.Down[MouseLeft] {
 		a.finishStroke()
 	}
@@ -678,6 +699,7 @@ func (a *App) finishStroke() {
 	if !a.paint.stroking {
 		return
 	}
+	tool := a.paint.tool
 	a.paint.stroking = false
 	a.paint.points = a.paint.points[:0]
 	a.paint.strokePt = nil
@@ -685,7 +707,14 @@ func (a *App) finishStroke() {
 		return
 	}
 	if _, ok := a.Bus.CommitDrag(); ok {
-		a.paint.recents.Add(a.paint.color)
+		// The recents record colours that were used. An eraser stroke used
+		// none, and a gradient used both of its ends, not just the near one.
+		if tool != paint.ToolEraser {
+			a.paint.recents.Add(a.paint.color)
+		}
+		if tool == paint.ToolGradient {
+			a.paint.recents.Add(a.paint.colorB)
+		}
 	}
 }
 
@@ -866,7 +895,7 @@ func (a *App) handlePaintKeys(in InputFrame) {
 	}
 	for _, k := range paintToolKeys {
 		if in.KeyPressed(k.key) {
-			a.paint.tool = k.tool
+			a.setPaintTool(k.tool)
 			break
 		}
 	}

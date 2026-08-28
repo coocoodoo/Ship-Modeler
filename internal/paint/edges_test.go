@@ -287,3 +287,57 @@ func TestPaintingNoEdgesIsRefused(t *testing.T) {
 		t.Error("painting an empty edge selection was accepted")
 	}
 }
+
+// Bands that share a face corner must cover it between them. Rounding the two
+// world corners into texels can land a band's first dab a texel short of the
+// face's own corner, and two bands each a texel short of a shared corner leave
+// a bare notch exactly where the eye expects the line to turn — every corner
+// of every outlined face (found by screenshot, 2026-08-28).
+func TestEdgeBandsMeetAtTheFaceCorners(t *testing.T) {
+	m := paintedCube(t, 4) // an 8 u face at 4 px/u: 32x32 texels
+	top := -1
+	for i := range m.Faces {
+		if m.FaceNormal(i).Y > 0.9 {
+			top = i
+			break
+		}
+	}
+	if top < 0 {
+		t.Fatal("the cube has no +Y face")
+	}
+
+	p := m.Faces[top].Paint
+	b := Brush{Color: red, Size: 2}
+	topo := m.Topo()
+	bands := 0
+	for i := range topo.Edges {
+		for _, use := range topo.Edges[i].Uses {
+			if use.Face != top {
+				continue
+			}
+			wa, wb, ok := EdgeEndsOf(m, i)
+			if !ok {
+				t.Fatalf("edge %d has no ends", i)
+			}
+			EdgeBand(m, top, p, b, wa, wb)
+			bands++
+			break
+		}
+	}
+	if bands != 4 {
+		t.Fatalf("expected the top face to have 4 boundary edges, painted %d", bands)
+	}
+
+	r := FaceRect(m, top, p)
+	corners := []image.Point{
+		r.Min,
+		{X: r.Max.X - 1, Y: r.Min.Y},
+		{X: r.Max.X - 1, Y: r.Max.Y - 1},
+		{X: r.Min.X, Y: r.Max.Y - 1},
+	}
+	for _, c := range corners {
+		if At(p, c).A == 0 {
+			t.Errorf("corner texel %v is bare — the bands leave a notch where they meet", c)
+		}
+	}
+}

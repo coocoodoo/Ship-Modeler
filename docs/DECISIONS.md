@@ -1317,3 +1317,33 @@ sentinel.
 Every golden with planes or sketch mode in frame regenerated (the sample ship
 golden did not move — paint mode already hid planes, which is its own small
 proof the contract holds together).
+
+**V-130 · The paint audit: the band that missed its corners, and the switch
+that wedged the bus.** "Work on the painting side, needs polish, find bugs and
+fix." Read everything, then rendered a probe and zoomed in — both halves found
+things the other could not.
+
+The screenshot found the edge tool's arithmetic. An even-width band's dab
+pullback was `(size-1)/2` where centring a `[t, t+size)` dab needs `size/2`,
+so a 2 px band sat one texel further from its edge than asked on min-side
+edges and hung one texel off the face on max-side ones, where the clip ate
+it — flush and fat on one side of a box, thin on the other, with a bare notch
+at every corner of every outlined face. Fixed, plus a one-texel end extension
+for ends that reach the face's border (off-lattice vertices can round a band
+a texel short of its corner), border ends only — extended everywhere, the
+overrun poked out as nubs at T-junction corners inside a face, where there is
+no boundary to clip against. Three renders to get right; the corner test
+(`TestEdgeBandsMeetAtTheFaceCorners`) and the edge golden pin it.
+
+The read found the state machine. Switching tools mid-stroke never finished
+the stroke, and switching to the edge tool — whose update path never reaches
+the stroke code — left the drag open on the bus indefinitely: undo dead, redo
+dead, the edge bake erroring, all silently, until some later brush stroke
+happened to close it. Every switch path (keyboard, panel, script) now goes
+through `setPaintTool`, which finishes a live stroke first. Smaller keeps:
+the recents strip no longer records the foreground colour for eraser strokes
+and records both ends of a gradient; the hovered edge's glow no longer
+freezes on screen when the pointer crosses to the panel; the "Click a
+face…" lock pick now beats edge picking to the click it was promised; and
+the resample and face-view prompts no longer surface under the edge tool,
+where the sticky face they describe is whatever the last brush tool touched.

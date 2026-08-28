@@ -2,10 +2,38 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** SK1–SK5 done, edge lines, pixel density (V-128) and the
-scale contract (V-129): planes, grid, camera and zoom finally agree. Suite
-green (16 packages), exe rebuilt. **Next: SK6 (image underlay) still needs
-your go-ahead.**
+**Current state:** SK1–SK5 done; V-128 pixel density, V-129 scale contract,
+V-130 paint audit (edge-band corners, mid-stroke tool switch). Suite green
+(16 packages), exe rebuilt. **Next: SK6 (image underlay) still needs your
+go-ahead.**
+
+---
+
+## 2026-08-28 — The paint audit: corners, and a wedged bus
+
+"Work on the painting side, needs polish, find bugs and fix." Two instruments,
+two harvests (V-130).
+
+**The screenshot found the geometry.** Baked a 2 px edge outline onto the test
+scene and zoomed in: bands one texel off their edge on min sides, one texel
+thin on max sides, and a bare notch at every corner. Root cause was a dab
+pullback of (size-1)/2 where centring needs size/2. The fix took three renders
+to land clean — the first attempt extended band ends everywhere and traded the
+notches for nubs poking past T-junction corners inside faces, so the extension
+now applies only to ends that reach the face's border, where the clip owns the
+overshoot. TestEdgeBandsMeetAtTheFaceCorners failed on the old code and pins
+the new; the edge golden regenerated (97.6% of pixels unchanged — the bands
+are the diff).
+
+**The read found the state machine.** Switching paint tools mid-stroke left
+the stroke's drag open on the bus — and the edge tool never reaches the stroke
+code, so it stayed open: undo dead, redo dead, the bake erroring, all silent.
+setPaintTool closes a live stroke first, from every switch path. Plus: eraser
+strokes no longer stamp the foreground colour into the recents (gradients now
+record both ends), the hovered edge's glow clears when the pointer leaves for
+the panel, the lock pick's promised click beats edge picking, and the
+resample/face-view prompts stay down under the edge tool. GPU-free regression
+tests in paint_test.go.
 
 ---
 

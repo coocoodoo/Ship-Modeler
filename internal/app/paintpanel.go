@@ -40,6 +40,13 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	// warning sometimes goes looks broken.
 	mismatch, mismatchRes := a.paintResMismatch()
 	oblique := a.paintOblique()
+	// Both prompts describe "the face you are pointing at", and the edge tool
+	// does not point at faces: under it the sticky face is whatever the last
+	// brush tool touched, and a resample offer about that face would be an
+	// offer about something invisible.
+	if a.paint.tool == paint.ToolEdge {
+		mismatch, oblique = false, false
+	}
 	// The dither modes and the fill toggle only mean anything to some tools, so
 	// they only appear for those tools. A panel that showed every control every
 	// tool might ever want would be a panel mostly full of greyed-out rows.
@@ -301,7 +308,7 @@ func (a *App) paintToolRow(r rl.Rectangle, tools []paintTool) {
 			Tooltip:  t.tip,
 			Shortcut: t.tool.Shortcut(),
 		}) {
-			a.paint.tool = t.tool
+			a.setPaintTool(t.tool)
 		}
 	}
 }

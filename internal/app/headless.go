@@ -1277,7 +1277,7 @@ func (r *ScriptRunner) paintOp(op io.Op) error {
 		if !ok {
 			return op.Errorf("unknown paint tool %q", op.Kind)
 		}
-		a.paint.tool = t
+		a.setPaintTool(t)
 
 	case "paint.size":
 		if !validBrushSize(op.Size) {
