@@ -75,6 +75,11 @@ const (
 	EvBodyPainted
 	// EvPlanesChanged means a default plane was shown or hidden.
 	EvPlanesChanged
+	// EvMarkersChanged means an orientation marker was placed, moved or
+	// removed. No derived cache depends on them — they draw straight from the
+	// document — so nothing needs to listen; the kind exists so the change is
+	// still announced like every other.
+	EvMarkersChanged
 	// EvDocReplaced means everything must be rebuilt: load, new, undo of a
 	// structural change.
 	EvDocReplaced

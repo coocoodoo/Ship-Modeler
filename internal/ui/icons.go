@@ -665,3 +665,11 @@ func DrawEdgeLineIcon(cx, cy, size float64, col color.RGBA) {
 	// The band itself, down the shared edge.
 	line(apexTop, apexBot, w*2.2, col)
 }
+
+// DrawMarkerIcon is an orientation dot: a small filled centre in a ring, the
+// glyph for the front/top/thruster markers a game engine reads (V-131).
+func DrawMarkerIcon(cx, cy, size float64, col color.RGBA) {
+	r := size * 0.36
+	rl.DrawCircleLinesV(rl.Vector2{X: float32(cx), Y: float32(cy)}, float32(r), col)
+	rl.DrawCircleV(rl.Vector2{X: float32(cx), Y: float32(cy)}, float32(size*0.14), col)
+}

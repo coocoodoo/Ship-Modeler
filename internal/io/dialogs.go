@@ -20,11 +20,12 @@ import (
 // never surfaced: the callers get a false.
 var errCancelled = zenity.ErrCanceled
 
-// shipFilter is the project file type.
+// shipFilter is the project file type: .pxm, plus the .ship name it had
+// before the rename, so old files stay one dialog away.
 func shipFilter() zenity.FileFilters {
 	return zenity.FileFilters{{
-		Name:     "Modeler ship (*.ship)",
-		Patterns: []string{"*" + ShipExtension},
+		Name:     "Pixel model (*.pxm, *.ship)",
+		Patterns: []string{"*" + ShipExtension, "*" + LegacyShipExtension},
 		CaseFold: true,
 	}}
 }

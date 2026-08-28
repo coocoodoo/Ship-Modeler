@@ -83,7 +83,7 @@ func (a *App) wantedCursor(in InputFrame) int32 {
 	if a.transformHoverCursor() != rl.MouseCursorDefault {
 		return a.transformHoverCursor()
 	}
-	if a.sketch.awaitingPlane {
+	if a.sketch.awaitingPlane || a.markers.armed {
 		return rl.MouseCursorPointingHand
 	}
 	return rl.MouseCursorDefault

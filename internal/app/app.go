@@ -83,6 +83,7 @@ type App struct {
 	box       boxSelectState
 	paint     paintState
 	files     fileState
+	markers   markerState
 
 	// hoverSketch is the visible sketch under the pointer, which the ID buffer
 	// cannot report because an overlay is not geometry.
@@ -513,6 +514,9 @@ func (a *App) routeModalAnswer(res ui.ModalResult) {
 func (a *App) HintText() string {
 	if a.hintOverride != "" {
 		return a.hintOverride
+	}
+	if a.markers.armed {
+		return a.markerHint()
 	}
 	if a.sketch.awaitingPlane {
 		return "Click a plane to sketch on it · Esc to cancel"

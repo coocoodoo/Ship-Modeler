@@ -55,6 +55,10 @@ type Op struct {
 	Vert    int         `json:"vert,omitempty"`
 	Edge    int         `json:"edge,omitempty"`
 	Delta   *[3]float64 `json:"delta,omitempty"`
+	// Marker ops: where the dot goes and the face normal it carries. (At is
+	// taken by the pick op, and a marker IS a dot.)
+	Dot    *[3]float64 `json:"dot,omitempty"`
+	Normal *[3]float64 `json:"normal,omitempty"`
 	Axis    string      `json:"axis,omitempty"`
 	Degrees float64     `json:"degrees,omitempty"`
 	// Rect is a box-select rectangle in window pixels.
@@ -173,6 +177,8 @@ var knownOps = map[string]bool{
 	"boolean":        true, "boolean.begin": true,
 	"boolean.commit": true, "boolean.cancel": true,
 	"select": true, "move": true, "rotate": true,
+	"marker.front": true, "marker.top": true, "marker.thruster": true,
+	"marker.clear": true,
 	"duplicate": true, "box.select": true,
 	"paint.begin": true, "paint.exit": true, "paint.res": true,
 	"paint.color": true, "paint.tool": true, "paint.size": true,

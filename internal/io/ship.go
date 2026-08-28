@@ -31,8 +31,20 @@ import (
 // standing. And the reader never gives up on a file it can partly understand: a
 // missing picture costs a face its paint and a warning, not the ship.
 
-// ShipExtension is the project file suffix.
-const ShipExtension = ".ship"
+// ShipExtension is the project file suffix: .pxm, "pixel model" (the user's
+// request, 2026-08-28 — the format their game engine consumes).
+const ShipExtension = ".pxm"
+
+// LegacyShipExtension is the suffix the format wore before the rename. Files
+// saved under it still open — a rename must never orphan anybody's work — and
+// save under the new name from then on.
+const LegacyShipExtension = ".ship"
+
+// IsShipFile reports whether a path looks like a project file, either name.
+func IsShipFile(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	return ext == ShipExtension || ext == LegacyShipExtension
+}
 
 // AppName in the manifest, so a file can say what wrote it.
 const manifestApp = "modeler"
@@ -90,7 +102,12 @@ func buildShip(doc *model.Document, thumb *image.RGBA) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
 	add := func(name string, data []byte) error {
-		w, err := zw.Create(name)
+		// Every member is STORED, not deflated. The game payload is read by
+		// engines outside this program — Iron Drift's loader is ~100 lines of
+		// dependency-free Rust because it never has to inflate anything — and
+		// what deflate would save is noise: the PNGs and the .glb's textures
+		// are already compressed, and the JSON is small.
+		w, err := zw.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Store})
 		if err != nil {
 			return fmt.Errorf("add %s: %w", name, err)
 		}
@@ -135,6 +152,29 @@ func buildShip(doc *model.Document, thumb *image.RGBA) ([]byte, error) {
 			return nil, err
 		}
 	}
+
+	// The game payload: a render-ready .glb and the orientation markers, under
+	// game/ so an engine can take just that folder's two members and ignore
+	// everything this program keeps for itself. Only when there is something
+	// visible to render — an empty document is not a ship yet, and its file
+	// says so by carrying no payload.
+	if len(visibleBodies(doc)) > 0 {
+		glb, err := BuildGLB(doc)
+		if err != nil {
+			return nil, fmt.Errorf("build the game model: %w", err)
+		}
+		if err := add("game/ship.glb", glb); err != nil {
+			return nil, err
+		}
+		markers, err := marshalGameMarkers(doc)
+		if err != nil {
+			return nil, fmt.Errorf("write the game markers: %w", err)
+		}
+		if err := add("game/markers.json", markers); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := zw.Close(); err != nil {
 		return nil, fmt.Errorf("finish the archive: %w", err)
 	}

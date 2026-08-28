@@ -106,7 +106,9 @@ func (a *App) DocumentName() string {
 	if a.files.path == "" {
 		return "Untitled"
 	}
-	return strings.TrimSuffix(filepath.Base(a.files.path), io.ShipExtension)
+	base := filepath.Base(a.files.path)
+	base = strings.TrimSuffix(base, io.ShipExtension)
+	return strings.TrimSuffix(base, io.LegacyShipExtension)
 }
 
 // DocumentTitle is the name with the marks that say what state it is in.

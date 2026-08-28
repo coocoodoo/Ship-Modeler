@@ -2,10 +2,41 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** SK1–SK5 done; V-128 pixel density, V-129 scale contract,
-V-130 paint audit (edge-band corners, mid-stroke tool switch). Suite green
-(16 packages), exe rebuilt. **Next: SK6 (image underlay) still needs your
-go-ahead.**
+**Current state:** .pxm shipped end to end (V-131): markers in the modeler,
+game payload in the file, loader + basis correction + thruster anchors in
+Iron Drift. Both suites green. Repo now pushes to
+github.com/coocoodoo/Iron-Drift-Modeler by the owner's instruction.
+
+---
+
+## 2026-08-28 — .pxm: the format the game eats (V-131)
+
+The big one: rename .ship to .pxm, add orientation markers to the modeler,
+and teach Iron Drift (the user's Rust game) to consume the result. Read the
+game first — its gpu.rs is a museum of hand-measured orientation facts
+(`model_nose_negative_z`, the THR_* thruster tables, SHIP_NOSE), which told
+me exactly what the markers must carry.
+
+**Modeler:** front/top/thruster dots placed by arm-then-pick from a new tree
+Markers section, drawn as coloured dots with exhaust ticks; singleton
+front/top with move-not-multiply commands; every save embeds game/ship.glb
+(same builder as the glTF export) and game/markers.json (dots + derived
+orthonormal basis + extents + per-thruster position/direction/radius); the
+whole zip is STORED now; .ship still opens everywhere. New ops
+marker.front/top/thruster/clear; golden `pxm_markers`; pxm_test.go pins
+payload-present, stored-only, basis math, round-trip, legacy open.
+
+**Game:** src/pxm.rs — a dependency-free stored-only zip reader (~100 lines,
+the reason the zip went STORED), serde markers, glb staged to a temp file for
+raylib. gpu.rs scans assets/models/PXM at load; draw_model_basis_ori composes
+the authored basis (a .pxm can never be on the backwards-noses list);
+pxm_thrusters/pxm_nose expose anchors in the THR_* convention. The sample
+ship, with markers, is generated INTO the game repo and cargo's pxm tests
+parse it — reader tested against the writer's real bytes. 95 game tests
+green, 16 modeler packages green.
+
+Goldens: all regenerated once (the tree grew a Markers section in every shot
+with bodies; verified the diff sat in the tree region before updating).
 
 ---
 

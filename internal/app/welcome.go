@@ -175,7 +175,8 @@ func (a *App) recentEntries() []recentEntry {
 		if len(out) >= recentRowCount {
 			break
 		}
-		name := strings.TrimSuffix(filepath.Base(p), ".ship")
+		name := strings.TrimSuffix(filepath.Base(p), ".pxm")
+		name = strings.TrimSuffix(name, ".ship")
 		if dir := filepath.Base(filepath.Dir(p)); dir != "." && dir != "" {
 			name = name + "  ·  " + dir
 		}

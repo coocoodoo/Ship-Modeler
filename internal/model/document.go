@@ -140,6 +140,10 @@ type Document struct {
 	Bodies        []*Body                     `json:"bodies"`
 	Features      []FeatureRec                `json:"features"`
 	Camera        CameraState                 `json:"camera"`
+	// Markers are the orientation dots a game engine reads: front, top and
+	// thruster positions (the user's request, 2026-08-28). Absent in files
+	// saved before they existed, which the tolerant reader treats as none.
+	Markers []Marker `json:"markers,omitempty"`
 
 	// DirtySinceSave drives the autosave timer and the close prompt.
 	DirtySinceSave bool `json:"-"`

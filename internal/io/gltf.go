@@ -183,12 +183,54 @@ func (b *gltfBuilder) accessor(a gltfAccessor) int {
 // `.glb` is one self-contained file, anything else writes JSON with a `.bin`
 // and the textures beside it.
 func ExportGLTF(outPath string, doc *model.Document) error {
-	bodies := visibleBodies(doc)
-	if len(bodies) == 0 {
-		return fmt.Errorf("there is nothing visible to export")
-	}
 	binary := strings.EqualFold(filepath.Ext(outPath), ".glb")
 	stem := strings.TrimSuffix(filepath.Base(outPath), filepath.Ext(outPath))
+	jsonData, bin, external, err := buildGLTF(doc, binary, stem)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(outPath)
+	if binary {
+		return writeFileAtomic(outPath, packGLB(jsonData, bin))
+	}
+	if err := writeFileAtomic(outPath, jsonData); err != nil {
+		return err
+	}
+	if err := writeFileAtomic(filepath.Join(dir, stem+".bin"), bin); err != nil {
+		return err
+	}
+	for rel, img := range external {
+		buf := new(bytes.Buffer)
+		if err := encodePNG(buf, img); err != nil {
+			return fmt.Errorf("write %s: %w", rel, err)
+		}
+		if err := writeFileAtomic(filepath.Join(dir, filepath.FromSlash(rel)), buf.Bytes()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// BuildGLB renders the document's visible bodies into a single in-memory
+// .glb — textures embedded, nothing on disk. It is what a .pxm carries as its
+// game payload: the engine loads exactly the bytes the glTF export would have
+// produced, and the two can never drift apart because they are one builder.
+func BuildGLB(doc *model.Document) ([]byte, error) {
+	jsonData, bin, _, err := buildGLTF(doc, true, "ship")
+	if err != nil {
+		return nil, err
+	}
+	return packGLB(jsonData, bin), nil
+}
+
+// buildGLTF assembles the document into glTF parts: the JSON, the binary
+// buffer, and — for the text flavour only — the external images to write
+// beside it.
+func buildGLTF(doc *model.Document, binary bool, stem string) ([]byte, []byte, map[string]*image.RGBA, error) {
+	bodies := visibleBodies(doc)
+	if len(bodies) == 0 {
+		return nil, nil, nil, fmt.Errorf("there is nothing visible to export")
+	}
 
 	b := &gltfBuilder{}
 	b.doc.Asset = gltfAsset{Version: "2.0", Generator: gltfGeneratorName}
@@ -206,7 +248,7 @@ func ExportGLTF(outPath string, doc *model.Document) error {
 	for _, body := range bodies {
 		node, err := buildGLTFBody(b, body, binary, external)
 		if err != nil {
-			return err
+			return nil, nil, nil, err
 		}
 		b.doc.Nodes = append(b.doc.Nodes, node)
 	}
@@ -225,29 +267,9 @@ func ExportGLTF(outPath string, doc *model.Document) error {
 
 	jsonData, err := json.Marshal(b.doc)
 	if err != nil {
-		return fmt.Errorf("write the glTF document: %w", err)
+		return nil, nil, nil, fmt.Errorf("write the glTF document: %w", err)
 	}
-
-	dir := filepath.Dir(outPath)
-	if binary {
-		return writeFileAtomic(outPath, packGLB(jsonData, b.bin.Bytes()))
-	}
-	if err := writeFileAtomic(outPath, jsonData); err != nil {
-		return err
-	}
-	if err := writeFileAtomic(filepath.Join(dir, stem+".bin"), b.bin.Bytes()); err != nil {
-		return err
-	}
-	for rel, img := range external {
-		buf := new(bytes.Buffer)
-		if err := encodePNG(buf, img); err != nil {
-			return fmt.Errorf("write %s: %w", rel, err)
-		}
-		if err := writeFileAtomic(filepath.Join(dir, filepath.FromSlash(rel)), buf.Bytes()); err != nil {
-			return err
-		}
-	}
-	return nil
+	return jsonData, b.bin.Bytes(), external, nil
 }
 
 // buildGLTFBody turns one body into a mesh, its materials and a node.

@@ -121,7 +121,7 @@ func WriteSidecar(shipPath, origin string, crash bool) error {
 }
 
 func sidecarPath(shipPath string) string {
-	return strings.TrimSuffix(shipPath, ShipExtension) + ".json"
+	return strings.TrimSuffix(shipPath, filepath.Ext(shipPath)) + ".json"
 }
 
 // FindRecoverable lists autosaves worth offering back, newest first.
@@ -143,7 +143,9 @@ func FindRecoverable() ([]Autosave, error) {
 
 	var out []Autosave
 	for _, e := range entries {
-		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ShipExtension) {
+		// Both suffixes: an autosave written before the .pxm rename is still
+		// somebody's unsaved work.
+		if e.IsDir() || !IsShipFile(e.Name()) {
 			continue
 		}
 		full := filepath.Join(dir, e.Name())
@@ -198,7 +200,7 @@ func ClearOwnAutosaves() {
 	}
 	me := os.Getpid()
 	for _, e := range entries {
-		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ShipExtension) {
+		if e.IsDir() || !IsShipFile(e.Name()) {
 			continue
 		}
 		full := filepath.Join(dir, e.Name())

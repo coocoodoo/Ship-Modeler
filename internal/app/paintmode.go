@@ -1005,14 +1005,14 @@ func (a *App) handleDroppedFiles(in InputFrame) {
 			if a.ImportPalette(path) && !a.InPaint() {
 				a.BeginPaint()
 			}
-		case io.ShipExtension:
+		case io.ShipExtension, io.LegacyShipExtension:
 			// Through the request queue, not straight to OpenPath: the unsaved
 			// work guard and the after-frame dialog rules apply to a drop the
 			// same as to Ctrl+O.
 			a.RequestOpenPath(path)
 		default:
 			a.Toast(ui.Toast{
-				Text: "Drop a .ship to open it, or a .hex palette for colours",
+				Text: "Drop a .pxm to open it, or a .hex palette for colours",
 				Kind: ui.ToastWarn,
 			})
 		}

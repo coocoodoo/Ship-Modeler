@@ -1347,3 +1347,35 @@ freezes on screen when the pointer crosses to the panel; the "Click a
 face…" lock pick now beats edge picking to the click it was promised; and
 the resample and face-view prompts no longer surface under the edge tool,
 where the sticky face they describe is whatever the last brush tool touched.
+
+**V-131 · .pxm: the format grows a game payload, and ships learn which way
+they point.** The user's game (Iron Drift, Rust + raylib) determines ship
+orientation and thruster effects by hand-maintained tables: a curated list of
+hulls discovered flying nose-backwards one at a time, thruster positions
+measured out of glTF quads, nose anchors found by clustering stern vertices.
+The request: rename .ship to .pxm and let the model carry the answers.
+
+Three parts. **Markers**: front, top and thruster dots placed on the model by
+the arm-then-pick gesture (V-63a) from a new tree section; front and top are
+singletons that move rather than multiply, thrusters accumulate; each dot
+stores its position and the face normal it was placed with, which for a
+thruster is the exhaust direction. **The payload**: every save embeds
+`game/ship.glb` (the same bytes the glTF export writes — one builder, so they
+can never drift) and `game/markers.json` (the dots plus the derived
+orthonormal right/up/forward basis, centre, half extents), and every zip
+member is now STORED rather than deflated, so the game's reader is a hundred
+lines of dependency-free Rust instead of a compression crate — what deflate
+saved on already-compressed PNGs and glb was nothing. **The rename**: .pxm is
+the extension, .ship still opens everywhere a file can arrive (dialog, drop,
+recents, autosave scan), because a rename must orphan nobody.
+
+Iron Drift got `src/pxm.rs` (stored-only zip reader, serde markers,
+temp-staged glb into raylib) and a gpu.rs registry: .pxm files in
+assets/models/PXM load at startup after the fixed hulls,
+`draw_model_basis_ori` composes the authored basis instead of consulting the
+hand lists, and `pxm_thrusters`/`pxm_nose` expose the anchors in the same
+(right, up, forward) convention the hand-measured tables use. The Rust tests
+run against the sample .pxm the Modeler generates into the game repo — the
+reader is tested against the real writer's bytes. Also by the owner's
+instruction, this repo now pushes to github.com/coocoodoo/Iron-Drift-Modeler,
+lifting the plan's local-only default.

@@ -108,6 +108,10 @@ func (a *App) BuildScene() render.Scene {
 	if sel := a.buildSelectionOverlay(); sel != nil {
 		s.Sketches = append(s.Sketches, sel)
 	}
+	// The orientation dots ride the same overlay layer (V-131).
+	if mk := a.buildMarkerOverlay(); mk != nil && !mk.Empty() {
+		s.Sketches = append(s.Sketches, mk)
+	}
 
 	// Sketch mode dims the rest of the model and puts the grid on the sketch
 	// plane, so the profile being drawn is what the eye lands on (SPEC-UX §8.1).
@@ -435,6 +439,22 @@ func (a *App) handleViewportClick(in InputFrame, vp render.Viewport) {
 		return
 	}
 
+	// An armed marker pick spends the click on placing the dot (V-131). It
+	// outranks selection for the same reason the plane pick does: the tree row
+	// promised this click would place, and a promise the click does not keep
+	// teaches people to stop trusting the rows.
+	if a.markers.armed {
+		if hit.Hit && hit.Kind == render.PickFace {
+			a.placeMarkerAt(hit, in, vp)
+		} else {
+			a.Toast(ui.Toast{
+				Text: "Click a face of the model to place the dot",
+				Kind: ui.ToastWarn,
+			})
+		}
+		return
+	}
+
 	if !hit.Hit {
 		// Empty space starts a rectangle. It only becomes a box select if the
 		// pointer actually travels; a press and release in the same place is
@@ -588,6 +608,8 @@ func (a *App) escape() {
 	case a.tree.renaming.Kind != model.SelNone:
 		a.tree.renaming = model.Ref{}
 		a.UI.ClearFocus()
+	case a.CancelMarkerPick():
+		// An armed marker pick unwinds first, like every armed pick does.
 	case a.sketch.awaitingPlane:
 		// The hint promises "Esc to cancel" while a plane pick is armed, and a
 		// promise the key does not keep teaches people to stop reading it.

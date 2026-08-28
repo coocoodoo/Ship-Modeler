@@ -268,6 +268,36 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return err
 		}
 
+	case "marker.front", "marker.top", "marker.thruster":
+		kind := model.MarkerFront
+		switch op.Op {
+		case "marker.top":
+			kind = model.MarkerTop
+		case "marker.thruster":
+			kind = model.MarkerThruster
+		}
+		if op.Dot == nil {
+			return op.Errorf("%s needs dot [x,y,z]", op.Op)
+		}
+		dir := geom.Vec3{Y: 1}
+		if op.Normal != nil {
+			dir = geom.Vec3{X: op.Normal[0], Y: op.Normal[1], Z: op.Normal[2]}
+		}
+		if err := a.Bus.Run(&model.PlaceMarker{Marker: model.Marker{
+			Kind: kind,
+			At:   geom.Vec3{X: op.Dot[0], Y: op.Dot[1], Z: op.Dot[2]},
+			Dir:  dir,
+		}}); err != nil {
+			return op.Errorf("place the marker: %v", err)
+		}
+
+	case "marker.clear":
+		for len(a.Doc().Markers) > 0 {
+			if err := a.Bus.Run(&model.DeleteMarker{Index: 0}); err != nil {
+				return op.Errorf("clear markers: %v", err)
+			}
+		}
+
 	case "duplicate":
 		a.duplicateSelection()
 

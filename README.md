@@ -92,8 +92,20 @@ Exports carry the same promise as far as the format allows:
 
 ## Files
 
-Ships are saved as `.ship`: a zip holding the document, one PNG per painted
-face, and a thumbnail. Dropping a `.ship` on the window opens it. Unsaved work
+Ships are saved as `.pxm` ("pixel model"): a zip holding the document, one
+PNG per painted face, a thumbnail — and a `game/` folder made for game
+engines: `ship.glb` (the render-ready model, textures embedded, NEAREST
+filtering baked in) and `markers.json` (the orientation dots and everything
+derived from them). Files saved under the old `.ship` name still open.
+
+The **Markers** section of the tree places the dots a game engine reads: one
+for the ship's front, one for its top, and one per thruster. Each dot lands
+on the face you click and carries that face's outward normal — for a thruster
+that is the exhaust direction. From those the file derives an orthonormal
+forward/up/right basis, so an engine loads a `.pxm` already knowing which way
+the ship flies, with no per-hull correction tables.
+
+Dropping a `.pxm` (or `.ship`) on the window opens it. Unsaved work
 is autosaved every two minutes and again if the program ever crashes; the next
 launch offers it back — and anything that would replace unsaved work, from
 Ctrl+N to the window's close button, asks first.

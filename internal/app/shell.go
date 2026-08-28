@@ -29,6 +29,7 @@ type treeState struct {
 	planesOpen   bool
 	sketchesOpen bool
 	bodiesOpen   bool
+	markersOpen  bool
 
 	// renaming identifies the row with an open inline editor.
 	renaming model.Ref
@@ -44,7 +45,7 @@ func (t *treeState) init(s *io.Settings) {
 		t.width = ui.TreeWidth
 	}
 	t.collapsed = s.TreeCollapsed
-	t.planesOpen, t.sketchesOpen, t.bodiesOpen = true, true, true
+	t.planesOpen, t.sketchesOpen, t.bodiesOpen, t.markersOpen = true, true, true, true
 }
 
 // buildShell lays out and runs the whole chrome, handling input and painting in
@@ -338,6 +339,17 @@ func (a *App) buildTree(r rl.Rectangle) {
 			row, rest = ui.SplitTop(rest, rowH)
 			a.bodyRow(row, b)
 		}
+	}
+	// The orientation dots a game engine reads out of the .pxm (V-131). Only
+	// offered once there is a model to put them on: a front dot on an empty
+	// document points at nothing.
+	if len(doc.Bodies) > 0 {
+		open := section("markers", "Markers", len(doc.Markers), &a.tree.markersOpen)
+		a.buildMarkerRows(func() rl.Rectangle {
+			var row rl.Rectangle
+			row, rest = ui.SplitTop(rest, rowH)
+			return row
+		}, open)
 	}
 
 	a.UI.HairlineH(footer.X, footer.Y, footer.Width, ui.ColorStroke)

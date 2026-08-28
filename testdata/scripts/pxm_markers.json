@@ -1,0 +1,12 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"marker.front","dot":[6,0,0],"normal":[1,0,0]},
+  {"op":"marker.top","dot":[0,5,0],"normal":[0,1,0]},
+  {"op":"marker.thruster","dot":[-6,0,-1.5],"normal":[-1,0,0]},
+  {"op":"marker.thruster","dot":[-6,0,1.5],"normal":[-1,0,0]},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"shot","name":"pxm_markers"}
+]
