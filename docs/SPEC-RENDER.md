@@ -21,7 +21,9 @@ The main scene renders into the default framebuffer at window resolution (no int
 
 - Inputs: vertex pos/normal/uv, uniforms: mvp, normal matrix, view-space light dirs, base color, texture, tint (hover/selection), alpha (previews).
 - Model: `lit = 0.55 + 0.45·max(0, n·L1) + 0.15·max(0, n·L2)`, L1 = normalize(0.4, 0.8, 0.45) in **view space** (headlight feel — model reads the same while orbiting), L2 = opposite fill. `rgb = texel.rgb⊕bodyColor (alpha-over) × lit × tint`.
-- No shadows, no SSAO in v1 — the edge overlay (§5) provides the CAD readability.
+- No shadows and no screen-space pass. **Baked ambient occlusion** instead (V-141, V-142): sixteen fixed hemisphere rays per rendered corner against the body's own triangles, the weighted hit fraction stored as an openness byte in the vertex colour's spare blue channel and multiplied into `lit`, scaled by the settings-owned `ao` strength (0.7 default, 0 disables, no rebuild to change it). Deterministic — a fixed ray pattern and no noise — which is what lets the goldens pin it.
+- Reach is `0.35 × the body's bounding-box diagonal`, clamped to [1.5, 12] units. A fixed radius made occlusion vanish on anything bigger than itself; "local" only means something relative to the size of the thing being shaded.
+- Because openness is a *corner* value the shader interpolates, a face needs interior corners for a falloff to exist on: `BuildBodyGPU` cuts each face on a barycentric grid at roughly a fifth of the AO radius, decided **per face** so two triangles sharing an edge inside a face split it identically and leave no seam. A face with nothing in front of it is not cut at all — on a convex body that is every face, so a plain box costs exactly what it always did. The tessellation is the render mesh only: the document mesh, picking, and the paint mapping never see it.
 
 ## 4. Theme in 3D
 Viewport clear = vertical gradient (two-triangle background quad, UX §3 colors). Planes = two-sided translucent tinted quads + label billboards. Region fills = accentSoft translucent triangulations lifted 0.05 u above the sketch plane (no z-fighting).

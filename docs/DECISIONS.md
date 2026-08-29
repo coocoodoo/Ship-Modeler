@@ -1622,3 +1622,56 @@ spot-reviewing three representative diffs (concave junctions darken, convex
 bodies untouched); five more the update pass grazed showed 0-2 pixels of
 encoder jitter and were reverted. Viewport shading only — the glTF export
 carries textures and materials, not the bake.
+
+**V-142 · Ambient occlusion is baked onto a face that has corners to bake it
+onto.** The report was "I really don't see ambient occlusion", and it was
+right. Measured on a hollowed box: at full strength only 2.9% of pixels
+changed, and a scanline across the inner floor showed the darkening was
+*exactly constant* — 30.3 levels at every pixel of the face, then nothing.
+
+That is not a tuning problem, it is a structural one. Openness (V-141) is a
+corner value the shader interpolates across the face, and a CAD face is a big
+flat polygon whose only corners are its outline. The inner floor of a box has
+four, all equally occluded, and interpolating four equal numbers gives a
+constant — a uniformly dimmer face, which reads as a darker shade of paint
+rather than as a shadow in a corner. There was nowhere for a falloff to live.
+
+So the render mesh now cuts a face into a grid, and the falloff has somewhere
+to go. Three things make that affordable:
+
+*Only faces with something in front of them are cut.* This is not an
+optimisation bolted on afterwards — it is the same statement as "this face is
+fully lit everywhere", and on a convex body it is every face. A plain box
+renders as the two triangles per face it always did.
+
+*The cut is decided per face, not per triangle.* Two triangles sharing an edge
+inside a face must split that edge identically or the shading breaks along a
+seam that is not there. A barycentric grid at one n per face guarantees it.
+
+*The bake was rebuilt around the new vertex count.* The occluder filter ran
+down every triangle for every corner — free at four corners a face, the entire
+bill at four hundred — so candidates are now gathered once per face and
+narrowed per corner from that short list, and the corner loop runs across
+cores. It stays byte-identical: the ray pattern is fixed and each corner is
+computed from the mesh alone. Net cost on the sample ship is about 2x the
+build time, paid on geometry change and skipped mid-drag.
+
+Two tuning changes came with it, both part of the same complaint. **Reach is
+now `0.35 × the body's diagonal`, clamped to [1.5, 12]**, because a fixed 2.5
+units put a three-unit cavity's ceiling out of range of its own floor —
+occlusion is local, but "local" is meaningless except relative to the size of
+the thing. And the **default strength went 0.5 → 0.7**: at 0.5 the deepest
+corner lost about an eighth of its brightness, which on a saturated hull colour
+is inside the noise.
+
+The inset rule needed one correction to suit interior samples. It exists
+because an abutting wall is edge-on from a corner *on the face's outline*, so
+the darkest point sampled brightest; a vertex the tessellation put inside the
+face has no wall at it. Insetting those too would drag every sample toward the
+centroid and flatten the very falloff this exists to produce — so the nudge now
+applies only within `aoInset` of the face's boundary, and scales to zero at
+that distance.
+
+What is still true and still deliberate: bodies are baked against their own
+triangles only, so one body does not occlude another. And the strength has no
+UI — it is a settings key, like MSAA.

@@ -620,6 +620,42 @@ the contract holding on its own.
 
 ---
 
+## 2026-08-28 (fix) — Ambient occlusion, now with somewhere to land
+
+"I really don't see ambient occlusion, do you think is possible to make it
+work?" It was possible, and the report was correct in a more interesting way
+than "the number is too low".
+
+**Measured first.** On a hollowed box at full strength, 2.9% of pixels changed
+and a scanline across the inner floor read `154.3 -> 124.0` at *every* pixel of
+the face — a delta of exactly 30.3, flat in both directions, then zero off the
+face. Not a gradient. A flat tint.
+
+**The cause was structural.** Openness is a corner value interpolated across
+the face, and a CAD face is a big flat polygon whose only corners are its
+outline. All four corners of that floor are equally occluded, and interpolating
+four equal numbers gives a constant. The body had 10 faces, 32 triangles and no
+interior vertices anywhere — there was physically nowhere for a corner falloff
+to exist (V-142).
+
+**The fix** is a shading tessellation in the render mesh: each face cut on a
+barycentric grid so shading has interior samples. Only faces with something in
+front of them are cut, which on a convex body is none of them, so a plain box
+costs what it always did. The bake was rebuilt to match — per-face candidate
+lists instead of a full triangle scan per corner, and the corner loop spread
+across cores, byte-identical either way. Sample ship went 33s naive, then 8.9s
+with the convex skip, then 1.6s parallel, against 0.75s before.
+
+**Two tunings, same complaint.** Reach is `0.35 x the body's diagonal` clamped
+to [1.5, 12] — a fixed 2.5 u put a three-unit cavity's ceiling out of range of
+its own floor. Default strength 0.5 -> 0.7.
+
+The ao_step golden tells the story: the old ledge is one flat tone, the new one
+darkens into the step wall with the wall darkening toward its base. 36 baselines
+regenerated after review; no behavioural test moved.
+
+---
+
 ## 2026-08-27 (fix) — A pixel is now the same size everywhere
 
 "So 1 u = 1 pixel correct?" No — and finding out why was worth the whole day.

@@ -121,7 +121,12 @@ func DefaultSettings() *Settings {
 // DefaultAO is the ambient occlusion strength a first run uses: present
 // enough that corners read, gentle enough that the palette stays the
 // palette.
-const DefaultAO = 0.5
+//
+// Raised from 0.5 with V-142. At 0.5 the deepest corner of a hull lost about
+// an eighth of its brightness, which on a saturated hull colour was inside the
+// noise — the report that started that work was simply "I really don't see
+// ambient occlusion".
+const DefaultAO = 0.7
 
 // ConfigDirEnv overrides where settings, autosaves and crash logs live.
 //
