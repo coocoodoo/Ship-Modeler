@@ -36,12 +36,15 @@ const (
 	// ToolTile stamps the armed tile of the imported sheet, snapped to a
 	// tile grid so stamps butt seamlessly (Tile_paint.md).
 	ToolTile
+	// ToolWand selects a region of similar colour by flooding from a click,
+	// within a tolerance; the other tools then paint only inside it (V-145).
+	ToolWand
 )
 
 // Tools lists them in the order the panel draws them: the ones that paint where
 // the pointer goes first, then the ones decided by two points.
 var Tools = []Tool{
-	ToolPencil, ToolBrush, ToolEraser, ToolFill, ToolPick,
+	ToolPencil, ToolBrush, ToolEraser, ToolFill, ToolPick, ToolWand,
 	ToolLine, ToolRect, ToolCircle, ToolGradient, ToolEdge, ToolTile,
 }
 
@@ -67,6 +70,8 @@ func (t Tool) String() string {
 		return "Edge"
 	case ToolTile:
 		return "Tile"
+	case ToolWand:
+		return "Wand"
 	default:
 		return "Pencil"
 	}
@@ -117,6 +122,8 @@ func (t Tool) Shortcut() string {
 		return "K"
 	case ToolTile:
 		return "T"
+	case ToolWand:
+		return "W"
 	default:
 		return "D"
 	}
@@ -151,6 +158,9 @@ type Brush struct {
 	// Dither spends a partial coverage on whole texels instead of on a blend,
 	// which is how softness stays inside the palette.
 	Dither Dither
+	// Mask, when set, confines every texel the brush writes to the wand's
+	// selection. Nil means unmasked, which is the ordinary case.
+	Mask *Mask
 	// Under is the colour a partial dab blends into where nothing is painted:
 	// the body's own colour, because that is what shows through.
 	Under color.RGBA
@@ -232,8 +242,13 @@ func walk(a, b image.Point) []image.Point {
 // The region is the face's own texel rectangle rather than the image's: the
 // image carries a margin that is not on the face at all, and a fill that
 // flooded into it would paint texels that can never be seen.
-func Fill(p *mesh.FacePaint, region image.Rectangle, start image.Point, to color.RGBA) int {
+// mask, when non-nil, is the wand's selection: the flood treats its border
+// the way it treats a colour change — as a wall.
+func Fill(p *mesh.FacePaint, region image.Rectangle, start image.Point, to color.RGBA, mask *Mask) int {
 	if p == nil || region.Empty() || !start.In(region) {
+		return 0
+	}
+	if mask != nil && !mask.Contains(start) {
 		return 0
 	}
 	to.A = 255
@@ -256,6 +271,9 @@ func Fill(p *mesh.FacePaint, region image.Rectangle, start image.Point, to color
 			{X: t.X, Y: t.Y + 1}, {X: t.X, Y: t.Y - 1},
 		} {
 			if !n.In(region) || seen[n] || At(p, n) != from {
+				continue
+			}
+			if mask != nil && !mask.Contains(n) {
 				continue
 			}
 			seen[n] = true

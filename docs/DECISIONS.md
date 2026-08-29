@@ -1760,3 +1760,27 @@ that failure would otherwise surface much later as a boolean refusing to run.
 What this does not do: it imports geometry only, and it makes no attempt at
 materials, colours or UVs. A face here takes its normal from its own plane and
 its colour from the body.
+
+**V-145 · The magic wand: select by colour, then every tool paints inside.**
+The user asked for a wand with a tolerance slider so the other paint tools
+edit only a selected area. The selection is a per-face texel mask: the wand
+floods 4-connected from the clicked texel across everything within the
+tolerance (largest per-channel difference, 0..255 — per-channel rather than a
+distance formula because palettes are ramps, and "within N steps on every
+channel" is how a ramp neighbours), with bare texels reading as the body's
+colour, the same rule the eyedropper and flood fill live by. Shift adds a
+second region; Esc, the panel's Clear, or leaving paint mode drops it.
+
+Obedience is structural, not per-tool: the mask rides the Brush into put(),
+the single texel writer every tool already funnels through, and the two
+writers that bypass it — flood fill and gradient — take the mask explicitly
+(the fill treats the selection border exactly like a colour change: as a
+wall). TestEveryToolObeysTheMask pins pencil, shapes, gradient and fill in one
+matrix. The mask is app state, not document state — a selection is
+scaffolding, so it neither saves nor undoes, while the strokes it constrains
+undo perfectly because they snapshot what they actually wrote. A selection is
+face-local and carries the face's resolution; a resample underneath it drops
+it rather than confining the brush to translated-wrong pixels. The outline
+draws as the boundary between selected and unselected texels, lifted off the
+face like the texel cursor, under every tool — a constraint you cannot see is
+a brush that mysteriously stops working.

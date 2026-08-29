@@ -113,6 +113,12 @@ func (a *App) BuildScene() render.Scene {
 	if mk := a.buildMarkerOverlay(); mk != nil && !mk.Empty() {
 		s.Sketches = append(s.Sketches, mk)
 	}
+	// The wand's selection outline draws under every paint tool, not only the
+	// wand: the selection is a standing constraint, and a constraint you
+	// cannot see is a brush that mysteriously stops working (V-145).
+	if wo := a.wandOverlay(); wo != nil {
+		s.Sketches = append(s.Sketches, wo)
+	}
 
 	// Sketch mode dims the rest of the model and puts the grid on the sketch
 	// plane, so the profile being drawn is what the eye lands on (SPEC-UX §8.1).

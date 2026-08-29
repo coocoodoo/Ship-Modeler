@@ -666,6 +666,7 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		"paint.textures", "paint.faceview", "paint.color2", "paint.swap",
 		"paint.dither", "paint.shapefill", "paint.lock", "paint.unlock",
 		"paint.edges", "paint.edgewidth", "paint.creases", "paint.pickedge",
+		"paint.wand", "paint.wandclear",
 		"tile.import", "tile.grid", "tile.select", "tile.orient", "tile.stamp":
 		if err := r.paintOp(op); err != nil {
 			return err
@@ -1488,6 +1489,38 @@ func (r *ScriptRunner) paintOp(op io.Op) error {
 		if !a.PaintFace(f.body.ID, f.uid, pts) {
 			return op.Errorf("the stroke was refused")
 		}
+
+	case "paint.wand":
+		f, err := r.faceByIndex(op)
+		if err != nil {
+			return err
+		}
+		if op.UV == nil {
+			return op.Errorf("paint.wand needs uv [x,y]")
+		}
+		if op.Tolerance != 0 {
+			a.paint.wandTolerance = clampInt(op.Tolerance, 0, 255)
+		}
+		m := f.body.Mesh
+		p := m.Faces[f.face].Paint
+		if p == nil {
+			var perr error
+			if p, perr = paint.Allocate(m, f.face, a.paint.res); perr != nil {
+				return op.Wrap(perr)
+			}
+		}
+		seed := image.Point{X: op.UV[0], Y: op.UV[1]}
+		mask := paint.WandSelect(p, paint.FaceRect(m, f.face, p), seed,
+			uint8(clampInt(a.paint.wandTolerance, 0, 255)), f.body.Color)
+		if mask == nil || mask.Count() == 0 {
+			return op.Errorf("the wand selected nothing at %v", seed)
+		}
+		a.paint.wandMask = mask
+		a.paint.wandBody, a.paint.wandFace = f.body.ID, f.uid
+		a.paint.wandRes = p.Res
+
+	case "paint.wandclear":
+		a.ClearWandSelection()
 
 	case "paint.resample":
 		f, err := r.faceByIndex(op)

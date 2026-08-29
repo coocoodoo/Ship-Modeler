@@ -174,7 +174,7 @@ func TestGradientRunsFromOneColourToTheOther(t *testing.T) {
 	p := testPaint(t, 4)
 	region := image.Rect(0, 0, 32, 11)
 	a, z := image.Point{X: 0, Y: 5}, image.Point{X: 31, Y: 5}
-	Gradient(p, region, a, z, red, blue, DitherNone)
+	Gradient(p, region, a, z, red, blue, DitherNone, nil)
 
 	if got := At(p, a); got != red {
 		t.Errorf("the start texel is %v, want the first colour %v", got, red)
@@ -199,7 +199,7 @@ func TestGradientRunsFromOneColourToTheOther(t *testing.T) {
 func TestGradientIsPerpendicularToItsDrag(t *testing.T) {
 	p := testPaint(t, 4)
 	region := image.Rect(0, 0, 32, 11)
-	Gradient(p, region, image.Point{X: 0, Y: 5}, image.Point{X: 31, Y: 5}, red, blue, DitherNone)
+	Gradient(p, region, image.Point{X: 0, Y: 5}, image.Point{X: 31, Y: 5}, red, blue, DitherNone, nil)
 
 	// A horizontal drag means every column is one colour top to bottom.
 	for x := 0; x < 32; x++ {
@@ -220,7 +220,7 @@ func TestDitheredGradientUsesOnlyTheTwoColours(t *testing.T) {
 	for _, d := range []Dither{Dither2x2, Dither4x4, Dither8x8} {
 		p := testPaint(t, 4)
 		region := image.Rect(0, 0, 32, 11)
-		Gradient(p, region, image.Point{X: 0, Y: 5}, image.Point{X: 31, Y: 5}, red, blue, d)
+		Gradient(p, region, image.Point{X: 0, Y: 5}, image.Point{X: 31, Y: 5}, red, blue, d, nil)
 
 		mixed := 0
 		for y := 0; y < 11; y++ {
@@ -252,7 +252,7 @@ func TestGradientOfZeroLengthFillsWithTheSecondColour(t *testing.T) {
 	p := testPaint(t, 4)
 	region := image.Rect(0, 0, 8, 8)
 	at := image.Point{X: 4, Y: 4}
-	Gradient(p, region, at, at, red, blue, DitherNone)
+	Gradient(p, region, at, at, red, blue, DitherNone, nil)
 	// A drag that went nowhere has no direction to ramp along. Filling with the
 	// colour under the pointer is the answer that matches what the release
 	// looked like.

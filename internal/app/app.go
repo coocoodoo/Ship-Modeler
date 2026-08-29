@@ -662,6 +662,7 @@ func shortcutSheet() []ui.Shortcut {
 		{Keys: "L / R / C", Description: "Line / rectangle / circle"},
 		{Keys: "N", Description: "Gradient"},
 		{Keys: "X", Description: "Swap the two colours"},
+		{Keys: "W", Description: "Magic wand: select by colour, then paint inside"},
 		{Keys: "K", Description: "Edge line: pick edges, bake a band"},
 		{Section: "Files"},
 		{Keys: "Ctrl+N", Description: "New ship"},

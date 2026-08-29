@@ -67,11 +67,13 @@ type Op struct {
 	// Paint ops. UV is a texel index, and Points is a run of them: a real
 	// stroke rather than a series of dabs, so a script exercises the same
 	// interpolation the pointer does.
-	Res    int      `json:"res,omitempty"`
-	Hex    string   `json:"hex,omitempty"`
-	UV     *[2]int  `json:"uv,omitempty"`
-	Points [][2]int `json:"points,omitempty"`
-	Size   int      `json:"size,omitempty"`
+	Res int     `json:"res,omitempty"`
+	Hex string  `json:"hex,omitempty"`
+	UV  *[2]int `json:"uv,omitempty"`
+	// Tolerance is the wand's colour latitude, 0..255.
+	Tolerance int      `json:"tolerance,omitempty"`
+	Points    [][2]int `json:"points,omitempty"`
+	Size      int      `json:"size,omitempty"`
 
 	// Tile ops (Tile_paint.md TP2). Path is shared with the file ops below;
 	// Tile is the selected tile's index in the sheet, named so because the
@@ -206,6 +208,7 @@ var knownOps = map[string]bool{
 	"paint.color2": true, "paint.swap": true, "paint.dither": true,
 	"paint.shapefill": true, "paint.lock": true, "paint.unlock": true,
 	"paint.edges": true, "paint.edgewidth": true, "paint.creases": true,
+	"paint.wand": true, "paint.wandclear": true,
 	"file.new": true, "file.save": true, "file.open": true,
 	"file.importmesh": true, "import.scale": true, "import.center": true,
 	"import.commit": true, "import.cancel": true,

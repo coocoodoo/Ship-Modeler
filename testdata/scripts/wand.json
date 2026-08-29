@@ -1,0 +1,19 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"paint.begin"},
+  {"op":"paint.res","res":4},
+  {"op":"paint.color","hex":"D23C32"},
+  {"op":"paint.tool","kind":"rect"},
+  {"op":"paint.shapefill","visible":true},
+  {"op":"paint.stroke","body":"Hull","axis":"+y","points":[[8,4],[19,13]]},
+  {"op":"paint.wand","body":"Hull","axis":"+y","uv":[10,6],"tolerance":16},
+  {"op":"paint.tool","kind":"gradient"},
+  {"op":"paint.color","hex":"53A4FF"},
+  {"op":"paint.color2","hex":"101418"},
+  {"op":"paint.stroke","body":"Hull","axis":"+y","points":[[0,0],[47,23]]},
+  {"op":"camera.view","view":"top"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"shot","name":"wand"}
+]

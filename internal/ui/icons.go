@@ -757,3 +757,20 @@ func DrawRotateCWIcon(cx, cy, size float64, col color.RGBA) {
 	ax, ay := cx, cy-r
 	poly(w, col, v2(ax-size*0.16, ay-size*0.14), v2(ax+size*0.06, ay), v2(ax-size*0.16, ay+size*0.14))
 }
+
+// DrawWandIcon is the magic wand: a tilted stick with a spark at its tip.
+func DrawWandIcon(cx, cy, size float64, col color.RGBA) {
+	s := size * 0.5
+	// The stick, tip top-right.
+	line := func(x0, y0, x1, y1 float64) {
+		rl.DrawLineEx(
+			rl.Vector2{X: float32(cx + x0*s), Y: float32(cy + y0*s)},
+			rl.Vector2{X: float32(cx + x1*s), Y: float32(cy + y1*s)},
+			float32(IconStroke), col)
+	}
+	line(-0.7, 0.7, 0.35, -0.35)
+	// The spark: a four-point twinkle at the tip.
+	tx, ty := 0.55, -0.55
+	line(tx-0.28, ty, tx+0.28, ty)
+	line(tx, ty-0.28, tx, ty+0.28)
+}

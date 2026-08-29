@@ -2,6 +2,29 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
+**Current state:** The magic wand shipped (V-145): tolerance-driven colour
+selection that every paint tool obeys. Suite green (16 packages), exe rebuilt,
+pushed.
+
+---
+
+## 2026-08-28 — The magic wand (V-145)
+
+"A magic wand where I can select an area and add a tolerance slider, so I can
+edit only the selected area with other paint tools." Built as a per-face texel
+mask enforced in put() — the single writer every paint tool funnels through —
+so obedience is structural; fill and gradient, the two writers that bypass
+put(), take the mask explicitly. Wand tool (W) in the pixel row, tolerance
+slider 0..255 with a plain-words note ("close shades" … "everything"), Shift
+adds regions, a standing "N texels selected · Clear" row under every tool, and
+the selection boundary traced on the face. Guards: face-local, dropped on
+resample (stale coordinates) or when the face is cut away. The obedience
+matrix (TestEveryToolObeysTheMask) and the wand golden pin it; the paint
+goldens did not move because none of them shoot with the panel up — verified
+byte-identical, not assumed.
+
+---
+
 ## 2026-08-28 — Toolbar icon refresh
 
 **Asked for:** Better icons across the UI.
@@ -17,21 +40,9 @@ outward arrow instead of reusing the import glyph.
 the complete scripted visual-baseline set (`go test ./internal/apptest` with
 baseline update enabled).
 
-**Current state:** Baked ambient occlusion in the viewport (V-141). One
-model, one pixel size — allocation follows existing
-paint and the Res chips resample the whole model (V-140). Tile stamping shipped end to end — TP1-TP3 of Tile_paint.md
-(V-138). Edge bands land on the face side of their edge, decided by
-winding (V-137); edge picks follow the whole line through seam vertices
-(V-136); edge paint bands reach their edges gap-free (V-135); fold
-creases draw and pick at any angle (V-134); bent faces
-fold into flat pieces along real creases (V-133), and the whole-corpus validity invariant is back from the dead. Placed
-dots are selectable and draggable (V-132). .pxm
-shipped end to end (V-131): markers in the modeler,
-game payload in the file, loader + basis correction + thruster anchors in
-Iron Drift. Both suites green. Repo now pushes to
-github.com/coocoodoo/Iron-Drift-Modeler by the owner's instruction.
-
 ---
+
+
 
 ## 2026-08-28 — Simple ambient occlusion (V-141)
 

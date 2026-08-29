@@ -45,6 +45,11 @@ type StrokeFace struct {
 	// (SPEC-GEOMETRY §8.2).
 	Res int
 
+	// Mask is the wand's selection: when set, the stroke writes only inside
+	// it. Undo needs nothing special — the snapshots record what was actually
+	// written, mask and all.
+	Mask *Mask
+
 	// Points is the texel path in the order the pointer visited it. Fill uses
 	// the first point as its seed.
 	Points []image.Point
@@ -250,13 +255,13 @@ func (c *StrokeFace) apply(m *mesh.Mesh, fi int, p *mesh.FacePaint) image.Rectan
 
 	if c.Tool == ToolFill {
 		r := region()
-		if Fill(p, r, first, c.Color) == 0 {
+		if Fill(p, r, first, c.Color, c.Mask) == 0 {
 			return image.Rectangle{}
 		}
 		return r
 	}
 	if c.Tool == ToolGradient {
-		return Gradient(p, region(), first, last, c.Color, c.ColorB, c.Dither)
+		return Gradient(p, region(), first, last, c.Color, c.ColorB, c.Dither, c.Mask)
 	}
 
 	b := Brush{
@@ -266,6 +271,7 @@ func (c *StrokeFace) apply(m *mesh.Mesh, fi int, p *mesh.FacePaint) image.Rectan
 		Soft:   c.Tool == ToolBrush,
 		Dither: c.Dither,
 		Under:  c.under,
+		Mask:   c.Mask,
 	}
 	if b.Size < 1 {
 		b.Size = 1

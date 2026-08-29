@@ -60,10 +60,15 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	// colours, and a swatch grid under a stamp would be a grid of things that
 	// do nothing (Tile_paint.md TP3).
 	showTiles := st.tool == paint.ToolTile
+	// The wand replaces the brush controls with its tolerance; the standing
+	// selection row shows under every tool, because the selection constrains
+	// every tool (V-145).
+	showWand := st.tool == paint.ToolWand
+	haveWandSel := st.wandMask != nil
 	// The brush's square is meaningless to the edge tool, which has its own
 	// width, and to the tile tool, whose size is the tile's. A control that
 	// does nothing is worse than an absent one.
-	showSize := !showEdges && !showTiles
+	showSize := !showEdges && !showTiles && !showWand
 
 	h := a.px(38) + // title
 		line + a.px(26)*2 + a.px(4) + a.px(6) + // two rows of tools
@@ -104,6 +109,14 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	if showEdges {
 		// Header, the width slider, then the two buttons.
 		h += line + a.px(24) + a.px(6) + a.px(26) + a.px(6)
+	}
+	if showWand {
+		// The tolerance label + slider.
+		h += line + a.px(24) + a.px(6)
+	}
+	if haveWandSel {
+		// The standing selection row: the count and its Clear button.
+		h += a.px(26) + a.px(6)
 	}
 
 	box := ui.Rect(
@@ -174,6 +187,15 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 
 	if showEdges {
 		a.buildEdgeSection(row, space, line)
+		space(6)
+	}
+
+	if showWand {
+		a.buildWandSection(row, line)
+		space(6)
+	}
+	if haveWandSel {
+		a.buildWandSelectionRow(row(a.px(26)))
 		space(6)
 	}
 
@@ -292,6 +314,8 @@ func paintPixelTools() []paintTool {
 		{paint.ToolEraser, ui.DrawEraserIcon, "Rub back to the body's own colour"},
 		{paint.ToolFill, ui.DrawFillIcon, "Flood the matching texels around the one you click"},
 		{paint.ToolPick, ui.DrawDropperIcon, "Pick up the colour under the cursor (or hold Alt)"},
+		{paint.ToolWand, ui.DrawWandIcon,
+			"Select similar colours around a click — the other tools then paint only inside"},
 	}
 }
 

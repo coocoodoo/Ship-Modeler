@@ -98,7 +98,7 @@ func TestFillSpreadsOverMatchingTexelsOnly(t *testing.T) {
 	p := testPaint(t, 4)
 	// A vertical wall of red splits the face in two.
 	Stroke(p, Brush{Color: red, Size: 1}, image.Point{X: 10, Y: 0}, image.Point{X: 10, Y: 15})
-	n := Fill(p, image.Rect(0, 0, 32, 16), image.Point{X: 4, Y: 8}, blue)
+	n := Fill(p, image.Rect(0, 0, 32, 16), image.Point{X: 4, Y: 8}, blue, nil)
 	if n == 0 {
 		t.Fatal("fill painted nothing")
 	}
@@ -112,7 +112,7 @@ func TestFillSpreadsOverMatchingTexelsOnly(t *testing.T) {
 		t.Error("fill leaked past the wall to the far side")
 	}
 	// Filling with the colour that is already there is a no-op, not a hang.
-	if again := Fill(p, image.Rect(0, 0, 32, 16), image.Point{X: 4, Y: 8}, blue); again != 0 {
+	if again := Fill(p, image.Rect(0, 0, 32, 16), image.Point{X: 4, Y: 8}, blue, nil); again != 0 {
 		t.Errorf("re-filling the same region painted %d texels, want 0", again)
 	}
 }
@@ -122,7 +122,7 @@ func TestFillStaysInsideTheRegionItIsGiven(t *testing.T) {
 	// The region is the face; the image is bigger because of its margin. A
 	// fill that ignores the region floods the margin too, and the margin is
 	// exactly the band that is not on the face at all.
-	Fill(p, image.Rect(0, 0, 32, 16), image.Point{X: 4, Y: 8}, blue)
+	Fill(p, image.Rect(0, 0, 32, 16), image.Point{X: 4, Y: 8}, blue, nil)
 	if got := At(p, image.Point{X: -1, Y: -1}); got.A != 0 {
 		t.Errorf("margin texel is %v, want untouched", got)
 	}

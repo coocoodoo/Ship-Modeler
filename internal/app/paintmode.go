@@ -146,6 +146,14 @@ type paintState struct {
 	hoverEdgeBody uint32
 	// edgeWidth is the band's thickness in texels, on each face (V-126).
 	edgeWidth int
+
+	// The magic wand's selection (V-132): the mask, the face it belongs to,
+	// the resolution its coordinates assume, and the armed tolerance.
+	wandMask      *paint.Mask
+	wandBody      uint32
+	wandFace      mesh.FaceUID
+	wandRes       int
+	wandTolerance int
 }
 
 // paintHover is the face and texel under the pointer.
@@ -181,6 +189,7 @@ func (a *App) initPaint() {
 	// straight out of the box fades into shadow rather than into nothing.
 	a.paint.colorB = paint.DefaultPalette()[0]
 	a.paint.edgeWidth = paint.DefaultEdgeWidth
+	a.paint.wandTolerance = DefaultWandTolerance
 	a.paint.hoverEdge = -1
 	a.paint.custom = append([]color.RGBA(nil), a.Settings.CustomPalette...)
 	a.paint.recents.Set(a.Settings.RecentColors)
@@ -225,6 +234,7 @@ func (a *App) ExitPaint() {
 	a.paint.awaitingLock = false
 	a.paint.edges = a.paint.edges[:0]
 	a.paint.hoverEdge = -1
+	a.paint.wandMask = nil
 }
 
 // paintPanelReachPx is how far in from the viewport's right edge the palette
@@ -409,6 +419,11 @@ func (a *App) updatePaint(in InputFrame, vp render.Viewport) {
 	// Alt is the eyedropper everywhere, held or armed (SPEC-UX §16).
 	if in.Alt || a.paint.tool == paint.ToolPick {
 		a.eyedrop()
+		return
+	}
+	// The wand selects rather than paints; Shift adds to the selection.
+	if a.paint.tool == paint.ToolWand {
+		a.wandClick(in.Shift)
 		return
 	}
 	a.beginStroke()
@@ -733,6 +748,7 @@ func (a *App) applyStroke() {
 		// The command reruns the whole stroke from its points each frame, so it
 		// needs its own copy: the slice keeps growing under it otherwise.
 		Points: append([]image.Point(nil), a.paint.points...),
+		Mask:   a.wandMaskFor(a.paint.strokeBody, a.paint.strokeFace),
 	}
 	// A stroke that has not changed anything yet is not an error worth saying
 	// out loud — the very first press on a texel that is already the brush
@@ -794,6 +810,7 @@ func (a *App) PaintFace(bodyID uint32, uid mesh.FaceUID, pts []image.Point) bool
 		Size: a.paint.size, Res: a.allocResFor(bodyID),
 		Dither: a.paint.dither, Fill: a.paint.fillShape,
 		Points: pts,
+		Mask:   a.wandMaskFor(bodyID, uid),
 	})
 }
 
@@ -948,9 +965,9 @@ func (a *App) paintCursorOverlay() *render.Overlay {
 			v.FaceRect = paint.FaceRect(f.body.Mesh, f.face, h.paint)
 		}
 	}
-	if a.paint.tool == paint.ToolPick {
-		// The dropper takes a colour rather than leaving one, so it shows the
-		// texel it would read and nothing about the brush.
+	if a.paint.tool == paint.ToolPick || a.paint.tool == paint.ToolWand {
+		// The dropper and the wand take rather than leave, so they show the
+		// texel they would read and nothing about the brush.
 		v.Erasing, v.Size = true, 1
 	}
 	return scene.BuildPaintCursor(v)
@@ -973,6 +990,7 @@ var paintToolKeys = []struct {
 	{rl.KeyC, paint.ToolCircle},
 	{rl.KeyN, paint.ToolGradient},
 	{rl.KeyK, paint.ToolEdge},
+	{rl.KeyW, paint.ToolWand},
 	{rl.KeyT, paint.ToolTile},
 }
 
@@ -999,6 +1017,7 @@ func (a *App) handlePaintKeys(in InputFrame) {
 		// the mode.
 		switch {
 		case a.CancelStroke():
+		case a.ClearWandSelection():
 		case a.ClearEdgeSelection():
 		case a.CancelLockPick():
 		case a.paint.locked:
@@ -1054,6 +1073,13 @@ func (a *App) paintHint() string {
 	}
 	if a.UI.In.Alt || st.tool == paint.ToolPick {
 		return "Click to pick up the colour under the cursor"
+	}
+	if st.tool == paint.ToolWand {
+		if st.wandMask != nil {
+			return fmt.Sprintf("%s selected · click reselects · Shift adds · Esc clears",
+				plural(st.wandMask.Count(), "texel", "texels"))
+		}
+		return "Click to select similar colours · tolerance is in the panel"
 	}
 	if h.allocated && !sameDensity(h.paint.Texel, st.res) {
 		d := paint.Density(h.paint)

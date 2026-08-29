@@ -54,6 +54,7 @@ out, its tooltip says how to turn it on.
 | **Paint** | `D` pencil · `B` soft brush · `E` eraser · `G` fill · `I` pick |
 | | `L` line · `R` rectangle · `C` circle · `N` gradient · `X` swap colours |
 | | `K` edge line — pick edges, set a width, bake a band along them |
+| | `W` magic wand — select similar colours; other tools then paint only inside (Shift adds, Esc clears) |
 | **Files** | `Ctrl+N` new · `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Shift+S` save as |
 | | `Ctrl+E` export · `Ctrl+I` import an STL or OBJ mesh |
 | **Edit** | `Ctrl+Z` undo · `Ctrl+Y` redo · `Del` delete · `H` hide |

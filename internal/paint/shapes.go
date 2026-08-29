@@ -143,7 +143,7 @@ func applyPoints(p *mesh.FacePaint, b Brush, pts []image.Point, filled bool) ima
 // rather than on colours between them, which is what keeps a gradient inside
 // the palette it was drawn from.
 func Gradient(p *mesh.FacePaint, region image.Rectangle, a, z image.Point,
-	from, to color.RGBA, d Dither) image.Rectangle {
+	from, to color.RGBA, d Dither, mask *Mask) image.Rectangle {
 
 	if p == nil || region.Empty() {
 		return image.Rectangle{}
@@ -154,6 +154,9 @@ func Gradient(p *mesh.FacePaint, region image.Rectangle, a, z image.Point,
 	dirty := image.Rectangle{}
 	for y := region.Min.Y; y < region.Max.Y; y++ {
 		for x := region.Min.X; x < region.Max.X; x++ {
+			if mask != nil && !mask.Contains(image.Point{X: x, Y: y}) {
+				continue
+			}
 			t := 1.0
 			if lenSq > 0 {
 				// The projection onto the drag axis, which is what makes the
@@ -181,6 +184,12 @@ func Gradient(p *mesh.FacePaint, region image.Rectangle, a, z image.Point,
 // softness, its dithering and the eraser all resolve into a colour.
 func put(p *mesh.FacePaint, b Brush, at image.Point, coverage float64) image.Rectangle {
 	if coverage <= 0 {
+		return image.Rectangle{}
+	}
+	// The wand's selection, honoured here and nowhere else: every tool funnels
+	// through this one writer, so a texel outside the mask is untouchable by
+	// construction rather than by each tool remembering to check.
+	if b.Mask != nil && !b.Mask.Contains(at) {
 		return image.Rectangle{}
 	}
 	if b.Erase {
