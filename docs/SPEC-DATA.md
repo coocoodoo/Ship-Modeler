@@ -62,6 +62,9 @@ thumbnail.png    256×256 render of the saved view (also used by welcome screen)
 - Reader: tolerant — unknown JSON fields ignored; missing paint PNG ⇒ face falls back to body color with a load warning list shown as one toast; `formatVersion` > known ⇒ open read-only copy with warning. Never crash on malformed input (fuzz the reader lightly in tests).
 - Round-trip invariant (tested): save→load→save produces byte-identical `document.json`.
 
+## 4a. Mesh import (Ctrl+I, V-144)
+STL (both encodings) and OBJ, read into triangle soup by `io.ReadMeshFile` and assembled by `mesh.Assemble`: weld onto the subunit grid, drop degenerates, orient the shells by walking the surface, merge coplanar triangles into polygon faces, drop collinear boundary points, compact. The merge test is tight (normals within a twentieth of a degree **and** every corner inside `PlanarDist`) so a tessellated cylinder keeps its facets. Binary-vs-ASCII STL is decided by `84 + 50n == size`, never by the leading "solid". NaN/Inf refused at read. Scale is a card decision, applied before snapping; the result may legitimately be an open shell, reported in the toast rather than refused. Geometry only — no materials, colours or UVs.
+
 ## 5. Exports (Ctrl+E dialog: format, path via zenity)
 
 - **OBJ + MTL + PNGs** (primary): triangulated; `v` floats; `vt` per painted-face texel mapping; one material per painted face (`map_Kd paint/<uid>.png`), one shared material per body color for unpainted faces; Y-up, -Z forward note in header comment; README documents "set texture filtering to nearest in your engine".

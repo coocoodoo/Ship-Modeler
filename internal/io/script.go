@@ -96,6 +96,9 @@ type Op struct {
 	// nobody to answer a dialog, and a test that named its own file is clearer
 	// than one that guessed where a dialog would have put it.
 	Path string `json:"path,omitempty"`
+	// Scale is the mesh import's units-per-file-unit (V-144). A pointer so a
+	// script can say "use the fitted default" by leaving it out.
+	Scale *float64 `json:"scale,omitempty"`
 
 	// Visibility, camera and capture ops.
 	Visible *bool  `json:"visible,omitempty"`
@@ -204,6 +207,8 @@ var knownOps = map[string]bool{
 	"paint.shapefill": true, "paint.lock": true, "paint.unlock": true,
 	"paint.edges": true, "paint.edgewidth": true, "paint.creases": true,
 	"file.new": true, "file.save": true, "file.open": true,
+	"file.importmesh": true, "import.scale": true, "import.center": true,
+	"import.commit": true, "import.cancel": true,
 	"file.export": true, "file.autosave": true, "file.recover": true,
 	"file.discard": true, "export.begin": true, "export.format": true,
 	"export.cancel": true, "export.scale": true, "export.alpha": true,

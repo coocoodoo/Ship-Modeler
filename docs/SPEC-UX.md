@@ -393,7 +393,7 @@ Baked means baked: it is ordinary paint from that moment, in the faces own pictu
 | Del | Delete selection |
 | Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z | Undo / Redo |
 | Ctrl+N / O / S / Shift+S | New / Open / Save / Save As |
-| Ctrl+E | Export dialog |
+| Ctrl+E / Ctrl+I | Export dialog / import an STL or OBJ mesh |
 | Ctrl+D | Duplicate body |
 | H | Hide selection (eye back on in tree) |
 | Alt (held) | Suppress snapping / eyedropper in Paint |

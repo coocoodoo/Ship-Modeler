@@ -12,6 +12,7 @@ import (
 
 	"modeler/assets"
 	"modeler/internal/geom"
+	"modeler/internal/geom/mesh"
 	"modeler/internal/io"
 	"modeler/internal/model"
 	"modeler/internal/paint"
@@ -48,6 +49,7 @@ const (
 	fileExport
 	fileImportPalette
 	fileImportTileset
+	fileImportMesh
 	fileSample
 	// fileSaveThen saves, and runs the parked action only if the save worked.
 	fileSaveThen
@@ -67,6 +69,17 @@ type fileState struct {
 	// welcomeDismissed marks that the welcome card has been answered or waved
 	// away this session, so it stays down even while the document is empty.
 	welcomeDismissed bool
+	// The mesh import (V-144): the triangles as they were read, held while the
+	// card asks what scale to bring them in at. Kept rather than re-read so
+	// changing a chip costs nothing and the size readout is instant.
+	importOpen   bool
+	importTris   []mesh.Tri3
+	importName   string
+	importScale  float64
+	importLo     geom.Vec3
+	importHi     geom.Vec3
+	importCenter bool
+
 	// exportOpen is the options card; exportFormat indexes io.ExportFormats,
 	// and exportScale and exportAlpha apply to the PNG one.
 	exportOpen   bool
@@ -195,6 +208,8 @@ func (a *App) RunPendingFile() {
 		a.importPaletteWithDialog()
 	case fileImportTileset:
 		a.importTilesetWithDialog()
+	case fileImportMesh:
+		a.importMeshWithDialog()
 	case fileSample:
 		a.BuildSampleShip()
 	case fileSaveThen:

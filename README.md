@@ -54,7 +54,8 @@ out, its tooltip says how to turn it on.
 | **Paint** | `D` pencil · `B` soft brush · `E` eraser · `G` fill · `I` pick |
 | | `L` line · `R` rectangle · `C` circle · `N` gradient · `X` swap colours |
 | | `K` edge line — pick edges, set a width, bake a band along them |
-| **Files** | `Ctrl+N` new · `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Shift+S` save as · `Ctrl+E` export |
+| **Files** | `Ctrl+N` new · `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Shift+S` save as |
+| | `Ctrl+E` export · `Ctrl+I` import an STL or OBJ mesh |
 | **Edit** | `Ctrl+Z` undo · `Ctrl+Y` redo · `Del` delete · `H` hide |
 | **Held** | `Alt` no snapping, or eyedropper in paint · `Ctrl` fine snap · `Shift` add to selection, constrain a shape |
 | `Esc` | Back one level · `?` the shortcut sheet |
@@ -129,8 +130,16 @@ toolbar's **New** button to the window's close button, asks first, offering to
 save, to discard, or to go back to what you were doing. Save runs first and the
 action follows only if it worked, so a dialog waved away costs you nothing.
 
-The toolbar's right end carries **New · Open · Save · Export**, each the button
-form of its shortcut.
+The toolbar's right end carries **New · Import · Open · Save · Export**, each
+the button form of its shortcut.
+
+**Ctrl+I** imports an **STL or OBJ** mesh. It is not a triangle dump: coplanar
+triangles are merged back into polygon faces, so an imported box arrives as six
+rectangles you can paint, push and sketch on rather than twelve triangles you
+cannot. Vertices are welded onto the same grid everything else here uses,
+winding is repaired, and the card asks what one file unit is worth — mesh files
+carry no units — showing the result in units before you commit. STEP files go
+through a converter first (FreeCAD exports STL happily).
 
 Settings, autosaves and crash logs live in `%APPDATA%\Modeler`. Set
 `MODELER_CONFIG_DIR` to put them somewhere else.

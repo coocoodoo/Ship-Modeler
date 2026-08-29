@@ -40,6 +40,15 @@ func AskOpenShip(startIn string) (string, bool, error) {
 	))
 }
 
+// AskImportMesh asks for a mesh file to bring in.
+func AskImportMesh(startIn string) (string, bool, error) {
+	return ask(zenity.SelectFile(
+		zenity.Title("Import a mesh"),
+		zenity.FileFilter{Name: "Mesh files", Patterns: []string{"*.stl", "*.obj"}},
+		zenity.Filename(startIn),
+	))
+}
+
 // AskSaveShip asks where to write a project, defaulting to a name.
 func AskSaveShip(suggested string) (string, bool, error) {
 	path, ok, err := ask(zenity.SelectFileSave(

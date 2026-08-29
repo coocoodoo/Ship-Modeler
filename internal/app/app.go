@@ -669,6 +669,7 @@ func shortcutSheet() []ui.Shortcut {
 		{Keys: "Ctrl+S", Description: "Save"},
 		{Keys: "Ctrl+Shift+S", Description: "Save as"},
 		{Keys: "Ctrl+E", Description: "Export"},
+		{Keys: "Ctrl+I", Description: "Import an STL or OBJ mesh"},
 		{Section: "Edit"},
 		{Keys: "Ctrl+Z", Description: "Undo"},
 		{Keys: "Ctrl+Y", Description: "Redo"},

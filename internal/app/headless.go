@@ -653,6 +653,8 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 
 	case "file.new", "file.save", "file.open", "file.export",
 		"file.autosave", "file.recover", "file.discard",
+		"file.importmesh", "import.scale", "import.center",
+		"import.commit", "import.cancel",
 		"export.begin", "export.format", "export.cancel",
 		"export.scale", "export.alpha":
 		if err := r.fileOp(op); err != nil {
@@ -1230,6 +1232,40 @@ func (r *ScriptRunner) fileOp(op io.Op) error {
 		if err := a.ExportTo(op.Path, op.Res, op.Visible != nil && *op.Visible); err != nil {
 			return op.Wrap(err)
 		}
+
+	case "file.importmesh":
+		if op.Path == "" {
+			return op.Errorf("file.importmesh needs a path")
+		}
+		if !a.LoadMeshFile(op.Path) {
+			return op.Errorf("the mesh would not read")
+		}
+
+	case "import.scale":
+		if !a.InImportMesh() {
+			return op.Errorf("no mesh is waiting to be imported")
+		}
+		if op.Scale == nil || *op.Scale <= 0 {
+			return op.Errorf("import.scale needs a positive scale")
+		}
+		a.files.importScale = *op.Scale
+
+	case "import.center":
+		if !a.InImportMesh() {
+			return op.Errorf("no mesh is waiting to be imported")
+		}
+		a.files.importCenter = op.Visible == nil || *op.Visible
+
+	case "import.commit":
+		if !a.InImportMesh() {
+			return op.Errorf("no mesh is waiting to be imported")
+		}
+		if !a.CommitImport() {
+			return op.Errorf("the import was refused")
+		}
+
+	case "import.cancel":
+		a.CancelImport()
 
 	case "file.autosave":
 		a.writeAutosave(op.Kind == "crash")

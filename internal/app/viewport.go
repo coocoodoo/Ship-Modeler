@@ -546,6 +546,8 @@ func (a *App) handleGlobalKeys(in InputFrame, vp render.Viewport) {
 			a.RequestFile(fileSave)
 		case in.KeyPressed(rl.KeyE):
 			a.BeginExport()
+		case in.KeyPressed(rl.KeyI):
+			a.RequestFile(fileImportMesh)
 		}
 	}
 	if in.Ctrl {
@@ -622,6 +624,8 @@ func (a *App) escape() {
 	case a.CancelTransform():
 		// A live drag is the innermost thing there is: Escape puts the model
 		// back where it started and records nothing (SPEC-DATA §2).
+	case a.InImportMesh():
+		a.CancelImport()
 	case a.InExport():
 		a.CancelExport()
 	case a.showShortcuts:

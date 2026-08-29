@@ -1712,3 +1712,51 @@ honest failure. And the new toolbar icon is about 600 pixels in a 921,600-pixel
 shot — 0.065%, comfortably under the goldens' 0.30% tolerance — so **no golden
 failed on a visible UI addition**. The baselines were regenerated anyway: a
 diary that shows a toolbar the program no longer has is worse than no diary.
+
+**V-144 · Mesh import, and the merge that makes it worth having.** The request
+was STEP. STEP is two problems: a Part 21 text format, which is a weekend, and
+a B-rep on trimmed NURBS surfaces, which is not. OpenCASCADE is the only real
+answer to the second and is a ~200 MB C++/CMake dependency — against the grain
+of everything D-04 and D-12 decided about how this program takes on code. Asked
+to choose, the answer was mesh import instead: STL and OBJ, reached from any
+STEP file through one conversion step in FreeCAD or similar.
+
+The reader is the small half. STL has one trap worth naming — a *binary* file
+may legally begin with the word "solid", so the encoding is decided by
+arithmetic (does `84 + 50n` equal the file size?) rather than by sniffing text,
+which is how importers end up reading binary files as ASCII and finding
+nothing. OBJ indexes from 1 and allows negative indices counting back from the
+end. NaN and infinity are refused at the door: one of them anywhere would
+poison every bounding box, snap and boolean downstream, and the file is the
+only place that can be explained.
+
+**The assembler is the point.** Loading triangles is not importing a model
+here. STL shares no vertices at all; a body assembled from raw triangles has a
+face per triangle, and a triangle is the one shape nothing in this program
+wants — paint allocates a picture per face, push/pull drags a face, sketch-on-
+face needs somewhere flat and sizeable. A thousand-triangle import would load
+and be useless. So `mesh.Assemble` welds onto the subunit grid (which makes
+coincidence exact rather than approximate, and matches every other body here),
+drops degenerates, walks the surface flipping triangles until neighbours agree
+which way is out, and merges coplanar triangles back into polygons. A twelve-
+triangle box comes back as six rectangles.
+
+The merge tolerance is deliberately tight, and the reason is a cylinder:
+adjacent facets of a tessellated round wall are nearly coplanar, and a loose
+test would swallow them into one enormous face and destroy the shape. Two
+triangles join only when their normals agree to a twentieth of a degree *and*
+every corner of the growing region stays inside `PlanarDist` — the tolerance
+the mesh is already held to. Merged boundaries then drop their collinear
+points, or a rectangle has twelve corners where it has four.
+
+**Scale is asked, not guessed.** Mesh files carry no units; an STL out of CAD
+is usually millimetres and a ship here is a couple of dozen units. The card
+defaults to the scale that brings the longest side to 16 u, offers the usual
+multipliers, and — the reason it exists — shows the result in units before
+anything is committed. The toast afterwards says how many faces came out of how
+many triangles, and says plainly when the result is not a closed solid, because
+that failure would otherwise surface much later as a boolean refusing to run.
+
+What this does not do: it imports geometry only, and it makes no attempt at
+materials, colours or UVs. A face here takes its normal from its own plane and
+its colour from the body.

@@ -1,0 +1,23 @@
+[
+  {"op":"file.new"},
+  {"op":"plane.visible","plane":"Top","visible":false},
+  {"op":"plane.visible","plane":"Front","visible":false},
+  {"op":"plane.visible","plane":"Right","visible":false},
+  {"op":"settle"},
+
+  {"op":"file.importmesh","path":"testdata/meshes/block.stl"},
+  {"op":"settle"},
+  {"op":"shot","name":"import_card"},
+
+  {"op":"import.scale","scale":0.4},
+  {"op":"import.center","visible":true},
+  {"op":"import.commit"},
+  {"op":"settle"},
+  {"op":"select","kind":"body","body":"block"},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"deselect"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"import_done"}
+]

@@ -620,6 +620,44 @@ the contract holding on its own.
 
 ---
 
+## 2026-08-28 (feature) — Mesh import: STL and OBJ, merged back into polygons
+
+"Can you make it so I can import *.step files?"
+
+STEP is two problems. The Part 21 text format is tractable; a B-rep on trimmed
+NURBS surfaces is not, and OpenCASCADE — the only real answer to the second —
+is a ~200 MB C++/CMake dependency against everything D-04 and D-12 decided.
+Put as a choice, the answer was mesh import instead: STL and OBJ, reachable
+from any STEP file via one conversion in FreeCAD.
+
+**The assembler is the feature, not the reader.** Loading triangles would have
+produced a body with a face per triangle, and a triangle is the one shape
+nothing here wants — paint needs a face to allocate a picture on, push/pull
+needs one to drag, sketch-on-face needs somewhere flat. `mesh.Assemble` welds
+onto the subunit grid, drops degenerates, walks the surface flipping triangles
+until neighbours agree which way is out, and merges coplanar triangles back
+into polygons. Twelve triangles in, six rectangles out, valid solid (V-144).
+
+The merge tolerance is tight on purpose: adjacent facets of a tessellated
+cylinder are nearly coplanar, and a loose test would eat the curvature. Normals
+must agree to a twentieth of a degree and every corner must stay within
+`PlanarDist` of the region's plane. Merged loops then drop collinear points.
+
+**Scale is asked rather than guessed** — mesh files carry no units. The card
+defaults to fitting the longest side to 16 u and shows the result in units
+before committing; the toast says how many faces came from how many triangles,
+and says plainly when the result is not closed.
+
+Two traps worth recording: a *binary* STL may begin with the word "solid", so
+the encoding is decided by whether `84 + 50n` matches the file size, not by
+sniffing text. And OBJ allows negative indices counting back from the end.
+
+Reached by Ctrl+I or the toolbar's import button. Goldens regenerated — the new
+icon at x=1114 tripped the staleness check this time, where the New button
+last commit did not.
+
+---
+
 ## 2026-08-28 (feature) — A New button, and a gate that offers to save
 
 "I see open, save and export, but I don't see a new button to start a new

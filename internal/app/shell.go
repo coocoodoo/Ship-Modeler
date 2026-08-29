@@ -74,6 +74,9 @@ func (a *App) buildShell(l Layout) {
 	case a.InTransform():
 		a.buildTransformCard(l.Viewport)
 	}
+	if a.InImportMesh() {
+		a.buildImportCard(l.Viewport)
+	}
 	if a.InExport() {
 		a.buildExportCard(l.Viewport)
 	}
@@ -240,6 +243,7 @@ func (a *App) buildToolbar(r rl.Rectangle) {
 		{"tool.export", "Export the ship", "Ctrl+E", ui.DrawExportIcon, fileExport},
 		{"tool.save", "Save " + a.DocumentName(), "Ctrl+S", ui.DrawSaveIcon, fileSave},
 		{"tool.open", "Open a ship", "Ctrl+O", ui.DrawOpenIcon, fileOpen},
+		{"tool.import", "Import an STL or OBJ mesh", "Ctrl+I", ui.DrawImportIcon, fileImportMesh},
 		{"tool.new", "Start a new ship", "Ctrl+N", ui.DrawNewIcon, fileNew},
 	}
 	for _, f := range files {
