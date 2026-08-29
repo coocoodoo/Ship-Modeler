@@ -457,6 +457,21 @@ func DrawSaveIcon(cx, cy, size float64, col color.RGBA) {
 		v2(cx+h*0.5, cy+h*0.8), v2(cx-h*0.5, cy+h*0.8))
 }
 
+// DrawNewIcon is a blank sheet with its corner turned, and a small plus in
+// the free space below the fold: a page that does not exist yet.
+func DrawNewIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	h := size / 2
+	// The sheet, with the top-right corner cut off at the fold.
+	closedPoly(w, col, v2(cx-h*0.65, cy-h*0.85), v2(cx+h*0.2, cy-h*0.85),
+		v2(cx+h*0.65, cy-h*0.4), v2(cx+h*0.65, cy+h*0.85), v2(cx-h*0.65, cy+h*0.85))
+	// The fold itself, which is what stops it reading as a plain rectangle.
+	poly(w, col, v2(cx+h*0.2, cy-h*0.85), v2(cx+h*0.2, cy-h*0.4), v2(cx+h*0.65, cy-h*0.4))
+	// The plus.
+	line(v2(cx-h*0.05, cy+h*0.05), v2(cx-h*0.05, cy+h*0.55), w, col)
+	line(v2(cx-h*0.3, cy+h*0.3), v2(cx+h*0.2, cy+h*0.3), w, col)
+}
+
 // DrawOpenIcon is a folder with its lid lifted.
 func DrawOpenIcon(cx, cy, size float64, col color.RGBA) {
 	w := strokeWidth(size)

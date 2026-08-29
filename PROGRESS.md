@@ -620,6 +620,40 @@ the contract holding on its own.
 
 ---
 
+## 2026-08-28 (feature) — A New button, and a gate that offers to save
+
+"I see open, save and export, but I don't see a new button to start a new
+model, can you add that with save before creating new dialog if dirty?"
+
+Both halves. New sits with Open, Save and Export at the right end of the
+toolbar, routing to the same `fileNew` the keyboard always sent — a shortcut
+with no button is a feature only manual-readers have.
+
+The gate was the more interesting half. It offered Discard or Keep working, so
+the answer most often wanted — save it, then go ahead — was something you did
+yourself: dismiss, save by hand, ask again. It has three answers now, with Save
+as the confirm so Enter keeps the work, Discard carrying the danger styling,
+and Escape still meaning "I did not mean to ask" (V-81, V-143). The title names
+what triggered it: "Save before starting a new ship?", "Save before opening?".
+
+**Save runs first and the action follows only if it worked.** A dialog waved
+away or a disk that refuses is not a save; treating it as one would make "Save"
+the fastest way to lose the work. Tested by blocking the write with a plain file
+standing where the directory would have to be.
+
+Two things fell out. `SaveAs` had no headless guard — a pathless `Save()` in a
+script would have opened a native dialog with nobody there; it refuses now,
+which is also what lets the save-then-act step see an honest failure. And the
+new icon is ~600 px in a 921,600-px shot, 0.065% against a 0.30% tolerance, so
+**no golden failed on a visible UI addition**. Regenerated them anyway; a diary
+showing a toolbar the program no longer has is worse than none.
+
+Six new tests on the guard, one on the modal. The dialog itself has no golden:
+`guardUnsaved` is bypassed headlessly by design, so a screenshot of it needs a
+patched build. Verified that way by hand, not pinned.
+
+---
+
 ## 2026-08-28 (fix) — Ambient occlusion, now with somewhere to land
 
 "I really don't see ambient occlusion, do you think is possible to make it

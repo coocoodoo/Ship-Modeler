@@ -501,7 +501,7 @@ func (a *App) draw(in InputFrame) {
 // neither: it dismisses the question and keeps things exactly as they were,
 // because a reflex must never be the thing that throws work away.
 func (a *App) routeModalAnswer(res ui.ModalResult) {
-	if !res.Confirmed && !res.Cancelled && !res.Dismissed {
+	if !res.Confirmed && !res.Alt && !res.Cancelled && !res.Dismissed {
 		return
 	}
 	switch {
@@ -515,12 +515,18 @@ func (a *App) routeModalAnswer(res ui.ModalResult) {
 			a.closeAnswer = closeAnswerNone
 		}
 	case a.files.confirm != fileNone:
-		// The "discard unsaved changes?" gate in front of New, Open and the
-		// sample. Only an explicit confirm lets the parked action through.
-		if res.Confirmed {
+		// The gate in front of New, Open and the sample. Save runs first and
+		// keeps the action parked until it succeeds; Discard lets it straight
+		// through; anything else drops it (V-143).
+		switch {
+		case res.Confirmed:
+			a.files.pending = fileSaveThen
+		case res.Alt:
 			a.files.pending, a.files.pendingPath = a.files.confirm, a.files.confirmPath
+			a.files.confirm, a.files.confirmPath = fileNone, ""
+		default:
+			a.files.confirm, a.files.confirmPath = fileNone, ""
 		}
-		a.files.confirm, a.files.confirmPath = fileNone, ""
 	}
 }
 

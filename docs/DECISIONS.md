@@ -1675,3 +1675,40 @@ that distance.
 What is still true and still deliberate: bodies are baked against their own
 triangles only, so one body does not occlude another. And the strength has no
 UI — it is a settings key, like MSAA.
+
+**V-143 · New is a button, and the unsaved-work gate has three answers.** The
+report was "I see open, save and export, but I don't see a new button" — and
+the second half of it, "with save before creating new dialog if dirty", named a
+gap that was already there for Open and the sample ship too.
+
+*The button.* New joins Open, Save and Export at the right end of the toolbar.
+Nothing about it is new behaviour: it routes to the same `fileNew` the keyboard
+has always sent, through the same gate. A shortcut with no visible button is a
+feature only the people who read the manual have.
+
+*The gate.* It used to offer two answers — Discard, or Keep working — which
+left out the one most often wanted. "Save it, then go ahead" was something the
+user had to do themselves: dismiss the dialog, save by hand, then ask again.
+So `ui.ModalState` gained an optional third button, and the question now reads
+Save · Discard · Keep working.
+
+Which button is which matters. **Save is the confirm**, so Enter — the reflex
+answer — is the one that keeps the work; Discard carries the danger styling;
+and Escape stays what V-81 made it, a dismissal that changes nothing rather
+than a synonym for cancel. The title names the action that triggered it ("Save
+before starting a new ship?", "Save before opening?") so the dialog reads as an
+answer to what was just asked rather than as a generic warning.
+
+*Save runs first, and the action follows only if it worked.* A save dialog
+waved away, or a disk that refuses the write, must not count — otherwise
+pressing "Save" becomes the fastest way to lose the work it was pressed to
+protect. That is `fileSaveThen`: it saves, and releases the parked action only
+on success.
+
+Two things fell out of building it. `SaveAs` had no headless guard, so a
+pathless `Save()` in a script would have opened a native dialog into an empty
+room; it refuses now, which is also what lets the save-then-act step see an
+honest failure. And the new toolbar icon is about 600 pixels in a 921,600-pixel
+shot — 0.065%, comfortably under the goldens' 0.30% tolerance — so **no golden
+failed on a visible UI addition**. The baselines were regenerated anyway: a
+diary that shows a toolbar the program no longer has is worse than no diary.

@@ -49,6 +49,8 @@ const (
 	fileImportPalette
 	fileImportTileset
 	fileSample
+	// fileSaveThen saves, and runs the parked action only if the save worked.
+	fileSaveThen
 )
 
 // fileState is where the document lives and what is queued against it.
@@ -158,12 +160,15 @@ func (a *App) guardUnsaved(act fileAction, path string) bool {
 		return false
 	}
 	a.files.confirm, a.files.confirmPath = act, path
+	// Three answers, because the question has three (V-143). Save is the
+	// confirm so that Enter — the reflex — is the one that keeps the work, and
+	// Escape still means "I did not mean to ask" and changes nothing.
 	a.UI.ShowModal(ui.ModalState{
-		Title:       "Discard unsaved changes?",
+		Title:       "Save before " + act.verb() + "?",
 		Body:        a.DocumentName() + " has changes that are not saved.",
-		ConfirmText: "Discard",
+		ConfirmText: "Save",
+		AltText:     "Discard",
 		CancelText:  "Keep working",
-		Danger:      true,
 	})
 	return true
 }
@@ -192,6 +197,29 @@ func (a *App) RunPendingFile() {
 		a.importTilesetWithDialog()
 	case fileSample:
 		a.BuildSampleShip()
+	case fileSaveThen:
+		// The parked action runs only if the save actually happened. A dialog
+		// waved away is not a save, and treating it as one would make "Save"
+		// the fastest way to lose the work it was pressed to protect.
+		next, path := a.files.confirm, a.files.confirmPath
+		a.files.confirm, a.files.confirmPath = fileNone, ""
+		if a.Save() {
+			a.files.pending, a.files.pendingPath = next, path
+			a.RunPendingFile()
+		}
+	}
+}
+
+// verb names what the parked action is about to do, so the question reads as
+// the thing the user just asked for rather than as a generic warning.
+func (act fileAction) verb() string {
+	switch act {
+	case fileOpen, fileOpenPath:
+		return "opening"
+	case fileSample:
+		return "loading the sample"
+	default:
+		return "starting a new ship"
 	}
 }
 
@@ -272,7 +300,15 @@ func (a *App) Save() bool {
 }
 
 // SaveAs asks where to write and remembers the answer.
+//
+// Headless has nobody to ask, so it refuses rather than opening a dialog into
+// an empty room — a script that means to write somewhere says where, and the
+// save-before-acting step (V-143) has to see a plain "no" so it leaves the
+// document alone.
 func (a *App) SaveAs() bool {
+	if a.Headless {
+		return false
+	}
 	suggested := a.files.path
 	if suggested == "" {
 		suggested = filepath.Join(a.Settings.LastDir, a.DocumentName()+io.ShipExtension)

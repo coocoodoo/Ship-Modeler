@@ -227,8 +227,10 @@ func (a *App) buildToolbar(r rl.Rectangle) {
 	}
 
 	// The file actions live at the right end, in the order they are reached
-	// for: open, save, export. Each takes its slot off the right and hands the
-	// rest along, with a gap so they read as three buttons and not one strip.
+	// for: new, open, save, export. Each takes its slot off the right and hands
+	// the rest along, with a gap so they read as separate buttons rather than
+	// one strip. Listed right to left, which is the order they are laid out in
+	// and the reverse of the order they are read in.
 	gap := a.px(4)
 	files := []struct {
 		id, tip, key string
@@ -238,6 +240,7 @@ func (a *App) buildToolbar(r rl.Rectangle) {
 		{"tool.export", "Export the ship", "Ctrl+E", ui.DrawExportIcon, fileExport},
 		{"tool.save", "Save " + a.DocumentName(), "Ctrl+S", ui.DrawSaveIcon, fileSave},
 		{"tool.open", "Open a ship", "Ctrl+O", ui.DrawOpenIcon, fileOpen},
+		{"tool.new", "Start a new ship", "Ctrl+N", ui.DrawNewIcon, fileNew},
 	}
 	for _, f := range files {
 		var box rl.Rectangle

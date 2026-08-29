@@ -326,8 +326,15 @@ type ModalState struct {
 	Title       string
 	Body        string
 	ConfirmText string
-	CancelText  string
-	Danger      bool
+	// AltText is an optional third answer, drawn between confirm and cancel.
+	//
+	// It exists for the one question that genuinely has three answers: save,
+	// don't save, don't go. Folding those into two buttons makes one of them a
+	// lie — either "cancel" means "discard", or the user has to leave the
+	// dialog, save by hand, and come back (V-143).
+	AltText    string
+	CancelText string
+	Danger     bool
 }
 
 // ShowModal opens a confirmation dialog.
@@ -347,8 +354,19 @@ func (c *Context) CloseModal() { c.modal = nil }
 // question leaves things exactly as they were.
 type ModalResult struct {
 	Confirmed bool
+	// Alt is the third button, when the dialog offers one.
+	Alt       bool
 	Cancelled bool
 	Dismissed bool
+}
+
+// ModalContents reports the open dialog's text, for tests and for callers that
+// need to know what was asked.
+func (c *Context) ModalContents() (ModalState, bool) {
+	if c.modal == nil {
+		return ModalState{}, false
+	}
+	return *c.modal, true
 }
 
 // DrawModal paints the open dialog over the whole window and blocks everything
@@ -383,10 +401,17 @@ func (c *Context) DrawModal(screen rl.Rectangle) ModalResult {
 	if c.Button(MakeID("modal.confirm"), confirmBox, orDefault(m.ConfirmText, "OK"), ButtonOpts{Style: style}) {
 		out.Confirmed = true
 	}
-	cancelBox, _ := SplitRight(remaining, btnW+c.Px(8))
+	cancelBox, remaining := SplitRight(remaining, btnW+c.Px(8))
 	cancelBox.Width -= c.Px(8)
 	if c.Button(MakeID("modal.cancel"), cancelBox, orDefault(m.CancelText, "Cancel"), ButtonOpts{}) {
 		out.Cancelled = true
+	}
+	if m.AltText != "" {
+		altBox, _ := SplitRight(remaining, btnW+c.Px(8))
+		altBox.Width -= c.Px(8)
+		if c.Button(MakeID("modal.alt"), altBox, m.AltText, ButtonOpts{Style: ButtonDanger}) {
+			out.Alt = true
+		}
 	}
 
 	if c.In.KeyPressed(rl.KeyEscape) {
@@ -395,7 +420,7 @@ func (c *Context) DrawModal(screen rl.Rectangle) ModalResult {
 	if c.In.KeyPressed(rl.KeyEnter) {
 		out.Confirmed = true
 	}
-	if out.Confirmed || out.Cancelled || out.Dismissed {
+	if out.Confirmed || out.Alt || out.Cancelled || out.Dismissed {
 		c.CloseModal()
 	}
 	// Everything under the dialog is inert while it is up.

@@ -22,9 +22,14 @@ Every tool activation sets the hint bar; every invalid click gives feedback (sub
 
 ## 2. Window layout
 
+The file buttons sit at the right end of the toolbar: **New · Open · Save · Export**, laid out from the right edge inward and read left to right. Each is the toolbar's face of a shortcut (Ctrl+N / O / S / E) rather than a second way to do something — New and Open go through the same unsaved-work gate the keyboard does (§2.1).
+
+### 2.1 The unsaved-work gate
+Anything that would replace the open document — New, Open, the sample ship, the window's close button — asks first when the document is dirty, and asks with **three answers, because the question has three**: *Save* (the confirm, so Enter is the answer that keeps the work), *Discard*, and *Keep working*. Escape is not an answer: it dismisses the question and changes nothing (V-81, V-143). Save runs first and the parked action follows **only if the save succeeded** — a dialog waved away is not a save.
+
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ TOOLBAR  [Sketch S][Extrude E][Boolean B][Move M][Paint P] │ [↶][↷] │ ⚙ │
+│ TOOLBAR [Sketch S][Extrude E][Boolean B][Move M][Paint P]│[↶][↷]│[+][📂][💾][⬆]│
 ├─────────────┬────────────────────────────────────────────────────────────┤
 │ TREE PANEL  │ VIEWPORT                                        ┌────────┐ │
 │ ▾ Planes    │                                                 │  cube  │ │

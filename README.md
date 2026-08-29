@@ -124,8 +124,13 @@ the ship flies, with no per-hull correction tables.
 
 Dropping a `.pxm` (or `.ship`) on the window opens it. Unsaved work
 is autosaved every two minutes and again if the program ever crashes; the next
-launch offers it back — and anything that would replace unsaved work, from
-Ctrl+N to the window's close button, asks first.
+launch offers it back — and anything that would replace unsaved work, from the
+toolbar's **New** button to the window's close button, asks first, offering to
+save, to discard, or to go back to what you were doing. Save runs first and the
+action follows only if it worked, so a dialog waved away costs you nothing.
+
+The toolbar's right end carries **New · Open · Save · Export**, each the button
+form of its shortcut.
 
 Settings, autosaves and crash logs live in `%APPDATA%\Modeler`. Set
 `MODELER_CONFIG_DIR` to put them somewhere else.
