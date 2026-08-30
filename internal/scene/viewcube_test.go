@@ -137,6 +137,20 @@ func TestCubeLayoutSitsTopRight(t *testing.T) {
 	if c.Contains(float64(vp.X+10), float64(vp.Y+10)) {
 		t.Error("Contains claims the far side of the viewport")
 	}
+	// The shading toggle sits beside home, is part of the widget, and the
+	// two never overlap.
+	if c.ShadeRect.X+c.ShadeRect.Width > c.HomeRect.X {
+		t.Error("shading toggle overlaps the home button")
+	}
+	if !c.Contains(float64(c.ShadeRect.X+2), float64(c.ShadeRect.Y+2)) {
+		t.Error("Contains misses the shading toggle")
+	}
+	if !c.HitShade(float64(c.ShadeRect.X+2), float64(c.ShadeRect.Y+2)) {
+		t.Error("HitShade misses its own button")
+	}
+	if c.HitShade(float64(c.HomeRect.X+2), float64(c.HomeRect.Y+2)) {
+		t.Error("HitShade claims the home button")
+	}
 }
 
 // TestCubeHitTestMatchesWhatIsDrawn walks the drawn sub-quads and checks that

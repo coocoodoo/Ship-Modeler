@@ -207,6 +207,9 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 	case "view.ao":
 		a.Settings.AO = *op.Strength
 
+	case "view.shading":
+		a.Settings.FlatShading = !*op.On
+
 	case "settle":
 		if err := r.settle(); err != nil {
 			return op.Wrap(err)

@@ -154,6 +154,23 @@ func DrawEyeIcon(cx, cy, size float64, visible bool, col color.RGBA) {
 	}
 }
 
+// DrawShadeIcon draws the shading toggle: a half-shaded ball when the
+// viewport is lit, a bare ring when it is flat.
+func DrawShadeIcon(cx, cy, size float64, col color.RGBA, flat bool) {
+	name := "shade"
+	if flat {
+		name = "shadeflat"
+	}
+	if drawSVGIcon(name, cx, cy, size, col) {
+		return
+	}
+	r := size / 2 * 0.85
+	rl.DrawCircleLinesV(v2(cx, cy), float32(r), col)
+	if !flat {
+		rl.DrawCircleSector(v2(cx, cy), float32(r*0.8), -90, 90, 12, col)
+	}
+}
+
 // DrawPencilIcon draws the rename affordance.
 func DrawPencilIcon(cx, cy, size float64, col color.RGBA) {
 	if drawSVGIcon("pencil", cx, cy, size, col) {

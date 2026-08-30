@@ -1,0 +1,27 @@
+[
+  {"op":"file.new"},
+  {"op":"sketch.begin","plane":"Top"},
+  {"op":"sketch.rect","a":[-5,-3],"b":[5,3]},
+  {"op":"extrude","depth":3,"result":"new"},
+  {"op":"settle"},
+
+  {"op":"paint.begin"},
+  {"op":"paint.res","res":4},
+  {"op":"paint.color","hex":"D8B23A"},
+  {"op":"paint.tool","kind":"rect"},
+  {"op":"paint.shapefill","visible":true},
+  {"op":"paint.stroke","body":"Body 1","axis":"+y","points":[[4,4],[20,16]]},
+  {"op":"paint.color","hex":"31465F"},
+  {"op":"paint.stroke","body":"Body 1","axis":"+z","points":[[2,2],[30,8]]},
+  {"op":"paint.exit"},
+
+  {"op":"view.ao","strength":0.6},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"shot","name":"shading_lit"},
+
+  {"op":"view.shading","on":false},
+  {"op":"settle"},
+  {"op":"shot","name":"shading_flat"}
+]

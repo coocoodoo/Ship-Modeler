@@ -222,7 +222,7 @@ var knownOps = map[string]bool{
 	"camera.view": true, "camera.frame": true, "camera.orbit": true,
 	"camera.zoom": true, "camera.project": true,
 	"settle": true, "shot": true, "pick": true, "dump": true,
-	"view.ao": true,
+	"view.ao": true, "view.shading": true,
 }
 
 func (o Op) validate() error {
@@ -272,6 +272,10 @@ func (o Op) validate() error {
 	case "view.ao":
 		if o.Strength == nil || *o.Strength < 0 || *o.Strength > 1 {
 			return o.Errorf("needs strength between 0 and 1")
+		}
+	case "view.shading":
+		if o.On == nil {
+			return o.Errorf("needs on (true for shaded, false for flat)")
 		}
 	case "tile.import":
 		if o.Path == "" {

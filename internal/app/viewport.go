@@ -23,6 +23,7 @@ func (a *App) BuildScene() render.Scene {
 		Camera:    a.Camera,
 		DimFactor: 1,
 		AO:        a.Settings.AO,
+		Flat:      a.Settings.FlatShading,
 		// A brush paints faces. Letting an edge or a vertex win the pixel under
 		// the cursor would be a stroke that lands on nothing, on exactly the
 		// meshes where the wires are densest — except for the edge tool, whose
@@ -286,7 +287,9 @@ func (a *App) handleCubeInput(in InputFrame, vp render.Viewport) {
 		}
 		// Release without a drag counts as a click on the zone under it.
 		a.cubeDrag = false
-		if zone, home := a.Cube.HitTest(in.MouseX, in.MouseY); home {
+		if a.Cube.HitShade(in.MouseX, in.MouseY) {
+			a.ToggleShading()
+		} else if zone, home := a.Cube.HitTest(in.MouseX, in.MouseY); home {
 			a.GoHome(vp)
 		} else if zone.Valid() {
 			a.SnapToZone(zone)
@@ -305,6 +308,18 @@ func (a *App) targetCamera() render.Camera {
 		return a.Anim.Target()
 	}
 	return a.Camera
+}
+
+// ToggleShading flips the viewport between the lit view and the flat one that
+// shows painted texels exactly as authored. A view setting, so it persists
+// like AO rather than entering the undo history.
+func (a *App) ToggleShading() {
+	a.Settings.FlatShading = !a.Settings.FlatShading
+	text := "Shading on"
+	if a.Settings.FlatShading {
+		text = "Flat view — colours as painted"
+	}
+	a.Toast(ui.Toast{Text: text})
 }
 
 // SnapToZone animates the camera to a view cube zone's canonical orientation.

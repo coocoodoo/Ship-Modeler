@@ -76,9 +76,14 @@ type ViewCube struct {
 	// Rect is the cube's panel in window pixels, recomputed each frame.
 	Rect     rl.Rectangle
 	HomeRect rl.Rectangle
+	// ShadeRect is the shading toggle beside the home button. Flat mirrors
+	// the app's setting so the button can show which view it would leave.
+	ShadeRect rl.Rectangle
+	Flat      bool
 
-	Hover     CubeZone
-	HoverHome bool
+	Hover      CubeZone
+	HoverHome  bool
+	HoverShade bool
 
 	quads []cubeQuad
 }
@@ -105,6 +110,12 @@ func (c *ViewCube) Layout(cam render.Camera, vp render.Viewport, scale float64) 
 	c.HomeRect = rl.Rectangle{
 		X:      c.Rect.X + c.Rect.Width - home,
 		Y:      c.Rect.Y + c.Rect.Height + float32(6*scale),
+		Width:  home,
+		Height: home,
+	}
+	c.ShadeRect = rl.Rectangle{
+		X:      c.HomeRect.X - home - float32(6*scale),
+		Y:      c.HomeRect.Y,
 		Width:  home,
 		Height: home,
 	}
@@ -216,16 +227,25 @@ func (c *ViewCube) HitTest(x, y float64) (CubeZone, bool) {
 	return best, false
 }
 
+// HitShade reports whether a window pixel is over the shading toggle.
+func (c *ViewCube) HitShade(x, y float64) bool {
+	pt := rl.Vector2{X: float32(x), Y: float32(y)}
+	return rl.CheckCollisionPointRec(pt, c.ShadeRect)
+}
+
 // Contains reports whether a window pixel is over the cube widget at all, so
 // the viewport can stop treating the drag as an orbit of the model.
 func (c *ViewCube) Contains(x, y float64) bool {
 	pt := rl.Vector2{X: float32(x), Y: float32(y)}
-	return rl.CheckCollisionPointRec(pt, c.Rect) || rl.CheckCollisionPointRec(pt, c.HomeRect)
+	return rl.CheckCollisionPointRec(pt, c.Rect) ||
+		rl.CheckCollisionPointRec(pt, c.HomeRect) ||
+		rl.CheckCollisionPointRec(pt, c.ShadeRect)
 }
 
 // Update refreshes the hover state from the cursor position.
 func (c *ViewCube) Update(x, y float64) {
 	c.Hover, c.HoverHome = c.HitTest(x, y)
+	c.HoverShade = c.HitShade(x, y)
 }
 
 // Draw paints the cube and its home button.
@@ -266,6 +286,7 @@ func (c *ViewCube) Draw(fonts *ui.Fonts, scale float64) {
 	rl.EnableBackfaceCulling()
 
 	c.drawHome(scale)
+	c.drawShade(scale)
 }
 
 func (c *ViewCube) drawHome(scale float64) {
@@ -279,6 +300,21 @@ func (c *ViewCube) drawHome(scale float64) {
 		float64(c.HomeRect.X+c.HomeRect.Width/2),
 		float64(c.HomeRect.Y+c.HomeRect.Height/2),
 		12*scale, ui.ColorText)
+}
+
+// drawShade paints the shading toggle. The glyph shows the current view —
+// half-shaded ball when lit, bare ring when flat — like the tree's eye.
+func (c *ViewCube) drawShade(scale float64) {
+	bg := ui.ColorCard
+	if c.HoverShade {
+		bg = ui.ColorAccent
+	}
+	rl.DrawRectangleRounded(c.ShadeRect, 0.3, 4, bg)
+	rl.DrawRectangleRoundedLines(c.ShadeRect, 0.3, 4, ui.ColorStroke)
+	ui.DrawShadeIcon(
+		float64(c.ShadeRect.X+c.ShadeRect.Width/2),
+		float64(c.ShadeRect.Y+c.ShadeRect.Height/2),
+		12*scale, ui.ColorText, c.Flat)
 }
 
 // cubeFaceColor tints each cube face with the axis it faces, dimmed so the

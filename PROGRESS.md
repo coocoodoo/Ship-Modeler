@@ -2,10 +2,26 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Audit-by-use pass done (V-146: multi-corner fillet,
-extrude-all-regions, plane fills recede under bodies) and the UI's icons are
-now SVG assets rasterized in-house (V-147, 51 icons, stroke fallback). Suite
-green (16 packages), goldens regenerated, exe rebuilt, pushed.
+**Current state:** Audit-by-use pass done (V-146), icons are SVG assets
+(V-147), and the viewport has a shading toggle beside the view cube's Home
+button (V-148: flat view shows painted texels as authored). Suite green,
+goldens regenerated, exe rebuilt, pushed.
+
+---
+
+## 2026-08-30 — The shading toggle (V-148)
+
+"Add a toggle button to toggle shaders on and off." A second button beside
+Home under the view cube flips the viewport between the lit view and a flat
+one: a `flatShade` uniform zeroes the two-light term and the AO term in the
+fragment shader, so texels render exactly as painted; hover/selection tints
+stay. Glyph shows the current state (half-shaded ball / bare ring, two new
+SVG icons with stroke fallbacks), the hint bar names the click's effect, and
+the choice persists as `flatShading` next to AO. Scriptable as
+`view.shading {on}`; TestGoldenShadingToggle pins a painted box in both
+states, and a scene test pins the button's geometry and hit test. All UI
+goldens refreshed (the button is in every shot — within tolerance, but a
+stale baseline eats the regression budget).
 
 ---
 

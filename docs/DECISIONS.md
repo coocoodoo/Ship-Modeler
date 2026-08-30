@@ -1843,3 +1843,21 @@ buttons and panels stay theme-drawn vectors (rounded rects, elevation from
 V-88), which is what they should be — SVG buys its keep on glyphs, not on
 rectangles. Textures unload with the app (ui.UnloadIcons in App.Close). All
 UI goldens regenerated after visual review of the three icon regions at 2×.
+
+**V-148 · The shading toggle: flat view lives beside the view cube.** The
+request was a button to turn shaders on and off. "Off" here means the flat
+view: the two-light model and the AO term go to nothing in the fragment
+shader (one `flatShade` uniform, mixed branchlessly), so painted texels read
+exactly as authored — the view a pixel artist checks colours in — while
+hover and selection tints stay, because a view without feedback strands the
+tools. The toggle is a second button beside Home under the view cube: that
+corner is already where the camera's view controls live, and shading is a
+view. Its glyph shows the current state like the tree's eye does —
+half-shaded ball when lit, bare ring when flat — and the hint bar says which
+way a click takes you. It is a setting (`flatShading`), persisted next to AO
+and MSAA, not document state and not undoable: how the viewport reads, not
+what the ship holds. Scripts drive it as `view.shading {on}`, and the
+view_shading golden pins both states of the same painted box. All UI goldens
+regenerated — the button appears under the cube in every shot (small enough
+to pass the 0.3% tolerance, refreshed anyway so the budget stays available
+for real regressions).

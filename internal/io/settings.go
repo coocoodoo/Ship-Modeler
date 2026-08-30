@@ -91,7 +91,10 @@ type Settings struct {
 	MSAA     bool    `json:"msaa"`
 	// AO scales the baked ambient occlusion, 0 (off) to 1. It is a setting
 	// like MSAA: how the viewport reads, not what the document holds.
-	AO              float64       `json:"ao"`
+	AO float64 `json:"ao"`
+	// FlatShading turns the lighting and AO off so painted texels read
+	// exactly as authored — the toggle under the view cube.
+	FlatShading     bool          `json:"flatShading"`
 	AutosaveSeconds int           `json:"autosaveSeconds"`
 	RecentFiles     []string      `json:"recentFiles"`
 	CustomPalette   []color.RGBA  `json:"customPalette"`

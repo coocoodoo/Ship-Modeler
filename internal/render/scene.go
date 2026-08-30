@@ -103,6 +103,11 @@ type Scene struct {
 	// change without rebuilding anything.
 	AO float64
 
+	// Flat turns the two-light model and the AO term off, so painted texels
+	// read exactly as authored. Hover and selection tints still apply — a
+	// view without feedback would strand the tools.
+	Flat bool
+
 	// PickFacesOnly keeps edges and vertices out of the ID pass. A mode that
 	// can only act on surfaces must not have its cursor captured by the wire
 	// running across one: the pick ribbons are five pixels wide and sit in

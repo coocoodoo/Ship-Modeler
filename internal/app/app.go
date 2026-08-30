@@ -317,6 +317,7 @@ func (a *App) update(in InputFrame) {
 
 	a.stepAutosave(in.DeltaMillis)
 	a.Cube.Layout(a.Camera, vp, a.Scale)
+	a.Cube.Flat = a.Settings.FlatShading
 	a.Triad.Layout(vp, a.Scale)
 	a.Cube.Update(in.MouseX, in.MouseY)
 
@@ -563,6 +564,12 @@ func (a *App) HintText() string {
 	}
 	if a.Cube.HoverHome {
 		return "Home view"
+	}
+	if a.Cube.HoverShade {
+		if a.Settings.FlatShading {
+			return "Flat view — click for shading"
+		}
+		return "Shaded view — click for flat colours"
 	}
 	if a.Cube.Hover.Valid() {
 		if l := a.Cube.Hover.Label(); l != "" {

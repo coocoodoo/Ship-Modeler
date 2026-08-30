@@ -58,6 +58,7 @@ uniform vec4 tint;
 uniform float alphaScale;
 uniform float useTexture;
 uniform float aoStrength;
+uniform float flatShade;
 
 out vec4 finalColor;
 
@@ -68,6 +69,8 @@ void main()
 {
     vec3 n = normalize(fragNormalView);
     float lit = 0.55 + 0.45 * max(0.0, dot(n, L1)) + 0.15 * max(0.0, dot(n, L2));
+    // flatShade 1 is the unlit view: every face at full brightness, AO off.
+    lit = mix(lit, 1.0, flatShade);
 
     vec3 base = colDiffuse.rgb;
     if (useTexture > 0.5) {
@@ -76,7 +79,7 @@ void main()
     }
 
     vec3 rgb = base * lit;
-    rgb *= 1.0 - aoStrength * (1.0 - fragAO);
+    rgb *= 1.0 - aoStrength * (1.0 - fragAO) * (1.0 - flatShade);
     rgb = mix(rgb, tint.rgb, tint.a);
     finalColor = vec4(rgb, colDiffuse.a * alphaScale);
 }

@@ -20,6 +20,7 @@ type Renderer struct {
 	locAlphaScale int32
 	locUseTexture int32
 	locAOStrength int32
+	locFlatShade  int32
 	locPickIDBase int32
 
 	shadedMat rl.Material
@@ -72,6 +73,7 @@ func NewRenderer() *Renderer {
 	r.locAlphaScale = rl.GetShaderLocation(r.shaded, "alphaScale")
 	r.locUseTexture = rl.GetShaderLocation(r.shaded, "useTexture")
 	r.locAOStrength = rl.GetShaderLocation(r.shaded, "aoStrength")
+	r.locFlatShade = rl.GetShaderLocation(r.shaded, "flatShade")
 	r.locPickIDBase = rl.GetShaderLocation(r.pick, "idBase")
 
 	white := rl.GenImageColor(1, 1, color.RGBA{R: 255, G: 255, B: 255, A: 255})
@@ -171,6 +173,12 @@ func (r *Renderer) drawBackground(vp Viewport) {
 func (r *Renderer) drawShadedPass(s *Scene) {
 	rl.SetShaderValue(r.shaded, r.locAOStrength,
 		[]float32{float32(s.AO)}, rl.ShaderUniformFloat)
+	flat := float32(0)
+	if s.Flat {
+		flat = 1
+	}
+	rl.SetShaderValue(r.shaded, r.locFlatShade,
+		[]float32{flat}, rl.ShaderUniformFloat)
 	rl.EnableBackfaceCulling()
 	for i := range s.Bodies {
 		b := &s.Bodies[i]
