@@ -154,6 +154,20 @@ func (a *App) buildPlaneDraws() []render.PlaneDraw {
 		only, limited = sk.Plane, true
 	}
 	fade := a.planeZoomFade()
+	// Once the document holds a visible body, the plane quads drop their fill
+	// and keep only the border and label (2026-08-29). Three translucent
+	// sheets crossing a model tint half of every working view — the ship seen
+	// through glass — and the sheet look earns its keep only while the planes
+	// ARE the scene: an empty document choosing where to start. A hovered or
+	// selected plane fills again, because then it is the thing being asked
+	// about.
+	hasBody := false
+	for _, b := range doc.Bodies {
+		if b.Visible && b.Mesh != nil {
+			hasBody = true
+			break
+		}
+	}
 	out := make([]render.PlaneDraw, 0, geom.PlaneCount)
 	for i := 0; i < geom.PlaneCount; i++ {
 		k := geom.PlaneKind(i)
@@ -170,11 +184,17 @@ func (a *App) buildPlaneDraws() []render.PlaneDraw {
 			// answer the hover with nothing.
 			f = 1
 		}
+		fill := ui.WithAlpha(scene.PlaneColor(k), scene.PlaneTintAlpha)
+		if hasBody && !hovered && !selected {
+			// The border and label derive from the colour's RGB with their
+			// own alpha, so zeroing the fill's alpha silences only the sheet.
+			fill = ui.WithAlpha(scene.PlaneColor(k), 0)
+		}
 		out = append(out, render.PlaneDraw{
 			Kind:     k,
 			Frame:    geom.PlaneFrame(k),
 			HalfSize: scene.PlaneHalfSize,
-			Color:    ui.WithAlpha(scene.PlaneColor(k), scene.PlaneTintAlpha),
+			Color:    fill,
 			Label:    k.String(),
 			Hovered:  hovered,
 			Selected: selected,

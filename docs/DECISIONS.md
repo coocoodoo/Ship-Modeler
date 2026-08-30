@@ -1784,3 +1784,62 @@ it rather than confining the brush to translated-wrong pixels. The outline
 draws as the boundary between selected and unselected texels, lifted off the
 face like the texel cursor, under every tool — a constraint you cannot see is
 a brush that mysteriously stops working.
+
+**V-146 · The audit: build a real ship with every tool, fix what snags.**
+The user's report was texture, not a bug list — "clunky, glitchy, buggy" — so
+the audit method was use, not inspection: a full interceptor built headless
+through the real op pipeline (spline fuselage, filleted and mirrored wings, a
+slot cut, a hex intake sketched on a face, portholes via linear pattern
+subtract, push/pull stern, full paint pass, markers, .pxm out). The geometry
+kernel came through clean; what snagged was the connective tissue, and each
+snag became a fix:
+
+- **Fillet/chamfer take any number of lines.** cornerOp demanded exactly two;
+  selecting a rectangle's four sides refused. Now it finds every shared
+  endpoint among the selected lines and rounds all of them in one
+  ReplaceEntities step, applying each corner to the current trimmed forms so
+  a line that meets two corners trims at both ends. Two lines still behave
+  exactly as before; the toast counts corners.
+- **Extrude with nothing picked takes all regions.** The no-pick branch
+  refused when the sketch arranged into more than one region ("Click a filled
+  region first"), which broke the obvious flow on any mirrored sketch — draw
+  both wings, extrude, get one wing or a scold. It now appends every region,
+  matching what extruding from the tree always did. The headless one-shot
+  extrude had quietly defaulted to region 0; it now leaves the selection
+  empty and lets the same BeginExtrude take everything, so a script's bare
+  "extrude" means what the interactive gesture means. And whatever the tool
+  auto-takes is written back into the region selection, so the profile it
+  grabbed glows exactly as if it had been clicked — extrude-everything is a
+  visible fact, not a guess.
+- **Plane fills go quiet once a body exists.** The three ground planes kept
+  their filled tint under a finished model, washing the viewport. With any
+  visible body, an unhovered unselected plane draws border and label only
+  (fill alpha 0); hover or selection restores the tint, and picking is
+  untouched — the furniture recedes when the work arrives.
+
+One change was tried and reverted, and the revert is the decision: faceByAxis
+("front", "top"...) picks the *outermost* face along the axis, not the
+largest. Switching to largest-area broke m5's stepped-face scripts, which
+meant the outermost step all along. Scripts that want a specific fragment of
+a multi-face side address it by face index; the axis words keep meaning "the
+far face", documented at the helper.
+
+**V-147 · Icons are SVG assets, rasterized in-house, with strokes as the
+fallback.** Every toolbar and panel icon was hand-plotted raylib strokes —
+thin, wiry, and each redesign meant repositioning line endpoints in Go. Icons
+are now 24×24 SVG files under internal/ui/icons/, go:embed'ed, parsed and
+rasterized by internal/ui/svg.go: a deliberate subset (path M/L/H/V/C/S/Q/T/Z
+absolute and relative, viewBox), curves flattened, even-odd scanline fill at
+4× supersample into a white-alpha texture cached per {icon, pixel size} and
+tinted at draw time — so one asset serves every colour and state the theme
+needs. No dependency was added: a full SVG library rasterizes CSS and
+gradients we don't author, and the subset is ~430 lines we own. Draw*Icon
+keeps its signature; each tries the SVG first and falls back to the old
+procedural strokes if the asset is missing or malformed, so a bad icon file
+degrades to the previous look rather than a hole. Placement rounds to whole
+pixels — a half-pixel offset is visible blur at 18 px. 51 icons cover the
+toolbar, document tree, sketch toolbar and flyouts, and the paint panel;
+buttons and panels stay theme-drawn vectors (rounded rects, elevation from
+V-88), which is what they should be — SVG buys its keep on glyphs, not on
+rectangles. Textures unload with the app (ui.UnloadIcons in App.Close). All
+UI goldens regenerated after visual review of the three icon regions at 2×.

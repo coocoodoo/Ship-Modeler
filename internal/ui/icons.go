@@ -72,6 +72,9 @@ func arrowHead(tip rl.Vector2, dx, dy, size float64, w float32, col color.RGBA) 
 
 // DrawHomeIcon draws the house glyph used by the view cube's home button.
 func DrawHomeIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("home", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	poly(w, col,
@@ -101,6 +104,9 @@ func DrawChevron(cx, cy, size float64, dir int, col color.RGBA) {
 
 // DrawCheckIcon draws the confirm tick.
 func DrawCheckIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("check", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	poly(w, col, v2(cx-h*0.7, cy), v2(cx-h*0.15, cy+h*0.55), v2(cx+h*0.7, cy-h*0.55))
@@ -108,6 +114,9 @@ func DrawCheckIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawCrossIcon draws the cancel cross.
 func DrawCrossIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("cross", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	line(v2(cx-h*0.6, cy-h*0.6), v2(cx+h*0.6, cy+h*0.6), w, col)
@@ -117,6 +126,13 @@ func DrawCrossIcon(cx, cy, size float64, col color.RGBA) {
 // DrawEyeIcon draws the visibility toggle: an open eye when visible, and the
 // same eye struck through when hidden.
 func DrawEyeIcon(cx, cy, size float64, visible bool, col color.RGBA) {
+	name := "eye"
+	if !visible {
+		name = "eyeoff"
+	}
+	if drawSVGIcon(name, cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	// Two arcs meeting at the corners approximate the lens shape.
@@ -140,6 +156,9 @@ func DrawEyeIcon(cx, cy, size float64, visible bool, col color.RGBA) {
 
 // DrawPencilIcon draws the rename affordance.
 func DrawPencilIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("pencil", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	tip := v2(cx-h*0.7, cy+h*0.7)
@@ -150,6 +169,9 @@ func DrawPencilIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawTrashIcon draws the delete affordance.
 func DrawTrashIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("trash", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	line(v2(cx-h*0.8, cy-h*0.5), v2(cx+h*0.8, cy-h*0.5), w, col)
@@ -161,6 +183,9 @@ func DrawTrashIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawPlaneIcon draws the tree icon for a default plane: a parallelogram.
 func DrawPlaneIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("plane", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	closedPoly(w, col,
@@ -170,6 +195,9 @@ func DrawPlaneIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawBodyIcon draws the tree icon for a body: a small wireframe cube.
 func DrawBodyIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("body", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	// Front face.
@@ -185,6 +213,9 @@ func DrawBodyIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawSketchIcon draws the tree icon for a sketch: an open profile with nodes.
 func DrawSketchIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("sketch", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	a := v2(cx-h*0.8, cy+h*0.6)
@@ -200,6 +231,9 @@ func DrawSketchIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawSketchToolIcon is the pencil-on-plane mark for the Sketch tool.
 func DrawSketchToolIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("sketchtool", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	closedPoly(w, col,
@@ -210,6 +244,9 @@ func DrawSketchToolIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawExtrudeIcon is a face with an arrow pulling out of it.
 func DrawExtrudeIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("extrude", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	closedPoly(w, col,
@@ -221,6 +258,9 @@ func DrawExtrudeIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawBooleanIcon is two overlapping circles.
 func DrawBooleanIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("boolean", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	// Two intersecting solids, with their overlap called out by a filled lens.
@@ -232,6 +272,9 @@ func DrawBooleanIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawMoveIcon is the four-way arrow of the transform tool.
 func DrawMoveIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("move", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	// A four-way move cursor, held back from the edge so the arrowheads stay
@@ -247,6 +290,9 @@ func DrawMoveIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawPaintIcon is a brush.
 func DrawPaintIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("paint", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	// A familiar round brush: bristles, ferrule and a single diagonal handle.
@@ -258,8 +304,18 @@ func DrawPaintIcon(cx, cy, size float64, col color.RGBA) {
 }
 
 // DrawUndoIcon and DrawRedoIcon are the curved history arrows.
-func DrawUndoIcon(cx, cy, size float64, col color.RGBA) { drawHistoryArrow(cx, cy, size, col, false) }
-func DrawRedoIcon(cx, cy, size float64, col color.RGBA) { drawHistoryArrow(cx, cy, size, col, true) }
+func DrawUndoIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("undo", cx, cy, size, col) {
+		return
+	}
+	drawHistoryArrow(cx, cy, size, col, false)
+}
+func DrawRedoIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("redo", cx, cy, size, col) {
+		return
+	}
+	drawHistoryArrow(cx, cy, size, col, true)
+}
 
 func drawHistoryArrow(cx, cy, size float64, col color.RGBA, mirrored bool) {
 	w := strokeWidth(size)
@@ -284,6 +340,9 @@ func drawHistoryArrow(cx, cy, size float64, col color.RGBA, mirrored bool) {
 
 // DrawSettingsIcon is the gear in the toolbar's right corner.
 func DrawSettingsIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("settings", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	rl.DrawCircleLinesV(v2(cx, cy), float32(h*0.38), col)
@@ -298,6 +357,9 @@ func DrawSettingsIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawCursorIcon is the arrow of the Select tool.
 func DrawCursorIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("cursor", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	tip := v2(cx-h*0.5, cy-h*0.85)
@@ -308,6 +370,9 @@ func DrawCursorIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawLineToolIcon is a stroke with a node at each end.
 func DrawLineToolIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("linetool", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	a := v2(cx-h*0.75, cy+h*0.7)
@@ -319,6 +384,9 @@ func DrawLineToolIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawRectToolIcon is an outlined rectangle with corner nodes.
 func DrawRectToolIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("recttool", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	l, t := cx-h*0.8, cy-h*0.6
@@ -331,6 +399,9 @@ func DrawRectToolIcon(cx, cy, size float64, col color.RGBA) {
 // DrawCircleToolIcon is a polygon-ish circle with a centre dot, because a
 // circle in this app is a regular n-gon (D-06).
 func DrawCircleToolIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("circletool", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	const sides = 8
@@ -345,6 +416,9 @@ func DrawCircleToolIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawFlipIcon is the two-way arrow that reverses an extrude (SPEC-UX §9.2).
 func DrawFlipIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("flip", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	line(v2(cx-h*0.8, cy-h*0.35), v2(cx+h*0.8, cy-h*0.35), w, col)
@@ -359,6 +433,9 @@ func DrawFlipIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawEraserIcon is a rubber on its side, wiping right to left.
 func DrawEraserIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("eraser", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	// The block, leaning the way a held eraser does.
@@ -372,6 +449,9 @@ func DrawEraserIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawFillIcon is a tipped bucket with a drop coming out of it.
 func DrawFillIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("fill", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	closedPoly(w, col,
@@ -384,6 +464,9 @@ func DrawFillIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawDropperIcon is the eyedropper: a slanted pipette with a bulb.
 func DrawDropperIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("dropper", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	line(v2(cx-h*0.8, cy+h*0.8), v2(cx+h*0.25, cy-h*0.25), w, col)
@@ -396,6 +479,9 @@ func DrawDropperIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawImportIcon is an arrow landing in a tray, used by the palette import.
 func DrawImportIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("import", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	line(v2(cx, cy-h*0.85), v2(cx, cy+h*0.15), w, col)
@@ -408,6 +494,9 @@ func DrawImportIcon(cx, cy, size float64, col color.RGBA) {
 // Keeping the two as separate symbols prevents the file bar from advertising
 // the exact opposite action.
 func DrawExportIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("export", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	poly(w, col, v2(cx-h*0.8, cy+h*0.18), v2(cx-h*0.8, cy+h*0.78),
@@ -419,6 +508,9 @@ func DrawExportIcon(cx, cy, size float64, col color.RGBA) {
 // DrawGradientIcon is a ramp: a box whose fill steps from dense to sparse,
 // drawn as bands because that is what an ordered-dither ramp looks like.
 func DrawGradientIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("gradient", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	l, t := cx-h*0.85, cy-h*0.75
@@ -435,6 +527,9 @@ func DrawGradientIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawSwapIcon is the two-way arrow that exchanges the near and far colours.
 func DrawSwapIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("swap", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	line(v2(cx-h*0.7, cy-h*0.35), v2(cx+h*0.7, cy-h*0.35), w, col)
@@ -446,6 +541,9 @@ func DrawSwapIcon(cx, cy, size float64, col color.RGBA) {
 // DrawSaveIcon is the floppy every program still uses, because everyone still
 // reads it.
 func DrawSaveIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("save", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	closedPoly(w, col, v2(cx-h*0.8, cy-h*0.8), v2(cx+h*0.5, cy-h*0.8),
@@ -460,6 +558,9 @@ func DrawSaveIcon(cx, cy, size float64, col color.RGBA) {
 // DrawNewIcon is a blank sheet with its corner turned, and a small plus in
 // the free space below the fold: a page that does not exist yet.
 func DrawNewIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("new", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	// The sheet, with the top-right corner cut off at the fold.
@@ -474,6 +575,9 @@ func DrawNewIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawOpenIcon is a folder with its lid lifted.
 func DrawOpenIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("open", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	poly(w, col, v2(cx-h*0.85, cy+h*0.6), v2(cx-h*0.85, cy-h*0.6),
@@ -488,6 +592,9 @@ func DrawOpenIcon(cx, cy, size float64, col color.RGBA) {
 // DrawMidLineIcon is a stroke with its node in the middle, which is where the
 // midpoint line is drawn from.
 func DrawMidLineIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("midline", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	a := v2(cx-h*0.75, cy+h*0.7)
@@ -498,6 +605,9 @@ func DrawMidLineIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawCenterRectIcon is a rectangle with its centre marked.
 func DrawCenterRectIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("centerrect", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	l, t := cx-h*0.8, cy-h*0.6
@@ -509,6 +619,9 @@ func DrawCenterRectIcon(cx, cy, size float64, col color.RGBA) {
 // DrawAlignedRectIcon is a rectangle turned off axis, which is the one thing
 // this variant does that the others cannot.
 func DrawAlignedRectIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("alignedrect", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	const a = 0.42 // radians of tilt
@@ -522,6 +635,9 @@ func DrawAlignedRectIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawPointToolIcon is a dot in a ring: a position, marked.
 func DrawPointToolIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("pointtool", cx, cy, size, col) {
+		return
+	}
 	h := size / 2
 	rl.DrawCircleLinesV(v2(cx, cy), float32(h*0.72), col)
 	rl.DrawCircleV(v2(cx, cy), float32(h*0.22), col)
@@ -530,6 +646,9 @@ func DrawPointToolIcon(cx, cy, size float64, col color.RGBA) {
 // DrawConstructionIcon is a dashed diagonal: geometry that guides without
 // being part of the shape.
 func DrawConstructionIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("construction", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	const dashes = 3
@@ -554,6 +673,9 @@ func DrawCircle3Icon(cx, cy, size float64, col color.RGBA) {
 
 // DrawEllipseIcon is an oval, wider than it is tall.
 func DrawEllipseIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("ellipse", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	const sides = 16
@@ -591,6 +713,9 @@ func DrawArc3Icon(cx, cy, size float64, col color.RGBA) {
 
 // DrawArcTangentIcon is an arc leaving a straight line smoothly.
 func DrawArcTangentIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("arctangent", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	// The line runs in along the bottom, and the arc curls up off its end.
@@ -600,6 +725,9 @@ func DrawArcTangentIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawArcCenterIcon is an arc with its centre marked and radii drawn to it.
 func DrawArcCenterIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("arccenter", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	r := h * 0.85
@@ -614,6 +742,9 @@ func DrawArcCenterIcon(cx, cy, size float64, col color.RGBA) {
 // DrawPolygonIcon is a hexagon with a corner marked: the inscribed variant is
 // measured to a corner.
 func DrawPolygonIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("polygon", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	pts := make([]rl.Vector2, 6)
@@ -628,6 +759,9 @@ func DrawPolygonIcon(cx, cy, size float64, col color.RGBA) {
 // DrawPolygonCircIcon is a hexagon with a flat side marked: the circumscribed
 // variant is measured to a side.
 func DrawPolygonCircIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("polygoncirc", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	pts := make([]rl.Vector2, 6)
@@ -642,6 +776,9 @@ func DrawPolygonCircIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawSlotIcon is a capsule lying on its side.
 func DrawSlotIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("slot", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	r := h * 0.45
@@ -654,6 +791,9 @@ func DrawSlotIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawSplineIcon is a curve through three marked points.
 func DrawSplineIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("spline", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	// An S-curve, sampled from a sine so it reads as smooth at icon size.
@@ -676,6 +816,9 @@ func DrawSplineIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawBezierIcon is a curve with its control cage.
 func DrawBezierIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("bezier", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	p0 := v2(cx-h*0.85, cy+h*0.6)
@@ -710,6 +853,9 @@ func DrawBezierIcon(cx, cy, size float64, col color.RGBA) {
 // DrawEdgeLineIcon is a corner with a stripe running along it: the edge-line
 // tool paints a band that turns the corner onto both faces.
 func DrawEdgeLineIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("edgeline", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	h := size / 2
 	// Two faces meeting at a vertical edge, drawn as a shallow V from above.
@@ -729,6 +875,9 @@ func DrawEdgeLineIcon(cx, cy, size float64, col color.RGBA) {
 // DrawMarkerIcon is an orientation dot: a small filled centre in a ring, the
 // glyph for the front/top/thruster markers a game engine reads (V-131).
 func DrawMarkerIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("marker", cx, cy, size, col) {
+		return
+	}
 	r := size * 0.36
 	rl.DrawCircleLinesV(rl.Vector2{X: float32(cx), Y: float32(cy)}, float32(r), col)
 	rl.DrawCircleV(rl.Vector2{X: float32(cx), Y: float32(cy)}, float32(size*0.14), col)
@@ -736,6 +885,9 @@ func DrawMarkerIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawTileIcon is the tile stamp: a 2x2 of little squares.
 func DrawTileIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("tile", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	s := size * 0.34
 	g := size * 0.10
@@ -750,6 +902,9 @@ func DrawTileIcon(cx, cy, size float64, col color.RGBA) {
 // DrawRotateCWIcon is a three-quarter arc with an arrowhead, turning
 // clockwise.
 func DrawRotateCWIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("rotatecw", cx, cy, size, col) {
+		return
+	}
 	w := strokeWidth(size)
 	r := size * 0.36
 	rl.DrawRingLines(v2(cx, cy), float32(r)-w/2, float32(r)+w/2, 90, 360, 24, col)
@@ -760,6 +915,9 @@ func DrawRotateCWIcon(cx, cy, size float64, col color.RGBA) {
 
 // DrawWandIcon is the magic wand: a tilted stick with a spark at its tip.
 func DrawWandIcon(cx, cy, size float64, col color.RGBA) {
+	if drawSVGIcon("wand", cx, cy, size, col) {
+		return
+	}
 	s := size * 0.5
 	// The stick, tip top-right.
 	line := func(x0, y0, x1, y1 float64) {

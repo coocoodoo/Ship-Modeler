@@ -2,9 +2,62 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** The magic wand shipped (V-145): tolerance-driven colour
-selection that every paint tool obeys. Suite green (16 packages), exe rebuilt,
-pushed.
+**Current state:** Audit-by-use pass done (V-146: multi-corner fillet,
+extrude-all-regions, plane fills recede under bodies) and the UI's icons are
+now SVG assets rasterized in-house (V-147, 51 icons, stroke fallback). Suite
+green (16 packages), goldens regenerated, exe rebuilt, pushed.
+
+---
+
+## 2026-08-30 — The audit-by-use, and icons become assets (V-146, V-147)
+
+**Request:** "Polish the 3D modeling Program... feels very clunky, glitchy...
+Do a full audit, use every tool making several models and improve them, The
+Paint tool as well. Also, Improve The UI, Find a way to use SVG in the
+program... Icons, Button, Panels, all of it."
+
+**The audit (V-146).** Built a complete interceptor through the headless op
+pipeline — spline fuselage, filleted + mirrored wings, slot cut, hex intake
+sketched on a face, porthole linear-pattern subtract, push/pull stern, full
+paint pass with edge creases, orientation markers, .pxm save + export.
+Geometry kernel held up (booleans, volumes, valid=1 throughout). Three snags,
+three fixes:
+
+- Fillet/chamfer refused more than two lines → cornerOp now rounds every
+  shared corner among the selected lines in one undo step (modify.go).
+- Extrude with no region picked refused multi-region sketches → takes all
+  regions, same as extruding from the tree (extrudemode.go). The headless
+  one-shot extrude's silent regions=[0] default now flows through the same
+  path, so scripts match the gesture.
+- Ground-plane fills washed out the viewport under finished models → fill
+  hidden (border+label stay) once any body is visible, unless hovered or
+  selected (viewport.go).
+
+Tried and reverted: faceByAxis largest-face-wins — m5's scripts proved axis
+words mean the *outermost* face; use face indices for fragments. Comment
+documents it.
+
+Second model (cargo hauler) exercised the rest: multi-corner chamfer
+("Chamfered 4 corners", hull volume exact), alignedrect + ellipse + circle3
+in one all-regions extrude, bezier + tangent arc + construction midline +
+point, move/rotate/duplicate, keep-tools union, shapefill rect/circle
+strokes, per-face resample (one-density rule pulled later paint to 16 px/u),
+tile stamps with orientation on a rotated face. Two refusals were correct
+behaviour, not bugs: extruding both lenses of a self-crossing bezier
+figure-eight (non-manifold), and resampling a never-painted face.
+
+**SVG icons (V-147).** internal/ui/svg.go — embedded-asset SVG subset parser
++ even-odd scanline rasterizer (4× supersample) → white-alpha textures cached
+per size, tinted at draw. 51 icons in internal/ui/icons/. All 48 Draw*Icon
+funcs go SVG-first with the old procedural strokes as fallback. Reviewed
+toolbar/tree, paint panel, and sketch toolbar crops at 2× — filled glyphs,
+crisp at 18 px. Buttons/panels stay theme vectors (V-88 elevation); SVG is
+for glyphs.
+
+**Suite:** all 16 packages green after regenerating UI goldens (icon change
+touches every shot; diffed a fresh render against its golden pixel-by-pixel
+first — 0.48% changed, every cluster an icon glyph, viewport and text
+untouched). Exe rebuilt, pushed.
 
 ---
 

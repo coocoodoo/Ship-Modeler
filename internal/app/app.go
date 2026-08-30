@@ -176,6 +176,7 @@ func (a *App) Close() {
 	}
 	a.gpu = nil
 	a.Fonts.Unload()
+	ui.UnloadIcons()
 	a.Renderer.Close()
 }
 

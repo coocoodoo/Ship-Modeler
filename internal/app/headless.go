@@ -976,15 +976,12 @@ func (r *ScriptRunner) extrudeOp(op io.Op, commit bool) error {
 	// entry point that starts from a sketch picked in the tree, so leave the
 	// selection alone and let BeginExtrude find it.
 	// Naming regions overrides whatever is selected; naming none leaves a
-	// selection built by earlier click ops alone, and falls back to the first
-	// region only when there is nothing to preserve.
-	if s != nil && (len(op.Regions) > 0 || len(a.sketch.selectedRegions) == 0) {
-		regions := op.Regions
-		if len(regions) == 0 {
-			regions = []int{0}
-		}
+	// selection built by earlier click ops alone. With neither, the empty
+	// selection flows into BeginExtrude, which takes every region — the same
+	// thing extruding interactively with nothing picked does (2026-08-30).
+	if s != nil && len(op.Regions) > 0 {
 		a.sketch.selectedRegions = map[int]bool{}
-		for _, i := range regions {
+		for _, i := range op.Regions {
 			a.sketch.selectedRegions[i] = true
 		}
 	}
@@ -1137,7 +1134,10 @@ func faceByAxis(b *model.Body, op io.Op) (faceRef, error) {
 			continue
 		}
 		// Among parallel faces, the one furthest out along the axis is the one
-		// a person would have clicked.
+		// a person would have clicked. (Not the largest: an audit tried that
+		// and it re-aimed every script that meant "the raised step's top", so
+		// outermost stands — a script that means a specific fragment of a
+		// complex body addresses it by face index instead, 2026-08-29.)
 		reach := b.Mesh.FaceCentroid(i).Dot(dir)
 		if best < 0 || reach > bestReach {
 			best, bestReach = i, reach

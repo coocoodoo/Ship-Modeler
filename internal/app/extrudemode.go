@@ -75,19 +75,29 @@ func (a *App) BeginExtrude() bool {
 		}
 	}
 	if len(regions) == 0 {
-		// Nothing picked: take the whole profile if it is unambiguous, which is
-		// the golden path of "draw a square, press E".
-		if len(arr.Regions) == 1 {
-			regions = []int{0}
-		} else if len(arr.Regions) == 0 {
+		if len(arr.Regions) == 0 {
 			a.Toast(ui.Toast{
 				Text: "Close the red endpoints first — extrude needs a closed region",
 				Kind: ui.ToastWarn,
 			})
 			return false
-		} else {
-			a.Toast(ui.Toast{Text: "Click a filled region to extrude it", Kind: ui.ToastWarn})
-			return false
+		}
+		// Nothing picked: take the whole profile. This used to refuse when
+		// there was more than one region, demanding a click per region — but
+		// "extrude what I just drew" is the intent nine times in ten (two
+		// mirrored wings, a ring of portholes), it is already what a sketch
+		// picked from the tree does, and picking a subset first still works
+		// exactly as before (found building a wing pair, 2026-08-29).
+		for i := range arr.Regions {
+			regions = append(regions, i)
+		}
+	}
+	// Whatever the tool took, show: auto-taken regions glow like clicked ones,
+	// so "extrude everything" is a visible fact rather than a guess.
+	if len(a.sketch.selectedRegions) == 0 && len(regions) > 0 {
+		a.sketch.selectedRegions = map[int]bool{}
+		for _, i := range regions {
+			a.sketch.selectedRegions[i] = true
 		}
 	}
 

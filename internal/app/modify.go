@@ -96,44 +96,87 @@ func (a *App) ChamferSelection(distance float64) bool {
 	})
 }
 
-// cornerOp is the shared half of fillet and chamfer: both need exactly two
-// selected lines, both replace them, and both refuse with a reason.
+// cornerOp is the shared half of fillet and chamfer: every corner the
+// selected lines share gets the treatment, in one undo step.
+//
+// It used to demand exactly two lines, which made rounding a four-corner
+// profile four select-a-pair-then-fillet cycles — with the entity indices
+// shifting under the selection after every one (found building a wing,
+// 2026-08-29). Now the whole chain is one gesture: select the outline,
+// fillet, done. Each line may meet two corners, so the corners are applied
+// to the lines' *current* trimmed forms in sequence — a fillet trims a leg
+// only near its own corner, so the two ends never fight over the middle.
 func (a *App) cornerOp(name string, size float64,
 	build func(model.Entity, model.Entity, int64) (sketch.FilletResult, error)) bool {
 
 	s, idx, ents, ok := a.selectedEntities()
-	if !ok || len(ents) != 2 {
+	if !ok || len(ents) < 2 {
 		a.Toast(ui.Toast{
-			Text: "Select the two lines that meet at the corner",
+			Text: "Select the lines that meet at the corners to round",
 			Kind: ui.ToastWarn,
 		})
 		return false
 	}
 	r := geom.ToSubunits(size)
-	res, err := build(ents[0], ents[1], r)
-	if err != nil {
-		a.Toast(ui.Toast{Text: capitalize(err.Error()), Kind: ui.ToastWarn})
+
+	// work holds each selected line's current form; extras collects the arcs
+	// and chamfer cuts as corners are spent.
+	work := append([]model.Entity(nil), ents...)
+	var extras []model.Entity
+	corners := 0
+	var lastErr error
+	for i := 0; i < len(ents); i++ {
+		for j := i + 1; j < len(ents); j++ {
+			if ents[i].Kind != model.EntLine || ents[j].Kind != model.EntLine {
+				continue
+			}
+			if !linesShareACorner(ents[i], ents[j]) {
+				continue
+			}
+			res, err := build(work[i], work[j], r)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			construction := ents[i].Construction && ents[j].Construction
+			work[i], work[j] = res.Lines[0], res.Lines[1]
+			work[i].Construction = ents[i].Construction
+			work[j].Construction = ents[j].Construction
+			for _, cut := range res.Lines[2:] {
+				cut.Construction = construction
+				extras = append(extras, cut)
+			}
+			if res.Arc.Kind == model.EntArc {
+				arc := res.Arc
+				arc.Construction = construction
+				extras = append(extras, arc)
+			}
+			corners++
+		}
+	}
+
+	if corners == 0 {
+		msg := "Select lines that share corners"
+		if lastErr != nil {
+			msg = capitalize(lastErr.Error())
+		}
+		a.Toast(ui.Toast{Text: msg, Kind: ui.ToastWarn})
 		return false
 	}
 
-	add := append([]model.Entity(nil), res.Lines...)
-	if res.Arc.Kind == model.EntArc {
-		add = append(add, res.Arc)
-	}
-	// A guide corner stays a guide.
-	if ents[0].Construction && ents[1].Construction {
-		for i := range add {
-			add[i].Construction = true
-		}
-	}
 	if !a.Run(&model.ReplaceEntities{
-		Sketch: s.ID, Remove: idx, Add: add, Label: name,
+		Sketch: s.ID, Remove: idx, Add: append(work, extras...), Label: name,
 	}) {
 		return false
 	}
 	a.sketch.session.ClearSelection()
-	a.Toast(ui.Toast{Text: name + "ed the corner"})
+	a.Toast(ui.Toast{Text: name + "ed " + plural(corners, "corner", "corners")})
 	return true
+}
+
+// linesShareACorner reports whether two lines touch end to end.
+func linesShareACorner(a, b model.Entity) bool {
+	return a.A == b.A || a.A == b.B || a.B == b.A || a.B == b.B
 }
 
 // MirrorSelection adds a reflected copy of the selection about an axis.
