@@ -651,6 +651,7 @@ func (a *App) gatherPaintSettings() {
 	st := &a.paint
 	a.Settings.CustomPalette = append([]color.RGBA(nil), st.custom...)
 	a.Settings.RecentColors = st.recents.List()
+	a.Settings.PaletteName = st.browser.applied
 	a.Settings.Paint = io.PaintSettings{
 		Res:    st.res,
 		Size:   st.size,

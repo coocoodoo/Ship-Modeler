@@ -210,6 +210,22 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 	case "view.shading":
 		a.Settings.FlatShading = !*op.On
 
+	case "palette.browse":
+		if *op.On {
+			a.OpenPaletteBrowser()
+		} else {
+			a.ClosePaletteBrowser()
+		}
+
+	// The query is `name`, the one free-text field the op struct carries.
+	case "palette.search":
+		a.paint.browser.query = op.Name
+
+	case "palette.apply":
+		if !a.ApplyPaletteNamed(op.Name) {
+			return op.Errorf("no palette called %q", op.Name)
+		}
+
 	case "settle":
 		if err := r.settle(); err != nil {
 			return op.Wrap(err)
@@ -1801,6 +1817,20 @@ func (r *ScriptRunner) dump() {
 			// results is how many of the targets have a live boolean result
 			// standing in for them in the viewport (V-150).
 			len(a.extrude.targets), len(a.extrude.resultPreview), a.extrude.previewErr)
+	}
+	// The palette library, once it has been opened or something has been
+	// applied from it. Counted here rather than read off the browser's cache
+	// so a dump never disturbs what the list is showing.
+	if b := &a.paint.browser; b.open || b.applied != "" {
+		lib := a.PaletteLibrary()
+		shown := 0
+		for i := range lib {
+			if lib[i].Matches(b.query) {
+				shown++
+			}
+		}
+		fmt.Printf("palette open=%d shown=%d of %d query=%q applied=%q colours=%d\n",
+			boolBit(b.open), shown, len(lib), b.query, b.applied, len(a.paint.custom))
 	}
 	if t := a.boolean.tool; t != nil {
 		fmt.Printf("boolean op=%q target=%d tools=%d keep=%d\n",

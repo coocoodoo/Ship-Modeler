@@ -75,6 +75,10 @@ func (a *App) buildShell(l Layout) {
 	// The palette is chrome of its own, not one of the contextual cards, and
 	// it is drawn while it is still sliding shut after paint mode has ended.
 	a.buildPaintBar(l.PaintBar)
+	// The library sits over the viewport, above the sidebar that opened it.
+	if a.InPaletteBrowser() {
+		a.buildPaletteBrowser(l.Viewport)
+	}
 	if a.InImportMesh() {
 		a.buildImportCard(l.Viewport)
 	}

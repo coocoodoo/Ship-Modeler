@@ -92,6 +92,9 @@ type Settings struct {
 	// AO scales the baked ambient occlusion, 0 (off) to 1. It is a setting
 	// like MSAA: how the viewport reads, not what the document holds.
 	AO float64 `json:"ao"`
+	// PaletteName is the library palette the custom page is showing, so the
+	// browser can point at it again next session (V-152).
+	PaletteName string `json:"paletteName"`
 	// FlatShading turns the lighting and AO off so painted texels read
 	// exactly as authored — the toggle under the view cube.
 	FlatShading     bool          `json:"flatShading"`

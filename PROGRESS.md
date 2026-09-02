@@ -2,10 +2,43 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** The palette is a right-hand sidebar that slides open with
-paint mode and has a Stop painting button (V-151). Live cut previews (V-150)
-and the colour system (V-149) shipped just before. Suite green, exe rebuilt,
-pushed.
+**Current state:** 4,442 palettes ship with the program, chosen from a
+searchable list (V-153). The palette sidebar (V-151), live cut previews
+(V-150) and the colour system (V-149) shipped just before. Suite green, exe
+rebuilt, pushed.
+
+---
+
+## 2026-09-02 — The palette library (V-153)
+
+**Request:** a menu to change colour palettes, as a list — with a zip of
+4,442 Lospec palettes attached.
+
+**Built:** the collection ships as one bundled file (627 KB) embedded in the
+binary, parsed lazily; a session that never opens the browser never pays for
+it. The browser is a search box over one scrolling list, each row the
+palette's name beside a strip of its colours (`SwatchRow`, a new kit widget)
+with a `+` when the set outruns the strip. Search takes words in any order.
+The list scrolls by whole rows on the wheel, so every drawn row is entirely
+inside the box — nothing half-clipped, nothing visible but unclickable.
+Clicking a row puts it on the custom page, never over the built-in one; the
+page's chip takes the palette's name; the choice is remembered by name.
+`%APPDATA%\Modeler\palettes\` is scanned too and listed first.
+
+**Caught on the way:** 45 of the 4,442 names carry glyphs the font atlas
+cannot draw (curly quotes, dashes, emoji), which would have been boxes in
+rows and toasts. Names are now folded to drawable glyphs at load — near twins
+map across, the rest are dropped, an emptied name becomes "Untitled palette"
+— covering the user's own folder as well as the bundle. Pinned by a test that
+walks every name in the library.
+
+**Ops:** `palette.browse {on}`, `palette.search {name}`, `palette.apply
+{name}`, plus a `palette ...` dump line. New golden `palette_library` (list,
+search, applied).
+
+**Goldens:** every paint shot went stale inside tolerance at one spot —
+(1141,491), the sidebar's footer button, where "Import .hex" became
+"Palettes…". Reviewed and regenerated.
 
 ---
 

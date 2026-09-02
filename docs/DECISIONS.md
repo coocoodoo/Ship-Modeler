@@ -1979,3 +1979,49 @@ panel of controls taller than the window can never bury it. Its shortcut is
 P, not Esc: P always leaves the mode, while Esc backs out one level at a
 time — a live stroke, then the wand selection, then the edge selection, then
 the lock — and only reaches the mode when nothing else is pending.
+
+**V-153 · The palette library: four thousand palettes as a list, not a file
+dialog.** The user arrived with a collection of 4,442 Lospec palettes and
+asked for a menu to change between them. The existing answer was Import .hex
+— a file dialog, which is the right tool only when you already know which
+file you want. Nobody knows which of four thousand they want; they want to
+look.
+
+So the palette is chosen from a searchable list, and every row shows its own
+colours, because the name of a palette tells you almost nothing ("Nostalgia",
+"+100", "(T)est (F)reak") and fourteen chips tell you everything. Search takes
+words in any order — "gb pocket" finds "Pocket GB" — since a name
+half-remembered is the normal case at this size. The list scrolls by whole
+rows on the wheel, so every row drawn is a row entirely inside the box: no
+half rows to clip, and none that are visible but not clickable. The scrollbar
+is a readout rather than a control, because with a wheel and a search box
+there is nothing left for a draggable thumb to do that is not already easier
+another way.
+
+The collection ships as one bundled file rather than 4,442 small ones. It is
+read start to finish or not at all, a directory of that many entries is slow
+to walk on Windows, and one file is one thing to diff. It is parsed lazily —
+a session that never opens the browser never pays for it — and the user's own
+folder beside the settings is scanned and listed first, because a folder you
+filled yourself is not a needle to find in someone else's haystack.
+
+Two things this exposed. Names from thousands of strangers are not ASCII:
+45 of them carry curly quotes, dashes and even emoji, and the font atlas is a
+curated codepoint list where anything else draws as a box (D-11). So a name
+is folded to drawable glyphs before it can reach a row or a toast — the near
+twins map across (‚ to a comma), the rest are dropped, and a name that empties
+out entirely becomes "Untitled palette". And the panel's second page was
+labelled "Imported", which describes where the colours came from — the one
+thing you already know. It carries the palette's name now.
+
+Applying never touches the built-in page, for the same reason importing never
+did: whatever you try, the colours you started with stay one click away. The
+choice is remembered by name in the settings, which is only ever used to point
+the list at the right row — the colours themselves already ride the settings,
+and looking the name up at launch would parse four thousand palettes to answer
+a question nobody has asked yet.
+
+`SwatchRow` joins the frozen widget set (SPEC-UX §4) to draw the rows: a
+label beside a strip of colours, with a "+" when the set is longer than the
+strip, since showing the first fourteen of a hundred without saying so is a
+lie about the set.

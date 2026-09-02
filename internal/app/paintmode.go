@@ -57,6 +57,9 @@ type paintState struct {
 	// one number the layout reads: the viewport ends where the bar begins.
 	bar float64
 
+	// browser is the palette library's list (V-152).
+	browser paletteBrowser
+
 	tool  paint.Tool
 	size  int
 	res   int
@@ -201,6 +204,11 @@ func (a *App) initPaint() {
 	if len(a.paint.custom) == 0 {
 		a.paint.page = 0
 	}
+	// The colours came back with the settings; this is only which row the
+	// library should point at when it opens. Deliberately not a lookup into
+	// the library — that would parse four thousand palettes at every launch
+	// to answer a question nobody has asked yet.
+	a.paint.browser.applied = strings.TrimSpace(a.Settings.PaletteName)
 }
 
 // BeginPaint enters paint mode (SPEC-UX §13.1).
@@ -240,6 +248,18 @@ func (a *App) ExitPaint() {
 	a.paint.edges = a.paint.edges[:0]
 	a.paint.hoverEdge = -1
 	a.paint.wandMask = nil
+	// The library belongs to the mode that opened it.
+	a.paint.browser.open = false
+}
+
+// closeBrowserIfOpen shuts the palette list, reporting whether there was one
+// to shut — the shape Esc's ladder is built from.
+func (a *App) closeBrowserIfOpen() bool {
+	if !a.paint.browser.open {
+		return false
+	}
+	a.ClosePaletteBrowser()
+	return true
 }
 
 // PaintBarOpenMillis and PaintBarShutMillis are how long the palette sidebar
@@ -1064,9 +1084,10 @@ func (a *App) handlePaintKeys(in InputFrame) {
 		a.ExitPaint()
 	}
 	if in.KeyPressed(rl.KeyEscape) {
-		// One level per press (SPEC-UX §1): a live stroke, then the lock, then
-		// the mode.
+		// One level per press (SPEC-UX §1): the library, a live stroke, the
+		// selections, the lock, then the mode.
 		switch {
+		case a.closeBrowserIfOpen():
 		case a.CancelStroke():
 		case a.ClearWandSelection():
 		case a.ClearEdgeSelection():
@@ -1172,6 +1193,8 @@ func (a *App) ImportPalette(path string) bool {
 	}
 	a.paint.custom = cols
 	a.paint.page = 1
+	// A file is not a library row, so the list stops claiming one is in use.
+	a.paint.browser.applied = ""
 	a.Toast(ui.Toast{
 		Text: fmt.Sprintf("Imported %s — %s", filepath.Base(path),
 			plural(len(cols), "colour", "colours")),

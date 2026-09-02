@@ -285,6 +285,73 @@ func (c *Context) ChipGroup(id ID, r rl.Rectangle, labels []string, selected int
 	return selected, changed
 }
 
+// SwatchRowSpec describes one row of a list that names a set of colours.
+type SwatchRowSpec struct {
+	Label string
+	// Swatches are drawn right-aligned, as many as fit in Columns.
+	Swatches []color.RGBA
+	// Columns is how many chips the strip has room for. A set longer than
+	// that draws Columns-1 chips and a "+", because showing the first
+	// fourteen of a hundred without saying so is a lie about the set.
+	Columns int
+	// Selected marks the row as the one in use: accent wash and edge bar.
+	Selected bool
+	Tooltip  string
+}
+
+// SwatchRow draws a name beside a strip of its colours and reports a click.
+//
+// Added for the palette browser (V-152). A list of colour sets cannot be read
+// by name — "Sunset 12" and "Dusk" tell you nothing — so the row is mostly
+// the colours themselves, and the name is the label on them.
+func (c *Context) SwatchRow(id ID, r rl.Rectangle, spec SwatchRowSpec) bool {
+	it := c.interact(id, r, false)
+
+	switch {
+	case spec.Selected:
+		c.FillRounded(r, 4, Fade(ColorAccent, 0.20))
+	case it.Hovered:
+		c.FillRounded(r, 4, ColorHover)
+	}
+	if spec.Selected {
+		FillRect(Rect(r.X, r.Y+c.Px(4), c.Px(2), r.Height-c.Px(8)), ColorAccent)
+	}
+
+	inner := InsetXY(r, c.Px(Spacing), 0)
+	cols := spec.Columns
+	if cols < 1 {
+		cols = 1
+	}
+	chip := c.Px(13)
+	gap := c.Px(2)
+	stripW := float32(cols)*(chip+gap) - gap
+	nameBox, stripBox := SplitLeft(inner, inner.Width-stripW-c.Px(Spacing))
+
+	label := ColorText
+	if spec.Selected {
+		label = ColorAccent
+	}
+	c.Text(nameBox, spec.Label, FontSizeUI, textColorFor(label, it))
+
+	n := len(spec.Swatches)
+	show := n
+	if show > cols {
+		show = cols - 1
+	}
+	y := stripBox.Y + (stripBox.Height-chip)/2
+	for i := 0; i < show; i++ {
+		box := Rect(stripBox.X+float32(i)*(chip+gap), y, chip, chip)
+		c.FillRounded(box, 2, spec.Swatches[i])
+	}
+	if show < n {
+		box := Rect(stripBox.X+float32(show)*(chip+gap), y, chip, chip)
+		c.TextCentered(box, "+", FontSizeSmall, ColorTextDim)
+	}
+
+	c.queueTooltip(id, r, it, spec.Tooltip, "", "")
+	return it.Clicked
+}
+
 func clamp01(v float64) float64 {
 	if v < 0 {
 		return 0

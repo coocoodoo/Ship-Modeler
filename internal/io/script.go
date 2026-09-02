@@ -223,6 +223,7 @@ var knownOps = map[string]bool{
 	"camera.zoom": true, "camera.project": true,
 	"settle": true, "shot": true, "pick": true, "dump": true,
 	"view.ao": true, "view.shading": true,
+	"palette.browse": true, "palette.search": true, "palette.apply": true,
 }
 
 func (o Op) validate() error {
@@ -276,6 +277,14 @@ func (o Op) validate() error {
 	case "view.shading":
 		if o.On == nil {
 			return o.Errorf("needs on (true for shaded, false for flat)")
+		}
+	case "palette.browse":
+		if o.On == nil {
+			return o.Errorf("needs on (true to open the library, false to close)")
+		}
+	case "palette.apply":
+		if o.Name == "" {
+			return o.Errorf("needs the name of a palette")
 		}
 	case "tile.import":
 		if o.Path == "" {

@@ -1,0 +1,24 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"select","kind":"body","body":"Hull"},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"deselect"},
+  {"op":"settle"},
+
+  {"op":"paint.begin"},
+  {"op":"palette.browse","on":true},
+  {"op":"dump"},
+  {"op":"shot","name":"palette_list"},
+
+  {"op":"palette.search","name":"gameboy"},
+  {"op":"dump"},
+  {"op":"shot","name":"palette_search"},
+
+  {"op":"palette.apply","name":"Nostalgia"},
+  {"op":"palette.browse","on":false},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"palette_applied"}
+]

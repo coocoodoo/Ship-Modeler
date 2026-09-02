@@ -194,9 +194,17 @@ func (a *App) buildPaintPanel(bar rl.Rectangle) {
 	}
 
 	if len(st.custom) > 0 && !showTiles {
-		pages := []string{"Built-in", "Imported"}
-		if pick, changed := a.UI.ChipGroup(ui.MakeID("paint.page"), row(a.px(24)),
-			pages, st.page, ui.ChipGroupOpts{
+		// The second page carries the palette's own name once one has been
+		// chosen from the library — "Imported" describes where it came from,
+		// which is the one thing you already know.
+		second := "Imported"
+		if st.browser.applied != "" {
+			second = st.browser.applied
+		}
+		chips := row(a.px(24))
+		second = a.UI.Truncate(second, ui.FontSizeSmall, chips.Width/2-a.px(12))
+		if pick, changed := a.UI.ChipGroup(ui.MakeID("paint.page"), chips,
+			[]string{"Built-in", second}, st.page, ui.ChipGroupOpts{
 				Tooltip: "Which page of colours the grid shows",
 			}); changed {
 			st.page = pick
@@ -605,10 +613,13 @@ func (a *App) paintFooterRow(r rl.Rectangle) {
 	rest.X += a.px(6)
 	rest.Width -= a.px(6)
 
-	if a.UI.Button(ui.MakeID("paint.import"), importBox, "Import .hex", ui.ButtonOpts{
-		Tooltip: "Load a Lospec palette — or just drop a .hex file on the window",
+	// The library is the way in now: the file dialog is still there, inside
+	// it, for a palette that is not in the collection — but a list you can
+	// search beats a dialog you have to already know the answer to.
+	if a.UI.Button(ui.MakeID("paint.library"), importBox, "Palettes…", ui.ButtonOpts{
+		Tooltip: "Browse the palette library, or import a .hex file",
 	}) {
-		a.RequestFile(fileImportPalette)
+		a.OpenPaletteBrowser()
 	}
 
 	label := "Textures"
