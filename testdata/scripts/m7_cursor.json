@@ -33,7 +33,7 @@
   {"op":"paint.res","res":4},
   {"op":"camera.orbit","degrees":76},
   {"op":"settle"},
-  {"op":"hover","at":[900,420]},
+  {"op":"hover","at":[750,420]},
   {"op":"dump"},
   {"op":"shot","name":"m7_oblique"},
   {"op":"paint.faceview"},

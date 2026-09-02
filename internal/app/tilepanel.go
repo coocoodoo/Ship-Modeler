@@ -19,22 +19,6 @@ import (
 // clickable, and that beats a scroll region nobody discovers.
 const tilePickerHeight = 150
 
-// tileSectionHeight is the measurement buildPaintPanel adds for this section.
-func (a *App) tileSectionHeight(line float32) float32 {
-	t := &a.paint.tiles
-	h := line + a.px(26) + a.px(4) + // header + import row
-		line + a.px(24) + a.px(4) // grid label + chips
-	if t.custom {
-		h += a.px(24) + a.px(4)
-	}
-	if t.set != nil {
-		h += a.px(tilePickerHeight) + a.px(4) + a.px(26) + a.px(4) // picker + orient row
-	} else {
-		h += line // the empty-state note
-	}
-	return h
-}
-
 // buildTileSection lays out and runs the tile controls.
 func (a *App) buildTileSection(row func(float32) rl.Rectangle, space func(float64), line float32) {
 	t := &a.paint.tiles

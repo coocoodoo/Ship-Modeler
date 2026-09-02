@@ -19,13 +19,18 @@ type Layout struct {
 	HintBar  rl.Rectangle
 	// Handle is the little chevron that collapses and restores the tree panel.
 	Handle rl.Rectangle
+	// PaintBar is the palette sidebar on the right, zero-width when shut. It
+	// is real chrome like the tree, not a card over the model: the viewport
+	// ends where it begins, so nothing you are painting hides under it.
+	PaintBar rl.Rectangle
 }
 
 // TreeHandleWidth is the collapse handle's width in logical pixels.
 const TreeHandleWidth = 12
 
-// ComputeLayout lays the chrome out for a framebuffer size.
-func ComputeLayout(fbW, fbH int, scale float64, treeWidth float64, collapsed bool) Layout {
+// ComputeLayout lays the chrome out for a framebuffer size. paintBar is the
+// palette sidebar's live width in logical pixels, 0 when it is shut.
+func ComputeLayout(fbW, fbH int, scale float64, treeWidth float64, collapsed bool, paintBar float64) Layout {
 	px := func(v float64) float32 { return float32(v * scale) }
 
 	var l Layout
@@ -34,6 +39,19 @@ func ComputeLayout(fbW, fbH int, scale float64, treeWidth float64, collapsed boo
 	rest := l.Screen
 	l.Toolbar, rest = ui.SplitTop(rest, px(ui.ToolbarHeight))
 	l.HintBar, rest = ui.SplitBottom(rest, px(ui.HintBarHeight))
+
+	// The sidebar comes off the right before the tree takes its share, so a
+	// narrow window squeezes the tree — which can be collapsed — rather than
+	// the palette, which cannot.
+	if paintBar > 0 {
+		w := px(paintBar)
+		if max := rest.Width - px(160); w > max {
+			w = max
+		}
+		if w > 0 {
+			l.PaintBar, rest = ui.SplitRight(rest, w)
+		}
+	}
 
 	if collapsed {
 		l.Tree = ui.Rect(rest.X, rest.Y, 0, rest.Height)

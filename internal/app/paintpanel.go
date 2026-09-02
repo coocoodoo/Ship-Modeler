@@ -11,9 +11,12 @@ import (
 	"modeler/internal/ui"
 )
 
-// The palette panel of SPEC-UX §13.1. It replaces the contextual card while
-// paint mode is on, and it is taller than the other cards because it is the one
-// panel you work out of continuously rather than dismiss.
+// The palette panel of SPEC-UX §13.1. It is a sidebar down the right of the
+// window rather than a card floating over the model (V-151): it is the one
+// panel you work out of continuously rather than dismiss, and a panel you
+// keep open all session has no business sitting on top of the thing you are
+// painting. The layout gives it real space, so the viewport ends where it
+// begins.
 //
 // The spec draws it with emoji. None of them are in the font atlas, and a
 // missing glyph is a box, so every one is a stroke icon instead (D-11).
@@ -28,16 +31,43 @@ const (
 	paintRecentsCount = 8
 )
 
-// buildPaintPanel lays out and runs the whole palette panel.
-func (a *App) buildPaintPanel(viewport rl.Rectangle) {
+// buildPaintBar draws the sidebar and runs the palette inside it.
+//
+// While the bar is still moving its contents are laid out at the width they
+// will finally have and clipped to however much has arrived, so the panel
+// slides in as one piece instead of reflowing at every width on the way.
+// Sliding shut it draws empty: the controls belong to paint mode, and the
+// mode is already gone by then.
+func (a *App) buildPaintBar(r rl.Rectangle) {
+	if r.Width <= 0 {
+		return
+	}
+	a.UI.Panel(r)
+	a.UI.HairlineV(r.X, r.Y, r.Height, ui.ColorStroke)
+	if !a.InPaint() {
+		return
+	}
+	full := ui.Rect(r.X+r.Width-a.px(paintPanelWidth), r.Y, a.px(paintPanelWidth), r.Height)
+	clipped := r.Width < full.Width-0.5
+	if clipped {
+		rl.BeginScissorMode(int32(r.X), int32(r.Y), int32(r.Width), int32(r.Height))
+	}
+	a.buildPaintPanel(full)
+	if clipped {
+		rl.EndScissorMode()
+	}
+}
+
+// buildPaintPanel lays out and runs the whole palette panel inside the bar.
+func (a *App) buildPaintPanel(bar rl.Rectangle) {
 	st := &a.paint
 	line := a.UI.Fonts.LineHeight(ui.FontSizeUI) + a.px(2)
 	swatch := a.px(paintSwatchSize)
 	gap := a.px(paintSwatchGap)
 
-	// The prompt and the oblique chip are the two things that come and go, so
-	// the panel is measured rather than fixed: a card with a hole in it where a
-	// warning sometimes goes looks broken.
+	// The prompt and the oblique chip come and go with what is under the
+	// pointer; the sidebar is full height either way, so they simply take
+	// their row when they apply.
 	mismatch, mismatchRes := a.paintResMismatch()
 	oblique := a.paintOblique()
 	// Both prompts describe "the face you are pointing at", and the edge tool
@@ -70,71 +100,23 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 	// does nothing is worse than an absent one.
 	showSize := !showEdges && !showTiles && !showWand
 
-	h := a.px(38) + // title
-		line + a.px(26)*2 + a.px(4) + a.px(6) + // two rows of tools
-		line + a.px(24) + a.px(8) + // res
-		a.px(26) + a.px(4) // import + textures
-	if !showTiles {
-		h += line + float32(paintPaletteRows)*(swatch+gap) + a.px(6) + // palette
-			line + swatch + a.px(8) + // recents
-			a.px(26) + a.px(6) // current colour + custom
-	} else {
-		h += a.tileSectionHeight(line) + a.px(6)
-	}
-	if showSize {
-		h += line + a.px(24) + a.px(6)
-	}
-	if len(st.custom) > 0 && !showTiles {
-		h += a.px(24) + a.px(4)
-	}
-	if mismatch {
-		h += line*2 + a.px(26) + a.px(6)
-	}
-	if oblique {
-		h += a.px(26) + a.px(6)
-	}
-	// The lock row is always there. It is the one control whose state you have
-	// to be able to read at a glance — "am I about to paint the face I think I
-	// am" is not a question worth hunting for an answer to.
-	h += a.px(26) + a.px(6)
-	if st.locked {
-		h += line
-	}
-	if showDither {
-		h += line + a.px(24) + a.px(6)
-	}
-	if showFill {
-		h += a.px(24) + a.px(6)
-	}
-	if showEdges {
-		// Header, the width slider, then the two buttons.
-		h += line + a.px(24) + a.px(6) + a.px(26) + a.px(6)
-	}
-	if showWand {
-		// The tolerance label + slider.
-		h += line + a.px(24) + a.px(6)
-	}
-	if haveWandSel {
-		// The standing selection row: the count and its Clear button.
-		h += a.px(26) + a.px(6)
-	}
+	inner := ui.InsetXY(bar, a.px(ui.Spacing+2), a.px(6))
 
-	box := ui.Rect(
-		viewport.X+viewport.Width-a.px(paintPanelWidth)-a.px(ui.Spacing*2),
-		viewport.Y+a.px(ui.ViewCubeSize+ui.ViewCubeMargin*2+34),
-		a.px(paintPanelWidth), h)
-	// The panel is taller than the others, and on a short window it would run
-	// off the bottom into the hint bar. Sliding it up is better than clipping
-	// it: every control stays reachable.
-	if bottom := viewport.Y + viewport.Height - a.px(ui.Spacing); box.Y+box.Height > bottom {
-		box.Y = bottom - box.Height
-		if box.Y < viewport.Y+a.px(ui.Spacing) {
-			box.Y = viewport.Y + a.px(ui.Spacing)
-		}
-	}
+	// The title wears the mode's colour with a stripe down the bar's edge, the
+	// same thing every tool card does.
+	titleBox, rest := ui.SplitTop(inner, a.UI.Fonts.LineHeight(ui.FontSizeHeader)+a.px(4))
+	ui.FillRect(ui.Rect(bar.X, titleBox.Y, a.px(3), titleBox.Height), ui.ColorAccent)
+	a.UI.Text(titleBox, "Paint", ui.FontSizeHeader, ui.ColorAccent)
+	a.UI.HairlineH(bar.X, titleBox.Y+titleBox.Height+a.px(4), bar.Width, ui.Fade(ui.ColorAccent, 0.35))
+	rest.Y += a.px(10)
+	rest.Height -= a.px(10)
 
-	card := a.UI.FloatingCard(ui.MakeID("paint.card"), box, "Paint", ui.FloatingCardOpts{})
-	body := card.Body
+	// The way out is pinned to the bottom, taken off before anything else, so
+	// it is in the same place whatever the tool above it has grown into — and
+	// so a panel of controls taller than the window can never bury it.
+	footer, body := ui.SplitBottom(rest, a.px(32))
+	footer.Y += a.px(6)
+	footer.Height -= a.px(6)
 	row := func(height float32) rl.Rectangle {
 		var r rl.Rectangle
 		r, body = ui.SplitTop(body, height)
@@ -246,6 +228,16 @@ func (a *App) buildPaintPanel(viewport rl.Rectangle) {
 		}) {
 			a.FaceView()
 		}
+	}
+
+	// The way out, in the footer taken off the bottom above. The shortcut is
+	// P rather than Esc: P always leaves the mode, while Esc backs out one
+	// level at a time and only reaches the mode once nothing else is pending.
+	if a.UI.Button(ui.MakeID("paint.stop"), footer, "Stop painting", ui.ButtonOpts{
+		Tooltip:  "Leave paint mode and close this panel",
+		Shortcut: "P",
+	}) {
+		a.ExitPaint()
 	}
 }
 

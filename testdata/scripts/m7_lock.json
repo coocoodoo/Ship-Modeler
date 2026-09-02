@@ -9,7 +9,7 @@
 
   {"op":"paint.begin"},
   {"op":"paint.res","res":4},
-  {"op":"hover","at":[700,420]},
+  {"op":"hover","at":[600,500]},
   {"op":"dump"},
 
   {"op":"paint.lock","body":"Hull","axis":"+z"},

@@ -282,7 +282,7 @@ func (a *App) Redo() {
 
 // Layout computes this frame's chrome geometry.
 func (a *App) Layout(fbW, fbH int) Layout {
-	return ComputeLayout(fbW, fbH, a.Scale, a.tree.width, a.tree.collapsed)
+	return ComputeLayout(fbW, fbH, a.Scale, a.tree.width, a.tree.collapsed, a.paintBarWidth())
 }
 
 // Viewport returns the 3D viewport for a framebuffer size.
@@ -313,6 +313,9 @@ func (a *App) Frame(in InputFrame) {
 func (a *App) update(in InputFrame) {
 	a.lastMouseX, a.lastMouseY = in.MouseX, in.MouseY
 	a.hintOverride = ""
+	// The sidebar's width is part of the layout, so it is eased before the
+	// layout is measured rather than a frame behind it.
+	a.stepPaintBar(in.DeltaMillis)
 	a.layout = a.Layout(in.WindowW, in.WindowH)
 	vp := a.layout.RenderViewport()
 

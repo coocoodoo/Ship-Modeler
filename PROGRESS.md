@@ -2,10 +2,43 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Combining extrudes preview their result live (V-150): a
-Subtract shows the pocket already cut with the leaving material as a red
-ghost, Add/Intersect show the joined body. Colour system (V-149) shipped
-just before. Suite green, exe rebuilt, pushed.
+**Current state:** The palette is a right-hand sidebar that slides open with
+paint mode and has a Stop painting button (V-151). Live cut previews (V-150)
+and the colour system (V-149) shipped just before. Suite green, exe rebuilt,
+pushed.
+
+---
+
+## 2026-09-02 — The palette becomes a sidebar (V-151)
+
+**Request:** "Turn the Paint cube into a right side bar that smoothly opens
+when on paint mode and add a stop painting button to hide the sidebar."
+
+**Built:** the palette is chrome now, not a card. `Layout` grew `PaintBar`,
+taken off the right edge before the tree takes its share, so the viewport
+ends where the panel begins. One eased number (`paint.bar`) smoothsteps into
+its width — 170 ms open, 120 ms shut — and while it moves the contents are
+laid out at their final width and scissor-clipped to what has arrived, so it
+slides in as one piece. Sliding shut it draws empty; the mode has ended. A
+Stop painting button is pinned to the bottom edge (shortcut P, since Esc
+backs out one level at a time). Headless snaps it open — a golden captures a
+state, never a transition.
+
+**Fell out of it:** `paintPanelReachPx` is now 0 (it existed to shove
+face-view framing out from under the floating card), so a face view centres
+properly; the panel's hand-maintained height sum and `tileSectionHeight` are
+deleted, a full-height sidebar having no use for them.
+
+**Script coordinates that moved with the viewport:** the narrower viewport
+reframes the model, so three hard-coded points needed relocating — the lock
+click in m7_panelreach (it had started landing on Stop painting), the oblique
+hover in m7_cursor (it fell off the model entirely and failed the run), and
+the pre-lock hover in m7_lock (it resolved a different face than the one the
+script locks). The cursor test's texel pair moved with it; the halving it
+actually pins — same pixel, half the density, half the index — still holds
+exactly (30→15, 8→4).
+
+**Suite:** 16 packages green, goldens regenerated, exe rebuilt.
 
 ---
 

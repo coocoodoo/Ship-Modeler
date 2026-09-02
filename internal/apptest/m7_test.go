@@ -311,12 +311,14 @@ func TestTheCursorShowsTheGridBeforeYouCommitToIt(t *testing.T) {
 		}
 	}
 	// Same pixel, half the density: the texel under the cursor is half the
-	// index it was, because each texel is twice as wide.
-	if at32.hoverTex != [2]int{17, 8} {
-		t.Errorf("at 4 px/u the cursor is on texel %v, want 17,8", at32.hoverTex)
+	// index it was, because each texel is twice as wide. The pair moved when
+	// the palette became a sidebar (V-151) and the viewport it is measured
+	// against narrowed; the halving is the part that matters, and it holds.
+	if at32.hoverTex != [2]int{30, 8} {
+		t.Errorf("at 4 px/u the cursor is on texel %v, want 30,8", at32.hoverTex)
 	}
-	if at16.hoverTex != [2]int{8, 4} {
-		t.Errorf("at 2 px/u the same pixel is on texel %v, want 8,4", at16.hoverTex)
+	if at16.hoverTex != [2]int{15, 4} {
+		t.Errorf("at 2 px/u the same pixel is on texel %v, want 15,4", at16.hoverTex)
 	}
 	if at16.hoverRes != 2 || at32.hoverRes != 4 {
 		t.Errorf("the chip did not reach the mapping: %d and %d",

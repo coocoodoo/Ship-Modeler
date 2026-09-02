@@ -1938,3 +1938,44 @@ the extrude's was not. And a boolean that fails in the preview is the same
 failure Enter would meet, so it is said in the card and the commit is
 disabled there and then — a disabled control that says why (SPEC-UX §15)
 beats a red toast after the fact.
+
+**V-151 · The palette becomes a sidebar, and paint mode grows a door.** The
+request: turn the paint card into a right-hand sidebar that opens smoothly,
+with a button to stop painting and close it. All three parts are the same
+observation — the palette is not a card. A card is something you dismiss;
+the palette is the one panel you work out of continuously for as long as
+you are painting, and a panel you keep open all session has no business
+floating on top of the thing you are painting.
+
+So it is chrome now, like the tree: `Layout` gives it real space off the
+right edge, and the viewport ends where it begins. Everything follows from
+that one change — the view cube and the triad move in with the viewport,
+`paintPanelReachPx` collapses to zero (it existed to slide the face-view
+framing out from under a card that overlapped the model; with a sidebar
+every pixel of the viewport is clear), and the pointer over the panel is
+chrome by geometry rather than by the card-capture list.
+
+The slide is one eased number, `paint.bar`, stepped toward paint mode's
+on/off and smoothstepped into a width — 170 ms open, 120 ms shut, because
+opening is the one you watch and shutting is a decision already made. While
+it moves, the contents are laid out at the width they will *finally* have
+and clipped with a scissor to however much has arrived, so the panel slides
+in as one piece instead of reflowing its columns at every width on the way.
+Sliding shut it draws empty: the controls belong to paint mode, and the mode
+has already ended.
+
+Headless snaps it open instead of sliding, for the same reason a headless
+run ignores the saved panel width and the theme file: a golden captures a
+state, never a transition, and a script that clicks a control the frame
+after entering paint mode must find it where it will finally be.
+
+Two things fell out of the move. The panel had carried a hand-maintained
+height sum — every optional row adding its own pixels so the card could be
+sized before it was drawn — and a full-height sidebar has no use for it, so
+it and the tile section's matching helper are gone. And the way out is
+pinned to the bottom edge, taken off before anything else is laid out, so it
+sits in the same place whatever the current tool has grown above it and a
+panel of controls taller than the window can never bury it. Its shortcut is
+P, not Esc: P always leaves the mode, while Esc backs out one level at a
+time — a live stroke, then the wand selection, then the edge selection, then
+the lock — and only reaches the mode when nothing else is pending.

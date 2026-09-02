@@ -69,11 +69,12 @@ func (a *App) buildShell(l Layout) {
 		a.buildBooleanCard(l.Viewport)
 	case a.InSketch():
 		a.buildSketchCard(l.Viewport)
-	case a.InPaint():
-		a.buildPaintPanel(l.Viewport)
 	case a.InTransform():
 		a.buildTransformCard(l.Viewport)
 	}
+	// The palette is chrome of its own, not one of the contextual cards, and
+	// it is drawn while it is still sliding shut after paint mode has ended.
+	a.buildPaintBar(l.PaintBar)
 	if a.InImportMesh() {
 		a.buildImportCard(l.Viewport)
 	}

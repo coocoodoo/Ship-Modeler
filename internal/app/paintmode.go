@@ -52,6 +52,11 @@ const FaceViewMargin = 0.12
 
 // paintState is the app's half of paint mode.
 type paintState struct {
+	// bar is how far the right-hand palette sidebar is open, 0 shut to 1
+	// wide. Eased every frame toward paint mode's on/off (V-151), and the
+	// one number the layout reads: the viewport ends where the bar begins.
+	bar float64
+
 	tool  paint.Tool
 	size  int
 	res   int
@@ -237,14 +242,60 @@ func (a *App) ExitPaint() {
 	a.paint.wandMask = nil
 }
 
-// paintPanelReachPx is how far in from the viewport's right edge the palette
-// panel reaches, in device pixels.
-func (a *App) paintPanelReachPx() float64 {
-	if !a.InPaint() {
+// PaintBarOpenMillis and PaintBarShutMillis are how long the palette sidebar
+// takes to slide. Opening is the slower of the two on purpose: it is the one
+// you watch, and it is carrying a panel of controls in with it. Shutting is
+// quick because you have already decided to leave.
+const (
+	PaintBarOpenMillis = 170.0
+	PaintBarShutMillis = 120.0
+)
+
+// stepPaintBar eases the sidebar toward open or shut.
+//
+// Headless runs snap instead of sliding. A golden captures a state, never a
+// transition, and a script that clicks a control the frame after entering
+// paint mode must find it where it will finally be — the same reason a
+// headless run ignores the saved panel width and the theme file.
+func (a *App) stepPaintBar(deltaMillis float64) {
+	want := 0.0
+	if a.InPaint() {
+		want = 1
+	}
+	if a.Headless {
+		a.paint.bar = want
+		return
+	}
+	span := PaintBarOpenMillis
+	if want < a.paint.bar {
+		span = PaintBarShutMillis
+	}
+	step := deltaMillis / span
+	if a.paint.bar < want {
+		a.paint.bar = math.Min(a.paint.bar+step, want)
+	} else if a.paint.bar > want {
+		a.paint.bar = math.Max(a.paint.bar-step, want)
+	}
+}
+
+// paintBarWidth is the sidebar's live width in logical pixels, eased. Smooth
+// rather than linear so the panel arrives rather than stopping dead.
+func (a *App) paintBarWidth() float64 {
+	t := a.paint.bar
+	if t <= 0 {
 		return 0
 	}
-	return float64(a.px(paintPanelWidth + ui.Spacing*3))
+	if t >= 1 {
+		return paintPanelWidth
+	}
+	// smoothstep
+	return paintPanelWidth * (t * t * (3 - 2*t))
 }
+
+// paintPanelReachPx is how far the palette reaches into the viewport. It is
+// zero now that the palette is a sidebar the layout accounts for (V-151): the
+// viewport ends where the bar begins, so every pixel of it is clear.
+func (a *App) paintPanelReachPx() float64 { return 0 }
 
 // BeginLockPick arms the lock: the next click on a face chooses it.
 func (a *App) BeginLockPick() {
