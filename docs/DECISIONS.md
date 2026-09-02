@@ -1861,3 +1861,37 @@ view_shading golden pins both states of the same painted box. All UI goldens
 regenerated — the button appears under the cube in every shot (small enough
 to pass the 0.3% tolerance, refreshed anyway so the budget stays available
 for real regressions).
+
+**V-149 · The colour system: the accent is the mode's, and the theme is a
+file.** The ask was a colourful UI. The old theme was one blue on slate —
+deliberately restrained, and by the user's account flat. The answer is not
+more colours sprinkled on; it is one rule: *what you are doing owns the
+colour*. Sketching is gold, extruding teal, booleans violet, painting pink,
+placing markers lime, and the idle model blue. The mechanism is a single
+indirection: `ColorAccent` was already the one token thirty-nine draw sites
+read for "the accent", so `ui.SetAccent` swaps it to the mode's colour at the
+top of every frame and the selection glow, the active-tool underline, the
+chips, the sliders, the sketch overlay, the extrude arrow and the card titles
+all change with the mode without any of them knowing. No call site was
+touched for that half. Where a thing must keep its own colour regardless of
+mode — the toolbar's mode buttons, which are the legend; the tree's icons,
+which read by kind; the paint tools, which group by what they do to the
+picture — `IconOpts.Accent` and `TreeRowSpec.IconColor` carry it. Cards grew
+an accent stripe and an accent title, and the hint bar a chip naming the
+mode, so the colour is never a guess.
+
+Two constraints shaped the palette. The hues must stay far from the three
+semantic colours — warn, error, success — because a warning toast inside
+sketch mode must still read as a warning, not as an accent-coloured note;
+a test pins the distances, and it caught the first marker orange leaning on
+the warn amber (the marker moved to highlighter lime, and warn a step toward
+orange). And the viewport is never tinted: a pixel artist needs it
+colour-true, so the accents live in the chrome alone.
+
+The theme is a file because the person who wants a colourful UI is the
+person who will want a *different* colourful UI next month: `theme.json`
+beside the settings, every token as a hex string, written out with the
+built-in values on first launch so there is something to edit rather than a
+blank. A file that fails to parse is refused whole — a half-applied palette
+is worse than the default — and headless runs never read it, so goldens
+depend on nothing outside the repo.

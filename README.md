@@ -66,6 +66,14 @@ and the feet of raised blocks sit in soft shadow, recomputed whenever the
 geometry changes. It is viewport shading, not paint and not exported - set
 `"ao"` in settings.json between 0 (off) and 1 to taste.
 
+The chrome's colour follows what you are doing: gold while sketching, teal
+while extruding, violet for booleans, pink in paint, lime while placing
+markers, blue otherwise. The hint bar names the mode in a chip of the same
+colour. Every colour is yours to change in `theme.json` beside the settings
+file - it is written out with the defaults on first launch, so open it and
+edit any `#RRGGBB`. The viewport itself never tints, so painted colours stay
+true.
+
 ## Painting, and why the exports look right
 
 Face paint is anchored to a frame that belongs to the face, not to the

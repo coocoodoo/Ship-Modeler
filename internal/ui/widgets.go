@@ -79,6 +79,10 @@ type IconOpts struct {
 	Shortcut    string
 	DisabledWhy string
 	Label       string // optional text under or beside the icon
+	// Accent, when set, is this button's own colour instead of the live mode
+	// accent: its active wash and underline, and — so a mode button carries
+	// its colour even when it is not the mode — its resting icon tint too.
+	Accent color.RGBA
 }
 
 // IconButton draws a stroke icon in a square hit area with an optional label.
@@ -86,10 +90,15 @@ type IconOpts struct {
 func (c *Context) IconButton(id ID, r rl.Rectangle, icon IconFunc, opts IconOpts) bool {
 	it := c.interact(id, r, opts.Disabled)
 
+	accent := ColorAccent
+	if opts.Accent.A > 0 {
+		accent = opts.Accent
+	}
+
 	// The active tool gets a soft accent wash as well as its underline, so the
 	// current mode reads from across the room and not only from two pixels.
 	if opts.Active {
-		c.FillRounded(r, CornerRadius, Fade(ColorAccentSoft, 0.55))
+		c.FillRounded(r, CornerRadius, Fade(Soft(accent), 0.55))
 	}
 	if it.Hovered && !it.Disabled {
 		c.FillRounded(r, CornerRadius, ColorHover)
@@ -99,10 +108,13 @@ func (c *Context) IconButton(id ID, r rl.Rectangle, icon IconFunc, opts IconOpts
 	}
 
 	tint := ColorTextDim
-	if opts.Active {
-		tint = ColorAccent
-	} else if it.Hovered {
+	switch {
+	case opts.Active:
+		tint = accent
+	case it.Hovered:
 		tint = ColorText
+	case opts.Accent.A > 0:
+		tint = Fade(accent, 0.75)
 	}
 	tint = textColorFor(tint, it)
 
@@ -120,7 +132,7 @@ func (c *Context) IconButton(id ID, r rl.Rectangle, icon IconFunc, opts IconOpts
 	if opts.Active {
 		// Accent underline, inset a little so it reads as a tab indicator.
 		u := Rect(r.X+c.Px(4), r.Y+r.Height-c.Px(2), r.Width-c.Px(8), c.Px(2))
-		FillRect(u, ColorAccent)
+		FillRect(u, accent)
 	}
 
 	c.queueTooltip(id, r, it, opts.Tooltip, opts.Shortcut, opts.DisabledWhy)

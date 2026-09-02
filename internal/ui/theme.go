@@ -22,7 +22,7 @@ var (
 
 	ColorAccent     = rgb(0x53, 0xA4, 0xFF)        // selection, active tool
 	ColorAccentSoft = rgba(0x53, 0xA4, 0xFF, 0x33) // region fills, soft highlights
-	ColorWarn       = rgb(0xFF, 0xB4, 0x54)        // clamped draft, bent face
+	ColorWarn       = rgb(0xFF, 0xA6, 0x3C)        // clamped draft, bent face
 	ColorError      = rgb(0xFF, 0x5D, 0x5D)        // open ends, failed ops
 	ColorSuccess    = rgb(0x3D, 0xD6, 0x8C)        // confirm, valid states
 
@@ -44,6 +44,38 @@ var (
 	ColorBevel  = rgba(0xFF, 0xFF, 0xFF, 0x16)
 	ColorShadow = rgba(0x00, 0x00, 0x08, 0x12)
 )
+
+// Mode accents (SPEC-UX §3.1, V-149). ColorAccent above is not a fixed colour:
+// it is whichever of these the app's current mode owns, swapped in by
+// SetAccent at the top of every frame. That one indirection is what makes the
+// selection glow, the active-tool underline, the chips, the sliders and the
+// sketch overlay all change colour with the mode without any of them knowing.
+//
+// The hues are chosen far apart and away from the three semantic colours
+// (warn amber, error red, success green) so a warning still reads as one
+// inside any mode — TestModeAccentsAreDistinctAndClearOfTheSemanticColours
+// holds them to that, which is how the first marker orange was caught
+// leaning on the warn amber. The viewport itself is never tinted — a pixel
+// artist needs it colour-true — so the accents live in the chrome only.
+var (
+	AccentModel   = rgb(0x53, 0xA4, 0xFF) // blue: idle, selection, move, files
+	AccentSketch  = rgb(0xFF, 0xD9, 0x4A) // gold: pencil on paper
+	AccentExtrude = rgb(0x2E, 0xD0, 0xCC) // teal: things growing
+	AccentBoolean = rgb(0xB4, 0x8C, 0xFF) // violet: things combining
+	AccentPaint   = rgb(0xFF, 0x6F, 0xB5) // pink: paint
+	AccentMarker  = rgb(0xA6, 0xF0, 0x4E) // lime: highlighter, for the dots you place
+)
+
+// SetAccent makes c the live accent: ColorAccent and its soft wash both follow.
+func SetAccent(c color.RGBA) {
+	ColorAccent = WithAlpha(c, 0xFF)
+	ColorAccentSoft = WithAlpha(c, 0x33)
+}
+
+// Soft is the wash version of an accent — the alpha ColorAccentSoft carries.
+func Soft(c color.RGBA) color.RGBA {
+	return WithAlpha(c, 0x33)
+}
 
 // Axis colors are shared by the triad, the gizmo arrows and the plane tints.
 var (

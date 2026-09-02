@@ -349,6 +349,7 @@ func (a *App) paintToolRow(r rl.Rectangle, tools []paintTool) {
 			Active:   a.paint.tool == t.tool,
 			Tooltip:  t.tip,
 			Shortcut: t.tool.Shortcut(),
+			Accent:   paintToolAccent(t.tool),
 		}) {
 			a.setPaintTool(t.tool)
 		}

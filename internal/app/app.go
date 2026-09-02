@@ -122,8 +122,12 @@ func New(headless bool) *App {
 	// A headless run must not inherit the user's saved panel width or collapse
 	// state: golden shots have to depend on the document alone.
 	settings, settingsErr := io.DefaultSettings(), error(nil)
+	themeWarn := ""
 	if !headless {
 		settings, settingsErr = io.LoadSettings()
+		// The theme file lives beside the settings. Headless runs keep the
+		// built-in palette so golden shots depend on nothing outside the repo.
+		themeWarn = loadThemeFile()
 	}
 
 	uiScale := settings.UIScaleOverride
@@ -162,6 +166,9 @@ func New(headless bool) *App {
 			Text: "Settings couldn't be read — using defaults",
 			Kind: ui.ToastWarn,
 		})
+	}
+	if themeWarn != "" {
+		a.Toast(ui.Toast{Text: themeWarn, Kind: ui.ToastWarn})
 	}
 	return a
 }
@@ -474,6 +481,9 @@ func (a *App) cardOnlyOwnsPointer(in InputFrame) bool {
 
 // draw paints the 3D view and then the chrome over it.
 func (a *App) draw(in InputFrame) {
+	// The accent is the mode's, and everything below — the renderer's
+	// selection tint, the widgets, the cards — reads it (SPEC-UX §3.1).
+	ui.SetAccent(a.modeAccent())
 	fbW, fbH := in.WindowW, in.WindowH
 	a.Renderer.SetFramebuffer(fbW, fbH)
 	l := a.layout

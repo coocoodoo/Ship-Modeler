@@ -50,27 +50,46 @@ Anything that would replace the open document — New, Open, the sample ship, th
 - Paint mode swaps the contextual card for the **palette panel** (§13).
 - View cube top-right **inside the viewport** (R15), axis triad bottom-right (R14).
 
-## 3. Theme (dark, v1's only theme; tokens centralized in `ui/theme.go`)
+## 3. Theme (dark; tokens centralized in `ui/theme.go`, retunable from `theme.json`)
 
 | Token | Value | Use |
 |---|---|---|
-| bg | #16181D | window bg |
-| panel | #1E2128 | toolbar/tree/hint |
-| card | #262A33 | floating cards, fields |
-| stroke | #343945 | hairlines, borders |
+| bg | #111319 | window bg |
+| panel | #1A1D25 | toolbar/tree/hint |
+| card | #252A35 | floating cards, fields |
+| stroke | #3A4150 | hairlines, borders |
 | text | #E8EAF0 | primary text |
-| textDim | #9AA3B2 | secondary, hints |
-| accent | #4C9AFF | selection, active tool, links |
-| accentSoft | #4C9AFF33 | region fills, soft highlights |
-| warn | #FFB454 | clamped draft, non-planar chip |
+| textDim | #9CA6B6 | secondary, hints |
+| accent | *the current mode's accent, §3.1* | selection, active tool, links |
+| accentSoft | accent at α 0x33 | region fills, soft highlights |
+| warn | #FFA63C | clamped draft, non-planar chip |
 | error | #FF5D5D | open ends, failed ops |
 | success | #3DD68C | confirm ✓, valid states |
-| viewportBg | vertical gradient #1A1D23 → #22262E | 3D background |
+| viewportBg | vertical gradient #2A303C (top) → #12141A | 3D background |
 | gridMinor / gridMajor | #FFFFFF0F / #FFFFFF24 | sketch grid |
 | edgeLine | body color × 0.35, α 0.85 | mesh crease/silhouette edges |
 | hover | #FFFFFF14 overlay | any hoverable |
 
 Axis colors: X #E5484D, Y #46A758, Z #3E63DD (triad, gizmo arrows, plane tints: Right=YZ→X-tint, Top=XZ→Y-tint, Front=XY→Z-tint at 10% alpha + 30% alpha border + small label).
+
+### 3.1 Mode accents (V-149)
+
+The accent is not one colour: it is whichever of these the current mode owns, and the app swaps it in at the top of every frame. Everything that draws "the accent" — selection glow, active-tool underline, chips, sliders, toggles, card titles and their edge stripe, the sketch overlay, the extrude arrow, the hint bar's mode chip — follows without knowing.
+
+| Mode | Accent | Hue |
+|---|---|---|
+| Model (idle, move, selection, files) | #53A4FF | blue |
+| Sketch | #FFD94A | gold |
+| Extrude / push-pull | #2ED0CC | teal |
+| Boolean | #B48CFF | violet |
+| Paint | #FF6FB5 | pink |
+| Markers (placing a dot) | #A6F04E | lime |
+
+Rules: the hues sit far apart from each other and from warn/error/success (pinned by test), so a warning still reads as a warning inside any mode. The toolbar's mode buttons wear their own colour always — the toolbar is the legend. Tree icons wear their kind's colour: planes their axis colour, sketches gold, bodies blue, markers lime. Paint tools group by what they do: pink puts pixels down, blue picks and selects (eyedropper, wand), teal builds structure (edge lines, tiles). The hint bar carries a chip naming the mode in its accent. The **viewport is never tinted** — painting needs a colour-true view — so accents live in the chrome only.
+
+### 3.2 theme.json
+
+Every token above, as `#RRGGBB` / `#RRGGBBAA` strings, in `theme.json` beside `settings.json`. Written out with the built-in values on first launch so every key is there to edit; read at launch. A missing key keeps its built-in value; a key that will not parse rejects the whole file (toast) and the built-in palette stands — a half-applied palette is worse than the default one. Headless runs never read it, so goldens depend on nothing outside the repo.
 
 Body auto-color cycle (8): #8EA3B0, #B08E8E, #8EB09B, #A38EB0, #B0A98E, #8E9BB0, #B08EA6, #96B08E (desaturated so paint reads on top).
 

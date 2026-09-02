@@ -223,6 +223,7 @@ func (a *App) buildMarkerRows(row func() rl.Rectangle, open bool) {
 		res := a.UI.TreeRow(ui.MakeID("tree.marker."+itoa(i)), row(), ui.TreeRowSpec{
 			Label:     label,
 			Icon:      ui.DrawMarkerIcon,
+			IconColor: ui.AccentMarker,
 			CanDelete: true,
 			Selected:  a.Sel.Contains(ref),
 			Indent:    1,
@@ -250,9 +251,10 @@ func (a *App) buildMarkerRows(row func() rl.Rectangle, open bool) {
 			label = "Click the model…"
 		}
 		res := a.UI.TreeRow(ui.MakeID("tree.marker.add."+kind.String()), row(), ui.TreeRowSpec{
-			Label:    label,
-			Icon:     ui.DrawMarkerIcon,
-			Selected: armed,
+			Label:     label,
+			Icon:      ui.DrawMarkerIcon,
+			IconColor: ui.AccentMarker,
+			Selected:  armed,
 			Indent:   1,
 			Dim:      !armed,
 		})

@@ -36,6 +36,10 @@ type TreeRowSpec struct {
 	Editing bool
 	// Dim draws the row muted, which is how a hidden object reads.
 	Dim bool
+	// IconColor, when set, is the kind's own colour — a plane in its axis
+	// colour, a sketch in the sketch accent — so the tree reads by hue before
+	// it is read by name (SPEC-UX §3.1).
+	IconColor color.RGBA
 }
 
 // TreeRowResult reports what the user did to a row this frame.
@@ -127,6 +131,9 @@ func (c *Context) TreeRow(id ID, r rl.Rectangle, spec TreeRowSpec) TreeRowResult
 	if spec.Icon != nil {
 		ctr := Center(iconBox)
 		tint := ColorTextDim
+		if spec.IconColor.A > 0 {
+			tint = spec.IconColor
+		}
 		if spec.Selected {
 			tint = ColorAccent
 		}

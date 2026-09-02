@@ -2,10 +2,38 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Audit-by-use pass done (V-146), icons are SVG assets
-(V-147), and the viewport has a shading toggle beside the view cube's Home
-button (V-148: flat view shows painted texels as authored). Suite green,
-goldens regenerated, exe rebuilt, pushed.
+**Current state:** The chrome is colourful by rule (V-149): the accent is
+whichever mode you are in — gold sketch, teal extrude, violet boolean, pink
+paint, lime markers, blue model — with a `theme.json` beside the settings
+to retune every token. Suite green, goldens regenerated, exe rebuilt, pushed.
+
+---
+
+## 2026-08-31 — The colour system (V-149)
+
+**Request:** "Color system" — the lane picked from the roadmap toward the
+best pixel-art ship modeler: "a colourful UI".
+
+**Built:** one rule, *the mode owns the accent*. `ui.SetAccent` swaps the
+live `ColorAccent`/`ColorAccentSoft` to the mode's colour at the top of each
+frame; the 39 existing accent draw sites (selection glow, underlines, chips,
+sliders, sketch overlay, gizmo arrow, card confirm) followed with no call-site
+change. Own-colour carriers: `IconOpts.Accent` (toolbar mode buttons are the
+legend; paint tools group pink/blue/teal by what they do; the sketch bar's
+Extrude button is teal), `TreeRowSpec.IconColor` (planes in their axis
+colour, sketches gold, bodies blue, markers lime). Cards got an accent edge
+stripe + accent title; the hint bar a mode chip. `theme.json` in the settings
+dir: every token as hex, written with defaults on first run, refused whole on
+a bad value, ignored headless.
+
+**Caught by test:** the first marker orange sat 58 from the warn amber and
+69 from sketch gold — a warning inside sketch mode would not have read as one.
+Marker moved to lime, warn a step toward orange, extrude a step off the
+success green. Distances are pinned.
+
+**Suite:** all 16 packages green after golden regeneration (every UI shot
+changes colour by design; reviewed sketch/extrude/paint/boolean/marker/idle
+shots before regenerating). Exe rebuilt, pushed.
 
 ---
 

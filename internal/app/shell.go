@@ -89,7 +89,7 @@ func (a *App) buildShell(l Layout) {
 	if a.BoxSelecting() {
 		a.drawBoxRect()
 	}
-	a.UI.HintBar(l.HintBar, a.HintText(), Version)
+	a.UI.HintBar(l.HintBar, a.modeName(), a.HintText(), Version)
 
 	// The tree's hover feeds the viewport highlight, and the viewport's hover
 	// feeds the tree's — whichever one is live this frame wins.
@@ -191,6 +191,9 @@ func (a *App) buildToolbar(r rl.Rectangle) {
 			Disabled:    !enabled,
 			Shortcut:    tool.shortcut,
 			DisabledWhy: why,
+			// Each mode button wears its own colour always, so the toolbar
+			// is the legend for the accent the rest of the chrome takes on.
+			Accent: modeColor(tool.mode),
 		})
 		if clicked && enabled {
 			tool.start(a)
@@ -381,8 +384,9 @@ func (a *App) planeRow(r rl.Rectangle, k geom.PlaneKind) {
 	visible := doc.PlaneVisible(k)
 
 	res := a.UI.TreeRow(ui.MakeID("tree.plane."+k.String()), r, ui.TreeRowSpec{
-		Label:    k.String(),
-		Icon:     ui.DrawPlaneIcon,
+		Label:     k.String(),
+		Icon:      ui.DrawPlaneIcon,
+		IconColor: planeAccent(k),
 		Visible:  visible,
 		HasEye:   true,
 		Selected: a.Sel.Contains(ref),
@@ -407,6 +411,7 @@ func (a *App) sketchRow(r rl.Rectangle, s *model.Sketch) {
 	res := a.UI.TreeRow(ui.MakeID("tree.sketch."+itoa(int(s.ID))), r, ui.TreeRowSpec{
 		Label:     s.Name,
 		Icon:      ui.DrawSketchIcon,
+		IconColor: ui.AccentSketch,
 		Visible:   s.Visible,
 		HasEye:    true,
 		CanRename: true,
@@ -446,6 +451,7 @@ func (a *App) bodyRow(r rl.Rectangle, b *model.Body) {
 	res := a.UI.TreeRow(ui.MakeID("tree.body."+itoa(int(b.ID))), r, ui.TreeRowSpec{
 		Label:     b.Name,
 		Icon:      ui.DrawBodyIcon,
+		IconColor: ui.AccentModel,
 		Visible:   b.Visible,
 		HasEye:    true,
 		Swatch:    &swatch,
@@ -678,6 +684,7 @@ func (a *App) buildSketchToolbar(r rl.Rectangle) {
 		Label:       "Extrude",
 		Disabled:    !closed,
 		Shortcut:    "E",
+		Accent:      ui.AccentExtrude,
 		Tooltip:     "Pull the selected region into a solid",
 		DisabledWhy: "Close the red endpoints first — extrude needs a closed region",
 	}) {

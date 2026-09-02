@@ -252,8 +252,11 @@ func (c *Context) FloatingCard(id ID, r rl.Rectangle, title string, opts Floatin
 	inner := Inset(r, pad)
 
 	titleBox, rest := SplitTop(inner, c.Fonts.LineHeight(FontSizeHeader))
-	c.Text(titleBox, title, FontSizeHeader, ColorText)
-	c.HairlineH(r.X, titleBox.Y+titleBox.Height+c.Px(4), r.Width, ColorStroke)
+	// The title wears the mode's colour, with a stripe down the card's edge
+	// beside it: which tool this card belongs to is the first thing it says.
+	FillRect(Rect(r.X, titleBox.Y, c.Px(3), titleBox.Height), ColorAccent)
+	c.Text(titleBox, title, FontSizeHeader, ColorAccent)
+	c.HairlineH(r.X, titleBox.Y+titleBox.Height+c.Px(4), r.Width, Fade(ColorAccent, 0.35))
 	rest.Y += c.Px(8)
 	rest.Height -= c.Px(8)
 
@@ -306,12 +309,24 @@ func (c *Context) iconFooterButton(id ID, r rl.Rectangle, icon IconFunc, tint co
 }
 
 // HintBar draws the always-present strip that says what to do next
-// (SPEC-UX §2). It is never empty: silence is never the answer.
-func (c *Context) HintBar(r rl.Rectangle, text, version string) {
+// (SPEC-UX §2). It is never empty: silence is never the answer. `mode` is the
+// name of the current mode, drawn as a chip in the mode's accent at the left
+// end — the same colour the rest of the chrome has taken on, named.
+func (c *Context) HintBar(r rl.Rectangle, mode, text, version string) {
 	c.Panel(r)
 	c.HairlineH(r.X, r.Y, r.Width, ColorStroke)
 	inner := InsetXY(r, c.Px(Spacing), 0)
 
+	if mode != "" {
+		chipW := c.TextWidth(mode, FontSizeSmall) + c.Px(Spacing*2)
+		chipBox, rest := SplitLeft(inner, chipW)
+		chip := InsetXY(chipBox, 0, c.Px(5))
+		c.FillRounded(chip, CornerRadius, ColorAccent)
+		c.TextCentered(chip, mode, FontSizeSmall, ColorBG)
+		inner = rest
+		inner.X += c.Px(Spacing)
+		inner.Width -= c.Px(Spacing)
+	}
 	if version != "" {
 		vb, rest := SplitRight(inner, c.TextWidth(version, FontSizeSmall)+c.Px(Spacing))
 		c.Text(vb, version, FontSizeSmall, Fade(ColorTextDim, 0.7))
