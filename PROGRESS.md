@@ -2,10 +2,30 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** The chrome is colourful by rule (V-149): the accent is
-whichever mode you are in — gold sketch, teal extrude, violet boolean, pink
-paint, lime markers, blue model — with a `theme.json` beside the settings
-to retune every token. Suite green, goldens regenerated, exe rebuilt, pushed.
+**Current state:** Combining extrudes preview their result live (V-150): a
+Subtract shows the pocket already cut with the leaving material as a red
+ghost, Add/Intersect show the joined body. Colour system (V-149) shipped
+just before. Suite green, exe rebuilt, pushed.
+
+---
+
+## 2026-08-31 — The live cut (V-150)
+
+**Request (with screenshot):** "when I subtract, I would like the model to
+give a preview as I subtract, it's not doing it."
+
+**Cause:** the pending prism was drawn — at 55% alpha, after the opaque
+bodies, depth-tested — but a Subtract prism sits inside the hull, so the hull
+hid it. Faithful and invisible.
+
+**Fix:** for Add/Subtract/Intersect, `rebuildResultPreview` runs the commit's
+own `csg.Boolean` against each target and `BuildScene` draws the result mesh
+in the target's place (unpickable); the prism ghost turns red for a cut,
+accent for a join; a body cut away entirely draws as nothing. The rebuild is
+memoized on the build parameters, so a drag frame that stayed on the same
+grid value costs nothing. A failing boolean disables Extrude with the reason
+in the card, before Enter. New golden `m3_cutpreview` (face sketch on the
+hull's top, Subtract 1.5 u, iso). SPEC-UX §9.2 gained the bullet.
 
 ---
 

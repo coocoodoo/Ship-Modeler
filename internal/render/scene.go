@@ -37,6 +37,12 @@ type BodyDraw struct {
 	// usually a body in this list — dimming it along with everything else
 	// defeats the whole point.
 	NoDim bool
+
+	// XRay draws a translucent body without the depth test, so it shows
+	// through whatever is in front of it. It exists for one thing: the ghost
+	// of material a cut is about to remove, which by definition sits inside
+	// the body being cut and would otherwise never be seen (V-150).
+	XRay bool
 }
 
 // dimFor is how far a body fades, honouring its exemption.

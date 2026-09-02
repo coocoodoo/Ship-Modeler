@@ -67,6 +67,10 @@ type SketchView struct {
 	// Selected is true when this sketch is the current selection. An idle
 	// sketch you have picked has to look picked, the same as anything else.
 	Selected bool
+	// NoFills leaves the closed regions unpainted. Set while an extrude's
+	// boolean result stands in the viewport: the fill would lie exactly
+	// across the opening of the cut it is trying to show (V-150).
+	NoFills bool
 }
 
 // BuildSketchDraw assembles the overlay.
@@ -88,7 +92,9 @@ func BuildSketchDraw(v SketchView) *render.Overlay {
 
 	appendReference(d, v)
 	arr := v.Sketch.Arrangement()
-	appendRegionFills(d, arr, v)
+	if !v.NoFills {
+		appendRegionFills(d, arr, v)
+	}
 	appendEntityStrokes(d, v)
 	appendPreview(d, v)
 	appendOpenEnds(d, arr)

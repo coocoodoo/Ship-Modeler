@@ -644,6 +644,9 @@ func (a *App) buildSketchDraws() []*render.Overlay {
 			HoverRegion:     a.sketch.hoverRegion,
 			SelectedRegions: a.sketch.selectedRegions,
 			Reference:       a.faceOutline2D(active),
+			// While a boolean result stands in the viewport, the region fill
+			// would lie exactly across the opening of the cut it is showing.
+			NoFills: len(a.extrude.resultPreview) > 0,
 		}))
 	}
 	return out

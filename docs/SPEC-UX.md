@@ -211,6 +211,7 @@ In Sketch with ≥1 region selected: `E` / toolbar Extrude / ✓-then-Extrude. A
 - **Arrow gizmo** at region centroid along the sketch-plane normal: shaft + cone, screen-constant size (~90 px), accent-colored, brightens on hover, cursor changes to ↕ along-axis.
 - LMB-drag moves depth along the normal with **grid snap 1 u** (Ctrl: ¼ u fine; Alt: free). Dragging through zero flips direction (arrow flips, preview flips). Depth readout rides the arrow tip; the card's drag-number field stays in sync (type exact values, arrows step 1 u).
 - The preview + gizmo also work from the pulled-back 3D view (not just normal-on).
+- Add, Subtract and Intersect preview the **result** (V-150): each target body is drawn as it would stand after the commit — the same boolean the commit runs — and the pending solid rides along as a ghost, red for material leaving (drawn x-ray, through the body, because removed material lives inside it), accent for material joining. The result body is undimmed; the active sketch's region fills stand down so they do not cover the opening. A body the cut would take entirely draws as nothing. Rebuilt only when a parameter actually changes (the drag snaps, so most frames change nothing). A boolean that fails says so in the card and disables Extrude before Enter, not after.
 
 ### 9.3 Options card (floating, right)
 ```

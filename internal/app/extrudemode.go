@@ -7,6 +7,7 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"modeler/internal/geom"
+	"modeler/internal/geom/csg"
 	"modeler/internal/geom/extrude"
 	"modeler/internal/geom/mesh"
 	"modeler/internal/geom/sketch2d"
@@ -40,6 +41,15 @@ type extrudeState struct {
 	// previewMesh is the pending solid, kept so the targets can be worked out
 	// and so a debug dump has something to write.
 	previewMesh *mesh.Mesh
+	// resultPreview is the live boolean result per target body for Add,
+	// Subtract and Intersect: the body as it would stand after the commit,
+	// drawn in its place so a cut reads as a cut and not as a plug hidden
+	// inside the hull (V-150). A nil entry is a body the cut would remove
+	// entirely, and it draws as nothing, which is what the commit would do.
+	resultPreview map[uint32]*render.BodyGPU
+	// previewKey is what the current preview was built from, so a drag frame
+	// that changed nothing rebuilds nothing — the boolean is the cost here.
+	previewKey string
 	// returnCamera restores the view if the tool is cancelled.
 	returnCamera render.Camera
 }
@@ -390,7 +400,17 @@ func regionCentroid(arr sketch2d.Arrangement, regions []int, frame geom.Frame) g
 func (a *App) rebuildExtrudePreview() {
 	t := a.extrude.tool
 	s := a.ActiveSketch()
+	// The drag calls this every frame, and the depth snaps to the grid, so
+	// most frames ask for exactly the preview already standing.
+	key := ""
+	if t != nil && s != nil {
+		key = fmt.Sprintf("%v|%v|%v", t.BuildParams(s.Frame()), t.Result, t.Regions)
+		if key == a.extrude.previewKey && (a.extrude.preview != nil || a.extrude.previewErr != "") {
+			return
+		}
+	}
 	a.dropExtrudePreview()
+	a.extrude.previewKey = key
 	a.extrude.previewErr = ""
 	a.extrude.previewMesh, a.extrude.targets = nil, nil
 	if t == nil || s == nil {
@@ -420,6 +440,63 @@ func (a *App) rebuildExtrudePreview() {
 	g := render.BuildBodyGPU(built.Mesh)
 	g.Upload()
 	a.extrude.preview = g
+	a.rebuildResultPreview()
+}
+
+// rebuildResultPreview runs the commit's own boolean against each target so
+// the viewport can show the body as it would stand — the pocket already cut,
+// the boss already joined — instead of a translucent plug that, for a cut,
+// sits inside the hull where nothing can see it (V-150). A boolean that fails
+// here would fail on Enter too, so it says so now and disables the commit.
+func (a *App) rebuildResultPreview() {
+	a.dropResultPreview()
+	t := a.extrude.tool
+	if t == nil || a.extrude.previewMesh == nil {
+		return
+	}
+	op, combining := t.Result.Op()
+	if !combining {
+		return
+	}
+	targets := a.extrudeTargets(t.Result)
+	if len(targets) == 0 {
+		return
+	}
+	doc := a.Doc()
+	out := map[uint32]*render.BodyGPU{}
+	for _, id := range targets {
+		b := doc.BodyByID(id)
+		if b == nil || b.Mesh == nil {
+			continue
+		}
+		res, err := csg.Boolean(op, b.Mesh, a.extrude.previewMesh)
+		if err != nil {
+			for _, g := range out {
+				if g != nil {
+					g.Unload()
+				}
+			}
+			a.extrude.previewErr = csgFailureToast(err)
+			return
+		}
+		if res.Empty {
+			out[id] = nil
+			continue
+		}
+		g := render.BuildBodyGPU(res.Mesh)
+		g.Upload()
+		out[id] = g
+	}
+	a.extrude.resultPreview = out
+}
+
+func (a *App) dropResultPreview() {
+	for _, g := range a.extrude.resultPreview {
+		if g != nil {
+			g.Unload()
+		}
+	}
+	a.extrude.resultPreview = nil
 }
 
 // bodiesReachedBy lists the visible bodies the pending solid runs into, newest
@@ -474,6 +551,8 @@ func (a *App) dropExtrudePreview() {
 		a.extrude.preview.Unload()
 		a.extrude.preview = nil
 	}
+	a.dropResultPreview()
+	a.extrude.previewKey = ""
 }
 
 // arrowLength is the gizmo's world length at the current zoom.
@@ -554,14 +633,30 @@ func (a *App) buildExtrudeGizmo(vp render.Viewport) *render.Overlay {
 	})
 }
 
-// extrudePreviewDraw is the translucent pending body.
+// extrudePreviewDraw is the translucent pending body. For a New body it wears
+// the colour it will be born with; for the combining results it is a ghost in
+// the boolean vocabulary push/pull already speaks — red for material leaving,
+// the accent for material joining — while the target draws as the result.
 func (a *App) extrudePreviewDraw() (render.BodyDraw, bool) {
 	if a.extrude.preview == nil {
 		return render.BodyDraw{}, false
 	}
+	col := model.AutoBodyColor(int(a.Doc().Seq.Body))
+	xray := false
+	if t := a.extrude.tool; t != nil && len(a.extrude.resultPreview) > 0 {
+		switch t.Result {
+		case tools.ResultSubtract:
+			// The material leaving sits inside the body it leaves, so it is
+			// drawn through the hull rather than behind it.
+			col, xray = ui.ColorError, true
+		case tools.ResultAdd, tools.ResultIntersect:
+			col = ui.ColorAccent
+		}
+	}
 	return render.BodyDraw{
 		GPU:       a.extrude.preview,
-		Color:     model.AutoBodyColor(int(a.Doc().Seq.Body)),
+		Color:     col,
+		XRay:      xray,
 		Alpha:     PreviewAlpha,
 		Transform: geom.Identity(),
 		// The scene is dimmed so this stands out. Dimming it too would leave

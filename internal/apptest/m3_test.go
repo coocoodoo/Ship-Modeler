@@ -52,7 +52,7 @@ var (
 	m3ExtrudeLine = regexp.MustCompile(
 		`^extrude depth=(-?[\d.]+) draft=(-?[\d.]+) achieved=(-?[\d.]+) ` +
 			`clamped=(\d) dir="(\w+)" through=(\d) regions=(\d+) ` +
-			`result="(\w+)" targets=(\d+) reach=(\d+)$`)
+			`result="(\w+)" targets=(\d+) reach=(\d+)`)
 	m3DocLine   = regexp.MustCompile(`undo=(\d+) redo=(\d+)`)
 	m3ToastLine = regexp.MustCompile(`^toast "(.*)"$`)
 )

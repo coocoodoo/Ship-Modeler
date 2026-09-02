@@ -1895,3 +1895,46 @@ built-in values on first launch so there is something to edit rather than a
 blank. A file that fails to parse is refused whole — a half-applied palette
 is worse than the default — and headless runs never read it, so goldens
 depend on nothing outside the repo.
+
+**V-150 · A cut previews as a cut: the combining extrudes show the result,
+not the plug.** The report came with a screenshot: Subtract chosen, the
+arrow dragged seven units into a hexagonal hull, and nothing to see but the
+arrow. The preview was there — a translucent prism at 55% — but a Subtract
+prism lives *inside* the body it is cutting, and the translucent pass draws
+after the opaque one with the depth test on, so the hull hid it completely.
+Faithful to the geometry, useless to the eye.
+
+Now the combining results (Add, Subtract, Intersect) run the commit's own
+boolean, `csg.Boolean`, against each target while the tool is open, and the
+viewport draws each target *as it would stand after Enter* — the pocket
+already cut, the boss already joined — with the pending solid riding along
+as a ghost in the vocabulary push/pull already speaks: red for material
+leaving, the accent for material joining. A body the cut would take entirely
+draws as nothing, which is what the commit would do to it. The mechanism is
+a substitution in BuildScene: a body with a pending result draws the result
+mesh in its place, unpickable, because the preview's faces are not the
+document's — and undimmed, because it is now the thing the dimming exists
+to make stand out.
+
+The first build of this was geometrically right and still invisible, which
+was instructive. The pocket's floor is lit like the face it was cut from,
+the sketch's own region fill lay exactly across the opening, and the red
+ghost sat in the hole under both. So three more things changed: the ghost
+of a cut draws **x-ray** — depth test off — because the material a cut
+removes is by definition inside the body and would otherwise never be seen
+(this is what makes the mid-body case in the report readable at all, where
+even the result preview shows nothing from outside); the active sketch's
+region fills stand down while a result stands (`SketchView.NoFills`); and
+the golden's pocket is deep enough to have walls.
+
+This reverses, for extrude, an earlier rule push/pull still keeps —
+"previews never run CSG; the boolean runs once, on release" — and the reason
+it can is a memo: the drag snaps to the grid, so a rebuild keyed on the
+build parameters runs the boolean only when the depth actually lands on a
+new value, not on every frame the pointer moves. At the sizes a pixel-art
+ship reaches, Manifold answers in single milliseconds. Push/pull is left as
+it is for now: its cut starts at the surface, so its ghost is visible where
+the extrude's was not. And a boolean that fails in the preview is the same
+failure Enter would meet, so it is said in the card and the commit is
+disabled there and then — a disabled control that says why (SPEC-UX §15)
+beats a red toast after the fact.

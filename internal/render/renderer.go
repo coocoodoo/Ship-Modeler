@@ -202,6 +202,14 @@ func (r *Renderer) drawTranslucentPass(s *Scene, vp Viewport) {
 		if b.GPU == nil || !b.GPU.uploaded || b.Alpha >= 0.999 {
 			continue
 		}
+		if b.XRay {
+			rl.DrawRenderBatchActive()
+			rl.DisableDepthTest()
+			r.drawBody(b, s.dimFor(b))
+			rl.DrawRenderBatchActive()
+			rl.EnableDepthTest()
+			continue
+		}
 		r.drawBody(b, s.dimFor(b))
 	}
 	rl.EnableBackfaceCulling()

@@ -49,6 +49,17 @@ func (a *App) BuildScene() render.Scene {
 			// are untouched and the eye puts them straight back.
 			HideTexture: a.paint.hideTextures,
 		}
+		// While an extrude is pending against this body, the body as it would
+		// stand after the commit takes its place (V-150). A nil entry is a
+		// body the cut takes entirely — the commit would delete it, so nothing.
+		if g, ok := a.extrude.resultPreview[b.ID]; ok {
+			if g == nil {
+				continue
+			}
+			// The result is the thing to look at now, so it is exempt from
+			// the dimming that exists to make the preview stand out.
+			d.GPU, d.Pickable, d.NoDim = g, false, true
+		}
 		// Hovering a body's row in the tree pre-highlights it in the viewport
 		// (SPEC-UX §7).
 		if a.TreeHover == ref {
