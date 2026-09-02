@@ -93,7 +93,11 @@ Every token above, as `#RRGGBB` / `#RRGGBBAA` strings, in `theme.json` beside `s
 
 Body auto-color cycle (8): #8EA3B0, #B08E8E, #8EB09B, #A38EB0, #B0A98E, #8E9BB0, #B08EA6, #96B08E (desaturated so paint reads on top).
 
-Type: embedded Go Regular — 13 px UI, 15 px section headers, 11 px hints/badges; line height 1.4; UI scale follows the OS display scale (raylib `GetWindowScaleDPI`) rounded to 1.0/1.25/1.5/2.0, fonts loaded at the scaled pixel size (no blurry scaling). Spacing unit 8 px; corner radius 6 px (cards 8 px); icons 18 px stroke-drawn, 1.5 px lines, round caps.
+Type: embedded Go Regular — 13 px UI, 15 px section headers, 11 px hints/badges; line height 1.4; UI scale follows the OS display scale (raylib `GetWindowScaleDPI`) rounded to 1.0/1.25/1.5/2.0, fonts loaded at the scaled pixel size (no blurry scaling). Spacing unit 8 px; corner radius 6 px (cards 8 px); icons drawn at 18 px (14 px in tree rows).
+
+Icons are SVG assets under `internal/ui/icons/`, rasterized in-house at load into white alpha masks and tinted at draw time, so one asset serves every colour and state (V-147, engine rebuilt V-154). The engine reads `<path>` with M L H V C S Q T Z, `viewBox`, `fill`, `fill-rule`, `stroke`, `stroke-width` and `stroke-linecap`; no arcs (author them as cubics). Strokes are stamped as a quad per segment plus a disc per joint and round cap, filled nonzero — joins are always round. Coverage is exact rather than sampled: 16 sub-scanlines per pixel row with analytic horizontal coverage. Every `Draw*Icon` tries its SVG first and falls back to its procedural strokes if the asset is missing or malformed, so a bad file degrades to the old look rather than a hole.
+
+**The set's rules**: a 24×24 grid, 2-unit strokes, round caps and joins, ~2 units of margin, and no detail finer than 2 units — anything smaller does not survive 18 px. Fills are used only where a stroke cannot say it: a pupil, a handle knob, a solid arrowhead. Two icons that sit next to each other must not read alike (the eyedropper keeps its bulb because the pencil is beside it; the mid-line takes end knobs because the point tool is a cross). `ICON_SHEET=<dir> go test ./internal/ui/ -run Icon` writes contact sheets of the whole set at 18 and 48 px, which is how it is reviewed.
 
 ## 4. Widget set (FROZEN at M1 — additions need a DECISIONS entry)
 

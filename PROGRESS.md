@@ -2,10 +2,43 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** 4,442 palettes ship with the program, chosen from a
-searchable list (V-152). The palette sidebar (V-151), live cut previews
-(V-150) and the colour system (V-149) shipped just before. Suite green, exe
-rebuilt, pushed.
+**Current state:** The icon set is redrawn as strokes on a rebuilt
+rasterizer (V-154). Shift+F looks square-on (V-153), 4,442 palettes ship in
+a searchable list (V-152), and the palette is a sliding sidebar (V-151).
+Suite green, exe rebuilt, pushed.
+
+---
+
+## 2026-09-02 — The icons redrawn as strokes (V-154)
+
+**Request:** "Use SVG to make high quality icons and rasterize them to the
+program. The current icons feel low quality."
+
+**Cause was the engine, not the drawing.** V-147's renderer could only fill,
+so every icon had to be hand-built as a silhouette — several rasterized to
+indistinguishable blobs, weights wandered, and holes depended on even-odd.
+
+**Engine rebuilt:** strokes (quad per segment, disc per joint and round cap,
+nonzero union — no mitre maths, no spikes), real winding (nonzero default,
+even-odd on request), and exact-coverage antialiasing (16 sub-scanlines,
+analytic horizontal coverage) in place of 4×4 point sampling.
+
+**All 53 icons redrawn** on one system: 24×24 grid, 2-unit round-capped
+strokes, ~2 units margin, nothing finer than 2 units. Fills only for pupils,
+knobs and arrowheads.
+
+**Caught by reviewing at size:** gradient read as paragraph text (now a
+filled ramp wedge); settings read as a rifle scope (now two sliders, since a
+gear is mush at 18 px); the eyedropper was a twin of the pencil beside it
+(kept its bulb); point-tool and mid-line were both a cross (mid-line took end
+knobs); Move's arrowheads were too small to register. `IconMask`/`IconNames`
+are exported so a test writes contact sheets with no GPU — that is how each
+of those was found.
+
+**Goldens:** every UI shot changed. Diffed a fresh render against its
+baseline first — 0.47% of pixels, every cluster an icon (toolbar, the tree's
+icon column, the paint tool rows, the view cube's buttons), the viewport
+untouched — then regenerated.
 
 ---
 
