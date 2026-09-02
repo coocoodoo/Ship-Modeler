@@ -3,13 +3,27 @@
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
 **Current state:** 4,442 palettes ship with the program, chosen from a
-searchable list (V-153). The palette sidebar (V-151), live cut previews
+searchable list (V-152). The palette sidebar (V-151), live cut previews
 (V-150) and the colour system (V-149) shipped just before. Suite green, exe
 rebuilt, pushed.
 
 ---
 
-## 2026-09-02 — The palette library (V-153)
+## 2026-09-02 — Shift+F looks square-on (V-153)
+
+**Request:** a spare key to focus the camera on a plane.
+
+Half existed: F frames a selected plane, but from wherever you stand, and the
+view cube turns square-on without knowing what is selected. Shift+F is F plus
+the turn — square-on to the selected plane or face, then framed. Picks the
+nearer side (a plane's normal has no preferred sign), declines when two faces
+disagree about which way is out, and falls back to plain framing when nothing
+flat is picked. New op `camera.lookat`, golden `m0_lookat`, and a test that
+pins the camera to the plane's normal within half a degree.
+
+---
+
+## 2026-09-02 — The palette library (V-152)
 
 **Request:** a menu to change colour palettes, as a list — with a zip of
 4,442 Lospec palettes attached.

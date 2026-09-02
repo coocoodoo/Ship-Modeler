@@ -122,6 +122,9 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 	case "camera.frame":
 		a.FrameSelection(vp)
 
+	case "camera.lookat":
+		a.LookAtSelection(vp)
+
 	case "camera.orbit":
 		a.Anim.Cancel()
 		a.Camera.Orbit(op.Degrees/render.OrbitDegPerPixel, 0)

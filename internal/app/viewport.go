@@ -368,6 +368,61 @@ func (a *App) FrameSelection(vp render.Viewport) {
 	a.Anim.Start(a.Camera, to)
 }
 
+// LookAtSelection turns the camera square-on to the selected plane or face
+// and frames it (V-153).
+//
+// F frames what is picked from wherever you happen to be standing, which is
+// the right answer for a body. For a flat thing it is the wrong one: a plane
+// seen at an angle is a parallelogram, and the one question you have about a
+// plane — what is on it, and where — is answered only by looking straight at
+// it. So Shift+F is F plus the turn.
+//
+// With nothing flat picked it falls back to plain framing rather than
+// refusing: the key still did the nearest useful thing to what was asked.
+func (a *App) LookAtSelection(vp render.Viewport) {
+	n, ok := a.selectionNormal()
+	if !ok {
+		a.FrameSelection(vp)
+		return
+	}
+	// Face the surface from the side its normal points at. A plane's normal
+	// is arbitrary in sign, so the nearer of the two faces is chosen: turning
+	// 180° to look at the same flat thing from behind is never what was meant.
+	if n.Dot(a.targetCamera().Forward()) > 0 {
+		n = n.Neg()
+	}
+	s := a.BuildScene()
+	box := a.selectionBounds(&s)
+	if !box.Valid() {
+		box = scene.FrameAll(&s)
+	}
+	to := a.targetCamera()
+	to.LookAlong(n)
+	to.FrameBox(box, vp.Aspect())
+	a.Anim.Start(a.Camera, to)
+}
+
+// selectionNormal is the normal of the one flat thing selected — a default
+// plane, or a face of a body — and whether there was exactly one to find.
+func (a *App) selectionNormal() (geom.Vec3, bool) {
+	var out geom.Vec3
+	found := 0
+	for _, ref := range a.Sel.Refs() {
+		switch ref.Kind {
+		case model.SelPlane:
+			out, found = geom.PlaneFrame(ref.Plane).N, found+1
+		case model.SelFace:
+			f, ok := a.resolveFace(ref.Body, ref.Face)
+			if !ok {
+				continue
+			}
+			out, found = f.body.Mesh.FaceNormal(f.face), found+1
+		}
+	}
+	// Two faces pointing different ways have no one direction to look from.
+	return out, found == 1
+}
+
 // previewOwnsView reports that a translucent preview is being dragged: an open
 // extrude, or a push/pull drag that has moved.
 //
@@ -611,7 +666,11 @@ func (a *App) handleGlobalKeys(in InputFrame, vp render.Viewport) {
 		a.Camera.Normalize()
 	}
 	if in.KeyPressed(rl.KeyF) {
-		a.FrameSelection(vp)
+		if in.Shift {
+			a.LookAtSelection(vp)
+		} else {
+			a.FrameSelection(vp)
+		}
 	}
 	if in.KeyPressed(rl.KeySlash) && in.Shift {
 		a.showShortcuts = !a.showShortcuts

@@ -220,6 +220,7 @@ var knownOps = map[string]bool{
 	"hover": true, "click": true, "drag": true, "drag.release": true,
 	"ui.tree":     true,
 	"camera.view": true, "camera.frame": true, "camera.orbit": true,
+	"camera.lookat": true,
 	"camera.zoom": true, "camera.project": true,
 	"settle": true, "shot": true, "pick": true, "dump": true,
 	"view.ao": true, "view.shading": true,

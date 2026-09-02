@@ -1,0 +1,23 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"settle"},
+  {"op":"dump"},
+
+  {"op":"select","kind":"plane","plane":"Right"},
+  {"op":"camera.lookat"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m0_lookat_plane"},
+
+  {"op":"deselect"},
+  {"op":"camera.view","view":"iso"},
+  {"op":"settle"},
+  {"op":"select","kind":"face","body":"Hull","axis":"+y"},
+  {"op":"camera.lookat"},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m0_lookat_face"}
+]

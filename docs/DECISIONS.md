@@ -1980,7 +1980,7 @@ P, not Esc: P always leaves the mode, while Esc backs out one level at a
 time — a live stroke, then the wand selection, then the edge selection, then
 the lock — and only reaches the mode when nothing else is pending.
 
-**V-153 · The palette library: four thousand palettes as a list, not a file
+**V-152 · The palette library: four thousand palettes as a list, not a file
 dialog.** The user arrived with a collection of 4,442 Lospec palettes and
 asked for a menu to change between them. The existing answer was Import .hex
 — a file dialog, which is the right tool only when you already know which
@@ -2025,3 +2025,29 @@ a question nobody has asked yet.
 label beside a strip of colours, with a "+" when the set is longer than the
 strip, since showing the first fourteen of a hundred without saying so is a
 lie about the set.
+
+**V-153 · Shift+F looks square-on at a plane.** The ask was a spare key to
+point the camera at a plane. Half of it already existed and neither half was
+the whole: F frames a selected plane — `selectionBounds` has understood
+planes since V-129 — but frames it from wherever you are standing, and the
+view cube turns square-on to the three axis directions but knows nothing
+about what you have selected.
+
+Framing from an angle is right for a body and wrong for anything flat: a
+plane seen obliquely is a parallelogram, and the one question you have about
+a plane — what is on it, and where — is only answered looking straight at it.
+So Shift+F is F plus the turn, and it works on a face as readily as a plane,
+which is the same want one level down.
+
+Three details. The normal's sign is arbitrary on a plane, so the nearer of
+the two sides is chosen — turning 180° to look at the same flat thing from
+behind is never what was meant. Two faces pointing different ways have no
+single direction to look from, so a multi-face selection declines and falls
+back to plain framing rather than picking one arbitrarily. And with nothing
+flat selected at all it simply frames, because the key should still do the
+nearest useful thing rather than nothing.
+
+Shift+F rather than a bare letter: F already means "frame", the shifted key
+reads as a stronger version of it, and it cannot collide with the mode-local
+letters (the sketch and paint tool keys own most of the alphabet between
+them). `camera.lookat` drives it from a script.

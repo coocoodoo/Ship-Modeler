@@ -663,6 +663,7 @@ func shortcutSheet() []ui.Shortcut {
 		{Keys: "Shift+Right-drag", Description: "Pan"},
 		{Keys: "Wheel", Description: "Zoom to cursor"},
 		{Keys: "F", Description: "Frame selection"},
+		{Keys: "Shift+F", Description: "Look square-on at the selected plane or face"},
 		{Keys: "O", Description: "Orthographic / perspective"},
 		{Section: "Tools"},
 		{Keys: "S", Description: "Sketch"},

@@ -11,7 +11,7 @@ Camera navigation works identically in **every** mode:
 - **RMB-drag** orbit (turntable, world-up locked, no roll)
 - **MMB-drag** or **Shift+RMB** pan
 - **Wheel** zoom to cursor (ortho: scale; persp: dolly), smoothed ~120 ms
-- **F** frame selection (or all if none); **O** toggle ortho/perspective
+- **F** frame selection (or all if none); **Shift+F** look square-on at the selected plane or face and frame it (V-153; falls back to plain framing when nothing flat is selected, and declines when two faces disagree about which way is out); **O** toggle ortho/perspective
 - View cube & triad always visible (§6)
 
 **LMB is the "do" button** and is mode-owned: select in Idle, draw in Sketch, drag gizmos in Extrude/Transform, paint in Paint. LMB never orbits.
@@ -97,7 +97,7 @@ Type: embedded Go Regular — 13 px UI, 15 px section headers, 11 px hints/badge
 
 ## 4. Widget set (FROZEN at M1 — additions need a DECISIONS entry)
 
-button · icon button (with tooltip) · toggle/eye · slider · **drag-number field** (drag to scrub w/ snap, click to type, Enter commit / Esc revert, unit suffix "u"/"°"/"px") · text field (rename) · tree row (icon, eye, label, swatch, hover actions) · color swatch + HSV popover picker · chip group (exclusive, e.g. 16/32/128/256/512) · tooltip (600 ms delay, shows shortcut) · toast (bottom-center, 3 s, max 3 stacked, may carry one action e.g. **Undo**) · floating card (title, body, ✓/✕ footer) · hint bar · modal confirm (rare — only recovery prompt & overwrite-on-export) · shortcut overlay (`?`) · **swatch row** (label + strip of its colours, `+` when the set is longer than the strip; added V-153 for the palette library).
+button · icon button (with tooltip) · toggle/eye · slider · **drag-number field** (drag to scrub w/ snap, click to type, Enter commit / Esc revert, unit suffix "u"/"°"/"px") · text field (rename) · tree row (icon, eye, label, swatch, hover actions) · color swatch + HSV popover picker · chip group (exclusive, e.g. 16/32/128/256/512) · tooltip (600 ms delay, shows shortcut) · toast (bottom-center, 3 s, max 3 stacked, may carry one action e.g. **Undo**) · floating card (title, body, ✓/✕ footer) · hint bar · modal confirm (rare — only recovery prompt & overwrite-on-export) · shortcut overlay (`?`) · **swatch row** (label + strip of its colours, `+` when the set is longer than the strip; added V-152 for the palette library).
 
 Toolbar buttons show: icon + label + shortcut in tooltip; active tool = accent underline + tinted icon.
 
@@ -297,7 +297,7 @@ Palette  [32 swatches, 8×4]
 ### 13.3 Palette
 Default: embedded original 32-color palette tuned for spaceship greys/hull/accent/glow ramps (author in code, document in README). Custom colors via HSV popover; recents auto-track 8. **Import .hex** (Lospec format: one RRGGBB per line) via file dialog, replaces "custom" page, never the built-in page.
 
-### 13.3a Palette library (V-153)
+### 13.3a Palette library (V-152)
 
 **Palettes…** in the paint sidebar opens the library: a search box over one scrolling list of every palette on offer — the ~4,400 bundled with the program, plus anything in `%APPDATA%\Modeler\palettes\` (`.hex` or `.txt`, one `#RRGGBB` per line), which is listed first. Each row is the palette's name beside a strip of its colours, with a `+` when it holds more than the strip shows. Search matches every word in any order. The wheel scrolls by whole rows; the scrollbar is a position readout, not a control. Clicking a row puts it on the custom page — never over the built-in one — and the page's chip takes the palette's name. The choice is remembered between sessions. Esc or **Close** dismisses the list; **Import .hex…** inside it is the old file dialog, for a palette that is not in the collection.
 
