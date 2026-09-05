@@ -2,49 +2,19 @@ package render
 
 import (
 	"math"
-	"testing"
-
 	"modeler/internal/geom"
 	"modeler/internal/geom/mesh"
+	"testing"
 )
 
-// Shading tessellation (the user's report, 2026-08-28): "I really don't see
-// ambient occlusion."
-//
-// It was baking correctly and had nowhere to land. Openness is a corner value
-// interpolated across the face, and a CAD face is a handful of big flat
-// polygons with no interior corners — so on the inside floor of a box, all
-// four corners are equally occluded and the interpolation of four equal
-// numbers is a constant. The face came out uniformly dimmer, which reads as a
-// darker shade rather than as a shadow in a corner. These tests pin the fix:
-// the render mesh gets interior vertices for the falloff to live on.
-
-func TestAFaceWithSomethingInFrontOfItGetsInteriorVertices(t *testing.T) {
+// Screen-space shading must not add triangles or change model geometry.
+func TestConcaveMeshNeedsNoShadingTessellation(t *testing.T) {
 	m := stepMesh()
 	g := BuildBodyGPU(m)
-
-	// The step's ledge is 8 x 4 units with the tower standing on it. Before
-	// this it had four corners and two triangles, and every point on it took
-	// its shading from those four — which is why the whole ledge came out one
-	// flat tone instead of dark against the wall.
-	fi := faceAlong(m, geom.Vec3{Y: 1})
-	interior := 0
-	lo, hi := faceBoundsIn(m, fi)
-	for i := 0; i < g.VertCount; i++ {
-		if g.vertFace[i] != fi {
-			continue
-		}
-		p := vertAt(g, i)
-		if p.X > lo.X+1e-6 && p.X < hi.X-1e-6 && p.Z > lo.Z+1e-6 && p.Z < hi.Z-1e-6 {
-			interior++
-		}
-	}
-	if interior == 0 {
-		t.Fatal("the ledge still has no vertex strictly inside it, so any " +
-			"corner falloff across it can only be a straight ramp between corners")
+	if g.TriCount != len(m.Triangulate()) {
+		t.Fatal("AO still adds render triangles")
 	}
 }
-
 func TestTessellationLeavesEveryVertexOnItsOwnFace(t *testing.T) {
 	m := stepMesh()
 	g := BuildBodyGPU(m)
@@ -91,32 +61,6 @@ func TestAConvexBodyIsNotSubdividedAtAll(t *testing.T) {
 	}
 }
 
-// The point of the whole exercise. On the ledge of a step, openness has to
-// climb as you walk away from the wall — not sit at one value for the whole
-// face, which is what a four-corner face gave.
-func TestOpennessClimbsAwayFromAWall(t *testing.T) {
-	m := stepMesh()
-	g := BuildBodyGPU(m)
-	BakeAO(g, m)
-
-	up := geom.Vec3{Y: 1}
-	var last byte
-	var lastZ float64
-	for i, z := range []float64{0.25, 1, 2, 3} {
-		got, ok := openness(g, geom.Vec3{X: 0, Y: 1, Z: z}, up)
-		if !ok {
-			t.Fatalf("no rendered corner near z=%v on the ledge", z)
-		}
-		if i > 0 && got <= last {
-			t.Errorf("openness at z=%v is %d, no lighter than %d at z=%v — "+
-				"the falloff away from the wall is flat", z, got, last, lastZ)
-		}
-		last, lastZ = got, z
-	}
-}
-
-// faceAlong is in ao_test.go's fixture family; these helpers keep the reads
-// above short.
 func vertAt(g *BodyGPU, i int) geom.Vec3 {
 	return geom.Vec3{
 		X: float64(g.positions[i*3]),
@@ -125,24 +69,27 @@ func vertAt(g *BodyGPU, i int) geom.Vec3 {
 	}
 }
 
-func faceBoundsIn(m *mesh.Mesh, fi int) (lo, hi geom.Vec3) {
-	lo = geom.Vec3{X: math.Inf(1), Y: math.Inf(1), Z: math.Inf(1)}
-	hi = geom.Vec3{X: math.Inf(-1), Y: math.Inf(-1), Z: math.Inf(-1)}
-	for _, loop := range m.Faces[fi].Loops {
-		for _, vi := range loop {
-			p := m.Verts[vi]
-			lo = geom.Vec3{X: math.Min(lo.X, p.X), Y: math.Min(lo.Y, p.Y), Z: math.Min(lo.Z, p.Z)}
-			hi = geom.Vec3{X: math.Max(hi.X, p.X), Y: math.Max(hi.Y, p.Y), Z: math.Max(hi.Z, p.Z)}
-		}
+func stepMesh() *mesh.Mesh {
+	// A plate with a tower on its back half, stitched watertight: the ledge
+	// top meets the step wall along y=1, z=0 - a genuine concave junction.
+	m := &mesh.Mesh{
+		Verts: []geom.Vec3{
+			{X: -4, Y: 0, Z: -4}, {X: 4, Y: 0, Z: -4}, {X: 4, Y: 0, Z: 4}, {X: -4, Y: 0, Z: 4},
+			{X: -4, Y: 1, Z: -4}, {X: 4, Y: 1, Z: -4},
+			{X: 4, Y: 1, Z: 0}, {X: -4, Y: 1, Z: 0},
+			{X: -4, Y: 1, Z: 4}, {X: 4, Y: 1, Z: 4},
+			{X: -4, Y: 4, Z: -4}, {X: 4, Y: 4, Z: -4}, {X: 4, Y: 4, Z: 0}, {X: -4, Y: 4, Z: 0},
+		},
+		Faces: []mesh.Face{
+			{ID: mesh.MakeFaceUID(1, 1), Loops: [][]int{{0, 1, 2, 3}}},            // bottom
+			{ID: mesh.MakeFaceUID(1, 2), Loops: [][]int{{8, 9, 6, 7}}},            // ledge top
+			{ID: mesh.MakeFaceUID(1, 3), Loops: [][]int{{7, 6, 12, 13}}},          // step wall +z
+			{ID: mesh.MakeFaceUID(1, 4), Loops: [][]int{{10, 13, 12, 11}}},        // tower top
+			{ID: mesh.MakeFaceUID(1, 5), Loops: [][]int{{3, 2, 9, 8}}},            // front +z
+			{ID: mesh.MakeFaceUID(1, 6), Loops: [][]int{{0, 4, 10, 11, 5, 1}}},    // back -z
+			{ID: mesh.MakeFaceUID(1, 7), Loops: [][]int{{0, 3, 8, 7, 13, 10, 4}}}, // left -x
+			{ID: mesh.MakeFaceUID(1, 8), Loops: [][]int{{1, 5, 11, 12, 6, 9, 2}}}, // right +x
+		},
 	}
-	return lo, hi
-}
-
-func faceAlong(m *mesh.Mesh, n geom.Vec3) int {
-	for i := range m.Faces {
-		if m.FaceNormal(i).Dot(n) > 0.999 {
-			return i
-		}
-	}
-	panic("no face along that normal")
+	return m
 }

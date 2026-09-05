@@ -94,7 +94,22 @@ func (a *App) buildShell(l Layout) {
 	if a.BoxSelecting() {
 		a.drawBoxRect()
 	}
-	a.UI.HintBar(l.HintBar, a.modeName(), a.HintText(), Version)
+	aoBox, hintBox := ui.SplitLeft(l.HintBar, a.px(104))
+	a.UI.HintBar(hintBox, a.modeName(), a.HintText(), Version)
+	a.UI.Panel(aoBox)
+	a.UI.HairlineH(aoBox.X, aoBox.Y, aoBox.Width, ui.ColorStroke)
+	a.UI.HairlineV(aoBox.X+aoBox.Width, aoBox.Y+a.px(6), aoBox.Height-a.px(12), ui.ColorStroke)
+	label := "AO Off"
+	on := a.Settings.AO > 0 && !a.Settings.FlatShading
+	if on {
+		label = "AO On"
+	}
+	if a.UI.IconButton(ui.MakeID("view.ao"), ui.InsetXY(aoBox, a.px(6), a.px(3)), ui.DrawAOIcon, ui.IconOpts{
+		Label: label, Active: on, Accent: ui.AccentModel,
+		Tooltip: "Ambient occlusion — soft contact shadows between surfaces",
+	}) {
+		a.ToggleAO()
+	}
 
 	// The tree's hover feeds the viewport highlight, and the viewport's hover
 	// feeds the tree's — whichever one is live this frame wins.
@@ -392,11 +407,11 @@ func (a *App) planeRow(r rl.Rectangle, k geom.PlaneKind) {
 		Label:     k.String(),
 		Icon:      ui.DrawPlaneIcon,
 		IconColor: planeAccent(k),
-		Visible:  visible,
-		HasEye:   true,
-		Selected: a.Sel.Contains(ref),
-		Indent:   1,
-		Dim:      !visible,
+		Visible:   visible,
+		HasEye:    true,
+		Selected:  a.Sel.Contains(ref),
+		Indent:    1,
+		Dim:       !visible,
 	})
 	if res.Hovered {
 		a.tree.hovered = ref

@@ -77,7 +77,10 @@ type PlaneDraw struct {
 // GridDraw is the sketch-mode grid: minor and major lines on a frame, fading
 // out as the spacing drops below a few pixels (SPEC-UX §8.1).
 type GridDraw struct {
-	Frame     geom.Frame
+	Frame geom.Frame
+	// Origin is the lattice origin in frame coordinates; the sheet stays
+	// centered on Frame.O even when a face's grid is anchored to world space.
+	Origin    geom.Vec2
 	HalfSize  float64
 	MinorStep float64
 	MajorStep float64
@@ -104,9 +107,8 @@ type Scene struct {
 	// sketch mode dims the rest of the model to 30% (SPEC-UX §8.1).
 	DimFactor float64
 
-	// AO is the baked ambient occlusion's strength, 0 to 1. The bake lives in
-	// the vertex data; this only scales how dark it reads, so the setting can
-	// change without rebuilding anything.
+	// AO is screen-space ambient occlusion strength, 0 to 1. At zero the GPU
+	// prepasses are skipped completely. It never changes mesh or paint data.
 	AO float64
 
 	// Flat turns the two-light model and the AO term off, so painted texels

@@ -24,6 +24,10 @@ const StampAlphaThreshold = 128
 // StampRect writes a tile's pixels with its min corner at a texel, clipped to
 // a rectangle, and returns the exact rect of texels it changed.
 func StampRect(p *mesh.FacePaint, tile *image.RGBA, at image.Point, clip image.Rectangle) image.Rectangle {
+	return stampRect(p, tile, at, clip, false)
+}
+
+func stampRect(p *mesh.FacePaint, tile *image.RGBA, at image.Point, clip image.Rectangle, preserveAlpha bool) image.Rectangle {
 	if p == nil || tile == nil {
 		return image.Rectangle{}
 	}
@@ -32,14 +36,16 @@ func StampRect(p *mesh.FacePaint, tile *image.RGBA, at image.Point, clip image.R
 	for y := 0; y < b.Dy(); y++ {
 		for x := 0; x < b.Dx(); x++ {
 			c := tile.RGBAAt(b.Min.X+x, b.Min.Y+y)
-			if c.A < StampAlphaThreshold {
+			if c.A == 0 || (!preserveAlpha && c.A < StampAlphaThreshold) {
 				continue
 			}
 			t := image.Point{X: at.X + x, Y: at.Y + y}
 			if !t.In(clip) {
 				continue
 			}
-			c.A = 255
+			if !preserveAlpha {
+				c.A = 255
+			}
 			if Set(p, t, c) {
 				dirty = union(dirty, oneTexel(t))
 			}
@@ -65,6 +71,9 @@ type StampFace struct {
 	Tile *image.RGBA
 	// Cells are the min corners the tile lands at, in the order stamped.
 	Cells []image.Point
+	// PreserveAlpha pastes copied paint without the imported tile's alpha
+	// threshold. Empty source pixels leave the destination untouched.
+	PreserveAlpha bool
 
 	// Filled in by Do.
 	paint     *mesh.FacePaint
@@ -75,6 +84,9 @@ type StampFace struct {
 }
 
 func (c *StampFace) Name() string {
+	if c.PreserveAlpha {
+		return "Paste pixels"
+	}
 	if len(c.Cells) > 1 {
 		return "Stamp tiles"
 	}
@@ -152,7 +164,7 @@ func (c *StampFace) Do(doc *model.Document) error {
 
 	wrote := image.Rectangle{}
 	for _, cell := range c.Cells {
-		wrote = union(wrote, StampRect(p, c.Tile, cell, face))
+		wrote = union(wrote, stampRect(p, c.Tile, cell, face, c.PreserveAlpha))
 	}
 	if wrote.Empty() {
 		return fmt.Errorf("that stamp did not change anything")

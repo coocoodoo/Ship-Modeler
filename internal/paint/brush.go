@@ -39,6 +39,8 @@ const (
 	// ToolWand selects a region of similar colour by flooding from a click,
 	// within a tolerance; the other tools then paint only inside it (V-145).
 	ToolWand
+	ToolSelect
+	ToolPaste
 )
 
 // Tools lists them in the order the panel draws them: the ones that paint where
@@ -46,10 +48,15 @@ const (
 var Tools = []Tool{
 	ToolPencil, ToolBrush, ToolEraser, ToolFill, ToolPick, ToolWand,
 	ToolLine, ToolRect, ToolCircle, ToolGradient, ToolEdge, ToolTile,
+	ToolSelect, ToolPaste,
 }
 
 func (t Tool) String() string {
 	switch t {
+	case ToolSelect:
+		return "Select"
+	case ToolPaste:
+		return "Paste"
 	case ToolBrush:
 		return "Brush"
 	case ToolEraser:
@@ -102,6 +109,10 @@ func ParseTool(s string) (Tool, bool) {
 // Shortcut is the key that arms a tool, listed in the palette panel.
 func (t Tool) Shortcut() string {
 	switch t {
+	case ToolSelect:
+		return "U"
+	case ToolPaste:
+		return "Ctrl+V"
 	case ToolBrush:
 		return "B"
 	case ToolEraser:

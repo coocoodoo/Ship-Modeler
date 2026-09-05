@@ -101,11 +101,12 @@ func (a *App) buildPaintPanel(bar rl.Rectangle) {
 	// selection row shows under every tool, because the selection constrains
 	// every tool (V-145).
 	showWand := st.tool == paint.ToolWand
+	showClipboard := st.tool == paint.ToolSelect || st.tool == paint.ToolPaste
 	haveWandSel := st.wandMask != nil
 	// The brush's square is meaningless to the edge tool, which has its own
 	// width, and to the tile tool, whose size is the tile's. A control that
 	// does nothing is worse than an absent one.
-	showSize := !showEdges && !showTiles && !showWand
+	showSize := !showEdges && !showTiles && !showWand && !showClipboard
 
 	inner := ui.InsetXY(bar, a.px(ui.Spacing+2), a.px(6))
 
@@ -114,6 +115,7 @@ func (a *App) buildPaintPanel(bar rl.Rectangle) {
 	titleBox, rest := ui.SplitTop(inner, a.UI.Fonts.LineHeight(ui.FontSizeHeader)+a.px(4))
 	ui.FillRect(ui.Rect(bar.X, titleBox.Y, a.px(3), titleBox.Height), ui.ColorAccent)
 	a.UI.Text(titleBox, "Paint", ui.FontSizeHeader, ui.ColorAccent)
+	a.buildPixelClipboardActions(titleBox)
 	a.UI.HairlineH(bar.X, titleBox.Y+titleBox.Height+a.px(4), bar.Width, ui.Fade(ui.ColorAccent, 0.35))
 	rest.Y += a.px(10)
 	rest.Height -= a.px(10)
@@ -199,8 +201,12 @@ func (a *App) buildPaintPanel(bar rl.Rectangle) {
 		a.buildTileSection(row, space, line)
 		space(6)
 	}
+	if showClipboard {
+		a.buildPixelClipboardSection(row, line)
+		space(6)
+	}
 
-	if len(st.custom) > 0 && !showTiles {
+	if len(st.custom) > 0 && !showTiles && !showClipboard {
 		// The second page carries the palette's own name once one has been
 		// chosen from the library — "Imported" describes where it came from,
 		// which is the one thing you already know.
@@ -219,7 +225,7 @@ func (a *App) buildPaintPanel(bar rl.Rectangle) {
 		space(4)
 	}
 
-	if !showTiles {
+	if !showTiles && !showClipboard {
 		a.UI.Text(row(line), "Palette", ui.FontSizeSmall, ui.ColorTextDim)
 		a.paintPaletteGrid(row(float32(paintPaletteRows)*(swatch+gap)), swatch, gap)
 		space(6)

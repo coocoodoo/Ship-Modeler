@@ -99,7 +99,7 @@ func PollInput(dtMillis float64) InputFrame {
 	d := rl.GetMouseDelta()
 	f.MouseX, f.MouseY = float64(pos.X), float64(pos.Y)
 	f.MouseDX, f.MouseDY = float64(d.X), float64(d.Y)
-	f.Wheel = float64(rl.GetMouseWheelMove())
+	f.Wheel = verticalWheelNotches(rl.GetMouseWheelMoveV())
 
 	buttons := [3]rl.MouseButton{rl.MouseLeftButton, rl.MouseRightButton, rl.MouseMiddleButton}
 	for i, b := range buttons {
@@ -141,3 +141,8 @@ func PollInput(dtMillis float64) InputFrame {
 	f.DeltaMillis = dtMillis
 	return f
 }
+
+// The scalar raylib wheel helper selects the larger of X and Y. A tilt
+// wheel/trackpad can therefore reverse an upward scroll when X is negative.
+// Navigation and paste rotation both follow vertical movement exclusively.
+func verticalWheelNotches(move rl.Vector2) float64 { return float64(move.Y) }

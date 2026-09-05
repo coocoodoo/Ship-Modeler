@@ -254,9 +254,11 @@ func (c *Context) FloatingCard(id ID, r rl.Rectangle, title string, opts Floatin
 	titleBox, rest := SplitTop(inner, c.Fonts.LineHeight(FontSizeHeader))
 	// The title wears the mode's colour, with a stripe down the card's edge
 	// beside it: which tool this card belongs to is the first thing it says.
-	FillRect(Rect(r.X, titleBox.Y, c.Px(3), titleBox.Height), ColorAccent)
-	c.Text(titleBox, title, FontSizeHeader, ColorAccent)
-	c.HairlineH(r.X, titleBox.Y+titleBox.Height+c.Px(4), r.Width, Fade(ColorAccent, 0.35))
+	FillRect(Rect(titleBox.X, titleBox.Y+c.Px(4), c.Px(3), titleBox.Height-c.Px(8)), ColorAccent)
+	titleBox.X += c.Px(10)
+	titleBox.Width -= c.Px(10)
+	c.Text(titleBox, title, FontSizeHeader, ColorText)
+	c.HairlineH(inner.X, titleBox.Y+titleBox.Height+c.Px(4), inner.Width, ColorStroke)
 	rest.Y += c.Px(8)
 	rest.Height -= c.Px(8)
 
@@ -321,8 +323,8 @@ func (c *Context) HintBar(r rl.Rectangle, mode, text, version string) {
 		chipW := c.TextWidth(mode, FontSizeSmall) + c.Px(Spacing*2)
 		chipBox, rest := SplitLeft(inner, chipW)
 		chip := InsetXY(chipBox, 0, c.Px(5))
-		c.FillRounded(chip, CornerRadius, ColorAccent)
-		c.TextCentered(chip, mode, FontSizeSmall, ColorBG)
+		c.FillRounded(chip, 4, Fade(ColorAccent, 0.14))
+		c.TextCentered(chip, mode, FontSizeSmall, ColorAccent)
 		inner = rest
 		inner.X += c.Px(Spacing)
 		inner.Width -= c.Px(Spacing)

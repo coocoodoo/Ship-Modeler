@@ -191,12 +191,14 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 	// A wheel notch at a point: `at` moves the pointer there first, so a
 	// script says where it is scrolling as well as how far.
 	case "wheel":
+		r.mods = mods{shift: op.Shift, ctrl: op.Ctrl, alt: op.Alt}
 		if op.At != nil {
 			r.mouse = [2]float64{op.At[0], op.At[1]}
 			r.moved = true
 		}
 		r.wheel = op.Degrees
 		r.step()
+		r.mods = mods{}
 
 	case "click":
 		r.mods = mods{shift: op.Shift, ctrl: op.Ctrl, alt: op.Alt}

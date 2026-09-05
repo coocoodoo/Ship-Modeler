@@ -77,6 +77,8 @@ func (s Snap) HasGuide() bool { return s.Infer != InferNone }
 type Config struct {
 	// GridStep is the snap lattice in subunits; zero disables the grid.
 	GridStep int64
+	// GridOrigin anchors the lattice independently of the sketch's local zero.
+	GridOrigin geom.Vec2i
 	// SubunitsPerPixel converts the pixel radii above into sketch distance, so
 	// snapping feels the same at every zoom level.
 	SubunitsPerPixel float64
@@ -133,17 +135,20 @@ func Resolve(cursor geom.Vec2i, ents []model.Entity, from *geom.Vec2i, cfg Confi
 			p := *from
 			switch inf {
 			case InferHorizontal:
-				p.X = snapTo(cursor.X, cfg.GridStep)
+				p.X = cfg.GridOrigin.X + snapTo(cursor.X-cfg.GridOrigin.X, cfg.GridStep)
 			case InferVertical:
-				p.Y = snapTo(cursor.Y, cfg.GridStep)
+				p.Y = cfg.GridOrigin.Y + snapTo(cursor.Y-cfg.GridOrigin.Y, cfg.GridStep)
 			}
 			return Snap{Point: p, Kind: SnapGrid, Infer: inf, From: *from}
 		}
 	}
 
 	return Snap{
-		Point: geom.Vec2i{X: snapTo(cursor.X, cfg.GridStep), Y: snapTo(cursor.Y, cfg.GridStep)},
-		Kind:  SnapGrid,
+		Point: cfg.GridOrigin.Add(geom.Vec2i{
+			X: snapTo(cursor.X-cfg.GridOrigin.X, cfg.GridStep),
+			Y: snapTo(cursor.Y-cfg.GridOrigin.Y, cfg.GridStep),
+		}),
+		Kind: SnapGrid,
 	}
 }
 

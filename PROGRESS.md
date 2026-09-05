@@ -2,10 +2,145 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** The brush has an alpha slider and translucent paint that
-composites properly, and exports no longer blacken unpainted texels (V-158).
-The executable and its window carry the program's own icon (V-157). Suite
-green, exe rebuilt, pushed.
+**Current state:** Paint now supports rectangular pixel selection and copying
+between faces, with a placement preview, session clipboard and undo/redo.
+Plane/face grids share a world reference. The interface has
+consistent outline icons and clearer typography. Live screen-space ambient
+occlusion replaces the vertex bake, with a persistent bottom-left toggle.
+Full suite green; modeler.exe and modeler-release.exe rebuilt. Changes are local.
+
+---
+
+## 2026-09-05 — Paste corner and rotation mini menu
+
+**Done:** Right-click during pixel placement opens a clamped mini menu with
+all four cursor anchor corners, the four quarter-turn angles, and Cancel.
+Preview and stamping share the corner offset, including rotated dimensions.
+Cancel, outside-click and Escape dismiss without painting or changing the
+paste. The menu blocks background controls and freezes its placement preview;
+right-drag still orbits/pans the camera.
+
+**Validation:** Added placement/undo coverage at every corner and angle with
+mirroring, menu choices and window bounds, and right-click versus camera drag.
+The rendered menu workflow checks all corners, rotation, cancellation and
+outside dismissal. Its initial cancellation comparison captured the brief
+hover refresh delay; advancing the scripted hover through that delay restored
+the identical preview. App, paint, scene and UI tests and the two clipboard UI
+workflows pass. Both Windows executables rebuilt.
+
+## 2026-09-05 — Horizontal and vertical paste mirrors
+
+**Done:** Added Flip H and Flip V buttons beneath the paste angle controls.
+Each toggle mirrors the rotated preview along its corresponding face-local
+axis, highlights while enabled, and can be combined or toggled off. A new
+copy resets both. Preview and placement use the same immutable orientation
+cache; exact pixel colors, alpha and undo snapshots are preserved.
+
+**Validation:** Covered both mirrors and their combinations at all four angles,
+toggle restoration, reset-on-copy, source immutability and mirrored/rotated
+paste undo/redo. The real sidebar workflow clicks both buttons, verifies that
+both flips equal 180°, and compares restored previews to the original.
+
+---
+
+## 2026-09-05 — Vertical wheel input and explicit paste angles
+
+**Fix:** Poll the vertical component of the wheel vector, replacing raylib's
+dominant-axis scalar helper. With repeated upward input interleaved with a
+larger negative horizontal signal, the old helper feeds +1/-2/+1/-2 and the
+paste alternates 0°/90°. The new regression completes a full turn and ignores
+horizontal-only input. This reproduces a possible cause of the user's symptom;
+the user's physical device stream has not been captured.
+
+Added direct 0°/90°/180°/270° chips using the same orientation setter as the
+wheel. UI checks compare their previews to the corresponding wheel previews,
+along with repeated turns, exact alpha-preserving pixel mapping and undo/redo.
+
+---
+
+## 2026-09-05 — Repeated paste rotation
+
+**Fix:** Normalize Ctrl+wheel to one quarter turn per scroll event. Applying
+the raw wheel magnitude could skip angles or wrap a whole turn with no visible
+change on devices that report larger deltas. The sidebar now shows 0° as well
+as 90°/180°/270°. Added continuous held-Ctrl tests for three full turns in
+either direction, with unit, coalesced, raw and fractional wheel magnitudes,
+idle frames, exact asymmetric preview pixels and unchanged camera position.
+The reported device behavior was not reproduced directly; the magnitude
+wraparound is covered by these regressions and the hidden-window UI workflow.
+
+---
+
+## 2026-09-05 — Ctrl+wheel paste rotation
+
+**Done:** Ctrl+mouse wheel rotates the active paste by 90° per notch, with
+reverse scrolling turning it back. The gesture is consumed before camera
+zoom; ordinary scrolling still zooms. Preview and placement share a cached,
+exact pixel rotation, including swapped rectangular dimensions and alpha.
+A new copy resets orientation. Sidebar dimensions/angle and the hint bar
+describe the gesture. Placed pixels remain independent of later rotations.
+
+**Validation:** Camera-routing and pixel tests cover both directions, multiple
+notches, a full turn, rectangular images, transparency and undo/redo. The
+hidden-window workflow checks previews at 0/90/180/270°, reversed and wrapped
+rotation, and a rotated paste across undo/redo.
+
+---
+
+## 2026-09-05 — Copy pixels between faces
+
+**Done:** Added a rectangular marquee in Paint (`U`, Shift for square), copy
+(`Ctrl+C`) and repeated face-local paste placement (`Ctrl+V`, click, Esc).
+Three outline icons beside the Paint heading and a dedicated sidebar section
+make the workflow available without shortcuts. Placement releases a source
+face lock and preserves pixel density, colors and partial alpha. Empty pixels
+leave the destination untouched. Each paste is one command with exact undo
+and redo snapshots. Source geometry/density changes invalidate the marquee;
+the detached clipboard survives editing and mode changes for this session.
+Copy excludes hidden source texture beyond polygon outlines and inside holes.
+
+**Validation:** Added command and app regressions for reversed drags, square
+selection at boundaries, clipboard independence, alpha, clipping, source
+resampling, keyboard routing and undo/redo. A real hidden-window UI test drags
+a selection, clicks Copy and Paste, transfers front-face paint to a top face,
+and verifies the rendered result across undo and redo. Paint screenshots are
+updated for the three new header controls.
+
+---
+
+## 2026-09-05 — Interface polish and live ambient occlusion
+
+**Done:** Replaced the CPU AO bake and its shading tessellation with a shared
+scene-depth GPU pass, 32 hemisphere samples, and depth-aware filtering. Separate
+bodies now cast contact shading on one another, including during edits. Ambient
+lighting receives the effect; paint, geometry, selection overlays, and translucent
+previews are preserved. Added a bottom-left AO On/Off control, settings persistence,
+and consistent behavior when enabling it from flat view.
+
+Reworked 52 icons into a consistent 1.75-unit outline set with round caps and
+joins. Added outline-path rasterization, native Windows typography with embedded
+fallbacks, slightly larger labels, subdued active-tool borders, section-count
+badges, and cleaner card headings. Updated two coordinate-based click fixtures
+to target the revised colour-picker and sketch-flyout layout.
+
+**Verified:** `go test ./...` passed, including the complete rendered integration
+suite (104 seconds). New pixel checks cover separate-body contact shadows, actual
+toggle clicks, perspective, sidebar resizing, and flat view; unit tests cover
+settings persistence, mesh coverage, and every icon asset. Regenerated 104 visual
+baselines for the intentional appearance changes and reviewed sketch, face-sketch,
+paint, palette, import, sample-ship, and AO renders. `git diff --check` is clean.
+Both static Windows executables were rebuilt and have matching hashes.
+
+**Visual evidence:** `docs/shots/ambient_on.png` and `ambient_off.png` show the
+same two separate bodies, with a soft contact shadow only in the enabled view.
+
+**Limit:** This is screen-space AO. Hidden and off-screen occluders cannot
+contribute; it is not hardware ray tracing. Details are in
+`docs/AMBIENT-OCCLUSION.md`.
+
+**Try it:** Reopen modeler.exe, then use AO On/Off at the bottom left. The control
+remains available with the scene panel collapsed and restores lighting from flat
+view when enabled.
 
 ---
 

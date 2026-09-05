@@ -27,6 +27,8 @@ type sketchState struct {
 	// snap is this frame's resolved cursor.
 	snap    sketch.Snap
 	hasSnap bool
+	// fineGrid follows Ctrl for both the visible lattice and cursor snapping.
+	fineGrid bool
 	// hoverRegion is the region under the cursor, or -1.
 	hoverRegion int
 	// selectedRegions are the regions picked for extrude (M3 consumes these).
@@ -110,6 +112,8 @@ func (a *App) enterSketch(s *model.Sketch) {
 	a.sketch.flyoutUp = false
 	a.sketch.modify.init()
 	a.sketch.hoverRegion = -1
+	a.sketch.hasSnap = false
+	a.sketch.hadClick = false
 	a.sketch.returnCamera = a.targetCamera()
 	a.sketch.awaitingPlane = false
 	a.Mode = ModeSketch
@@ -175,18 +179,25 @@ func (a *App) gridStep() float64 {
 	return 1
 }
 
+func (a *App) effectiveGridStep(fine bool) float64 {
+	if fine {
+		return float64(geom.SubunitsFine) / geom.Unit
+	}
+	return a.gridStep()
+}
+
 // SketchGridSteps are the spacings the card offers, in units.
 var SketchGridSteps = []float64{0.25, 0.5, 1, 2}
 
 // snapConfig builds this frame's snap tolerances.
 func (a *App) snapConfig(in InputFrame, vp render.Viewport) sketch.Config {
 	c := sketch.DefaultConfig(a.subunitsPerPixel(vp))
-	c.GridStep = geom.ToSubunits(a.gridStep())
+	c.GridStep = geom.ToSubunits(a.effectiveGridStep(in.Ctrl))
 	if c.GridStep <= 0 {
 		c.GridStep = geom.SubunitsPerUnit
 	}
-	if in.Ctrl {
-		c.GridStep = geom.SubunitsFine
+	if s := a.ActiveSketch(); s != nil {
+		c.GridOrigin = s.GridOrigin()
 	}
 	c.Suppressed = in.Alt
 	// The face a face-sketch sits on brings its own corners and edge midpoints

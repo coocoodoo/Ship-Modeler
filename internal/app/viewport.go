@@ -7,6 +7,7 @@ import (
 
 	"modeler/internal/geom"
 	"modeler/internal/geom/mesh"
+	"modeler/internal/io"
 	"modeler/internal/model"
 	"modeler/internal/render"
 	"modeler/internal/scene"
@@ -131,6 +132,9 @@ func (a *App) BuildScene() render.Scene {
 	if wo := a.wandOverlay(); wo != nil {
 		s.Sketches = append(s.Sketches, wo)
 	}
+	if po := a.pixelSelectionOverlay(); po != nil {
+		s.Sketches = append(s.Sketches, po)
+	}
 
 	// Sketch mode dims the rest of the model and puts the grid on the sketch
 	// plane, so the profile being drawn is what the eye lands on (SPEC-UX §8.1).
@@ -140,7 +144,7 @@ func (a *App) BuildScene() render.Scene {
 	if a.InSketch() || a.InExtrude() {
 		s.DimFactor = SketchDimFactor
 		if sk := a.ActiveSketch(); sk != nil {
-			s.Grid = scene.SketchGridFor(sk, a.gridStep())
+			s.Grid = scene.SketchGridFor(sk, a.effectiveGridStep(a.sketch.fineGrid))
 		}
 		for i := range s.Bodies {
 			s.Bodies[i].Pickable = false
@@ -333,6 +337,19 @@ func (a *App) ToggleShading() {
 	a.Toast(ui.Toast{Text: text})
 }
 
+// ToggleAO is always available in the bottom-left status bar. Enabling it from
+// flat view also restores lighting, so the control's state matches the result.
+func (a *App) ToggleAO() {
+	if a.Settings.AO > 0 && !a.Settings.FlatShading {
+		a.Settings.AO = 0
+		return
+	}
+	if a.Settings.AO <= 0 {
+		a.Settings.AO = io.DefaultAO
+	}
+	a.Settings.FlatShading = false
+}
+
 // SnapToZone animates the camera to a view cube zone's canonical orientation.
 func (a *App) SnapToZone(z scene.CubeZone) {
 	to := a.targetCamera()
@@ -499,6 +516,9 @@ func (a *App) handleCameraInput(in InputFrame, vp render.Viewport) {
 	if a.cubeDrag {
 		return
 	}
+	if a.handlePixelPasteRightClick(&in, vp) {
+		return
+	}
 	inViewport := vp.Contains(int(in.MouseX), int(in.MouseY))
 
 	if in.Pressed[MouseRight] && inViewport {
@@ -525,6 +545,9 @@ func (a *App) handleCameraInput(in InputFrame, vp render.Viewport) {
 	// it (reported 2026-09-04). Orbit and pan still work over a card — it is
 	// only the wheel that a scrolling list has to take.
 	if in.Wheel != 0 && inViewport && !a.UI.WheelCaptured(in.MouseX, in.MouseY) {
+		if !a.chromeOwnsPointer(in) && !a.Cube.Contains(in.MouseX, in.MouseY) && a.rotatePixelPasteWheel(in) {
+			return
+		}
 		a.Anim.Cancel()
 		a.Camera.ZoomToCursor(in.Wheel, vp.Local(in.MouseX, in.MouseY),
 			float64(vp.W), float64(vp.H))

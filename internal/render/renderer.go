@@ -21,6 +21,7 @@ type Renderer struct {
 	locUseTexture int32
 	locAOStrength int32
 	locFlatShade  int32
+	locAOViewport int32
 	locPickIDBase int32
 
 	shadedMat rl.Material
@@ -29,7 +30,8 @@ type Renderer struct {
 	whiteTex rl.Texture2D
 	blankTex rl.Texture2D // 1x1 transparent: "this face has no paint"
 
-	pickRT rl.RenderTexture2D
+	pickRT  rl.RenderTexture2D
+	ambient *ambientPass
 
 	// boxRT is the bigger, rarer target box select renders into.
 
@@ -74,6 +76,8 @@ func NewRenderer() *Renderer {
 	r.locUseTexture = rl.GetShaderLocation(r.shaded, "useTexture")
 	r.locAOStrength = rl.GetShaderLocation(r.shaded, "aoStrength")
 	r.locFlatShade = rl.GetShaderLocation(r.shaded, "flatShade")
+	r.locAOViewport = rl.GetShaderLocation(r.shaded, "aoViewport")
+	r.shaded.UpdateLocation(rl.ShaderLocMapOcclusion, rl.GetShaderLocation(r.shaded, "aoTexture"))
 	r.locPickIDBase = rl.GetShaderLocation(r.pick, "idBase")
 
 	white := rl.GenImageColor(1, 1, color.RGBA{R: 255, G: 255, B: 255, A: 255})
@@ -102,6 +106,9 @@ func NewRenderer() *Renderer {
 // textures we free here, so those few dozen bytes are left to process exit
 // rather than risking a double free.
 func (r *Renderer) Close() {
+	if r.ambient != nil {
+		r.ambient.close()
+	}
 	rl.UnloadRenderTexture(r.pickRT)
 	if r.boxReady {
 		rl.UnloadRenderTexture(r.boxRT)
@@ -123,13 +130,7 @@ func (r *Renderer) DrawViewport(s *Scene, vp Viewport) {
 		return
 	}
 	r.drawBackground(vp)
-
-	r.begin3D(s.Camera, vp)
-	r.drawShadedPass(s)
-	r.drawEdgePass(s, vp)
-	r.drawTranslucentPass(s, vp)
-	r.drawOverlayPass(s, vp)
-	r.end3D()
+	r.drawSceneNoBackground(s, vp)
 }
 
 // begin3D sets the GL viewport and matrices for a sub-rectangle of the window.
@@ -171,8 +172,6 @@ func (r *Renderer) drawBackground(vp Viewport) {
 
 // drawShadedPass draws opaque bodies with the flat-shading shader.
 func (r *Renderer) drawShadedPass(s *Scene) {
-	rl.SetShaderValue(r.shaded, r.locAOStrength,
-		[]float32{float32(s.AO)}, rl.ShaderUniformFloat)
 	flat := float32(0)
 	if s.Flat {
 		flat = 1

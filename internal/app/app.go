@@ -243,12 +243,7 @@ func (a *App) bodyGPU(b *model.Body) *render.BodyGPU {
 		return g
 	}
 	g := render.BuildBodyGPU(b.Mesh)
-	// The AO bake is skipped mid-drag: a drag rebuilds the body every frame,
-	// and a ray bake per frame would turn it into a slideshow. The commit's
-	// rebuild bakes, so the shading pops in on release — the honest trade.
-	if !a.Bus.Dragging() {
-		render.BakeAO(g, b.Mesh)
-	}
+	// Ambient occlusion is evaluated by the renderer each frame across bodies.
 	g.Upload()
 	a.gpu[b.ID] = g
 	return g
@@ -311,6 +306,7 @@ func (a *App) Frame(in InputFrame) {
 // geometrically here rather than by asking the widget kit, so this can run
 // before the widgets do and still be exact.
 func (a *App) update(in InputFrame) {
+	a.sketch.fineGrid = in.Ctrl
 	a.lastMouseX, a.lastMouseY = in.MouseX, in.MouseY
 	a.hintOverride = ""
 	// The sidebar's width is part of the layout, so it is eased before the
@@ -404,7 +400,7 @@ func (a *App) update(in InputFrame) {
 	// that left the modal to read the same Escape as its own answer, closing
 	// the program without saving. The shortcut sheet owns it the same way: a
 	// sheet explaining the S key must not be the thing the S key acts through.
-	if !a.UI.WantKeyboard() && !a.UI.ModalOpen() {
+	if !a.pixelPasteMenuOpen() && !a.UI.WantKeyboard() && !a.UI.ModalOpen() {
 		if a.showShortcuts {
 			if in.KeyPressed(rl.KeyEscape) || (in.KeyPressed(rl.KeySlash) && in.Shift) {
 				a.showShortcuts = false
@@ -434,6 +430,9 @@ func (a *App) update(in InputFrame) {
 // chromeOwnsPointer reports whether the toolbar, tree, an overlay or a live
 // widget drag has the pointer, in which case the viewport ignores it.
 func (a *App) chromeOwnsPointer(in InputFrame) bool {
+	if a.pixelPasteMenuOpen() {
+		return true
+	}
 	if a.showShortcuts || a.UI.ModalOpen() {
 		return true
 	}
@@ -469,6 +468,9 @@ func (a *App) chromeOwnsPointer(in InputFrame) bool {
 // (SPEC-UX §1); it is only the left button that belongs to the card. Over the
 // toolbar or the tree — real chrome — nothing does.
 func (a *App) cardOnlyOwnsPointer(in InputFrame) bool {
+	if a.pixelPasteMenuOpen() {
+		return false
+	}
 	if a.showShortcuts || a.UI.ModalOpen() || a.UI.Dragging() {
 		return false
 	}
@@ -501,6 +503,7 @@ func (a *App) draw(in InputFrame) {
 	a.Triad.Draw(a.Camera, a.Fonts, a.Scale)
 
 	a.UI.Begin(in.ToUI())
+	a.buildPixelPasteMenu()
 	a.buildShell(l)
 	a.UI.DrawToasts(l.Viewport)
 	if a.showShortcuts {
@@ -685,6 +688,8 @@ func shortcutSheet() []ui.Shortcut {
 		{Keys: "N", Description: "Gradient"},
 		{Keys: "X", Description: "Swap the two colours"},
 		{Keys: "W", Description: "Magic wand: select by colour, then paint inside"},
+		{Keys: "U", Description: "Select pixels: drag a rectangle; Shift makes a square"},
+		{Keys: "Ctrl+C / Ctrl+V", Description: "Copy selected pixels / place on another face"},
 		{Keys: "K", Description: "Edge line: pick edges, bake a band"},
 		{Section: "Files"},
 		{Keys: "Ctrl+N", Description: "New ship"},

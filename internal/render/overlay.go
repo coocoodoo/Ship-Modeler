@@ -158,19 +158,13 @@ func (r *Renderer) drawGrid(c ribbonContext, g *GridDraw) {
 		if step <= 0 || step*pxPerUnit < minSpacingPx {
 			return
 		}
-		n := int(g.HalfSize/step) + 1
-		for i := -n; i <= n; i++ {
-			t := float64(i) * step
-			if t < -g.HalfSize || t > g.HalfSize {
-				continue
-			}
-			if skipMultiplesOf > 0 && math.Abs(math.Mod(t, skipMultiplesOf)) < 1e-9 {
-				continue // the major pass draws this one
-			}
+		for _, t := range gridLinePositions(g.Origin.X, g.HalfSize, step, skipMultiplesOf) {
 			r.drawRibbon(c,
 				g.Frame.ToWorld(geom.Vec2{X: t, Y: -g.HalfSize}),
 				g.Frame.ToWorld(geom.Vec2{X: t, Y: g.HalfSize}),
 				1, col, 1)
+		}
+		for _, t := range gridLinePositions(g.Origin.Y, g.HalfSize, step, skipMultiplesOf) {
 			r.drawRibbon(c,
 				g.Frame.ToWorld(geom.Vec2{X: -g.HalfSize, Y: t}),
 				g.Frame.ToWorld(geom.Vec2{X: g.HalfSize, Y: t}),
@@ -180,16 +174,37 @@ func (r *Renderer) drawGrid(c ribbonContext, g *GridDraw) {
 	drawSet(g.MinorStep, minor, g.MajorStep)
 	drawSet(g.MajorStep, major, 0)
 
-	if g.ShowAxes {
+	if g.ShowAxes && math.Abs(g.Origin.Y) <= g.HalfSize {
 		r.drawRibbon(c,
-			g.Frame.ToWorld(geom.Vec2{X: -g.HalfSize}),
-			g.Frame.ToWorld(geom.Vec2{X: g.HalfSize}),
+			g.Frame.ToWorld(geom.Vec2{X: -g.HalfSize, Y: g.Origin.Y}),
+			g.Frame.ToWorld(geom.Vec2{X: g.HalfSize, Y: g.Origin.Y}),
 			1.5, fadeAlpha(g.AxisUColor, g.Alpha), 1)
+	}
+	if g.ShowAxes && math.Abs(g.Origin.X) <= g.HalfSize {
 		r.drawRibbon(c,
-			g.Frame.ToWorld(geom.Vec2{Y: -g.HalfSize}),
-			g.Frame.ToWorld(geom.Vec2{Y: g.HalfSize}),
+			g.Frame.ToWorld(geom.Vec2{X: g.Origin.X, Y: -g.HalfSize}),
+			g.Frame.ToWorld(geom.Vec2{X: g.Origin.X, Y: g.HalfSize}),
 			1.5, fadeAlpha(g.AxisVColor, g.Alpha), 1)
 	}
+}
+
+// gridLinePositions clips a world-anchored lattice to the local sheet. Major
+// lines are classified relative to the lattice origin, never the face center.
+func gridLinePositions(origin, halfSize, step, skipMultiplesOf float64) []float64 {
+	if step <= 0 {
+		return nil
+	}
+	first := int(math.Ceil((-halfSize - origin) / step))
+	last := int(math.Floor((halfSize - origin) / step))
+	var positions []float64
+	for i := first; i <= last; i++ {
+		d := float64(i) * step
+		if skipMultiplesOf > 0 && math.Abs(math.Remainder(d, skipMultiplesOf)) < 1e-9 {
+			continue
+		}
+		positions = append(positions, origin+d)
+	}
+	return positions
 }
 
 func fadeAlpha(c color.RGBA, a float64) color.RGBA {

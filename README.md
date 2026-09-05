@@ -55,18 +55,23 @@ out, its tooltip says how to turn it on.
 | | `L` line · `R` rectangle · `C` circle · `N` gradient · `X` swap colours |
 | | `K` edge line — pick edges, set a width, bake a band along them |
 | | `W` magic wand — select similar colours; other tools then paint only inside (Shift adds, Esc clears) |
+| | `U` rectangular pixel selector · `Ctrl+C` copy pixels · `Ctrl+V` paste onto a face |
 | **Files** | `Ctrl+N` new · `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Shift+S` save as |
 | | `Ctrl+E` export · `Ctrl+I` import an STL or OBJ mesh |
 | **Edit** | `Ctrl+Z` undo · `Ctrl+Y` redo · `Del` delete · `H` hide |
 | **Held** | `Alt` no snapping, or eyedropper in paint · `Ctrl` fine snap · `Shift` add to selection, constrain a shape |
 | `Esc` | Back one level · `?` the shortcut sheet |
 
-The viewport bakes a **simple ambient occlusion**: inside corners, pockets
-and the feet of raised blocks sit in soft shadow, recomputed whenever the
-geometry changes. It is viewport shading, not paint and not exported - set
-`"ao"` in settings.json between 0 (off) and 1 to taste.
+The viewport uses **live screen-space ambient occlusion**: inside corners,
+pockets and contact between separate parts receive soft shadows as you edit
+and orbit. Use **AO On / AO Off** at the bottom left; the setting is remembered.
+Enabling AO from flat view also restores lighting. The effect uses visible
+scene depth, so surfaces hidden from the camera cannot contribute shadows.
+It does not alter paint or exported geometry; rendered PNGs include the shading.
 
-The chrome's colour follows what you are doing: gold while sketching, teal
+The interface uses consistent outline icons, native Windows typography with
+embedded fallbacks, and restrained active-tool highlights. The chrome's colour
+follows what you are doing: gold while sketching, teal
 while extruding, violet for booleans, pink in paint, lime while placing
 markers, blue otherwise. The hint bar names the mode in a chip of the same
 colour. Every colour is yours to change in `theme.json` beside the settings
@@ -80,6 +85,25 @@ Face paint is anchored to a frame that belongs to the face, not to the
 triangles under it, so pixels stay where you put them when the geometry
 underneath changes. Cut a window through a painted hull and the paint on both
 sides of the cut is still exactly where it was.
+
+To **copy pixels between faces**, press `U` in Paint and drag a box around the
+paint you want; hold `Shift` for a square. Press `Ctrl+C`, then `Ctrl+V`, hover
+another face to preview the placement, and click to paste. The three icons
+beside the Paint heading provide the same controls. Hold `Ctrl` and scroll
+the mouse wheel to rotate the paste in 90° steps; scrolling back reverses it.
+You can also choose **0° / 90° / 180° / 270°** directly under **Rotation**.
+The **Flip H** and **Flip V** buttons mirror the rotated paste left/right or
+top/bottom. They highlight when enabled; click again to restore. Both can be
+combined, and copying a new selection resets the flips.
+Right-click during placement to choose which of the paste's **four corners**
+follows the cursor, or choose **0° / 90° / 180° / 270°** in the mini menu.
+**Cancel**, clicking outside, or `Esc` closes the menu without placing pixels
+or changing the current paste. Right-drag still moves the camera.
+You can place the copied
+pattern repeatedly; `Esc` stops placement and `Ctrl+Z` undoes each paste.
+Pixels keep their colors and alpha, one copied pixel per destination pixel.
+Empty pixels leave existing paint underneath, and the destination face clips
+the result at its edges. The clipboard lasts for the current app session.
 
 The **Edge tool** (`K`) paints a band along edges you pick — panel seams,
 plating lines, an outlined hull. **All corners** takes every sharp edge of a

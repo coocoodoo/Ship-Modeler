@@ -52,6 +52,7 @@ const FaceViewMargin = 0.12
 
 // paintState is the app's half of paint mode.
 type paintState struct {
+	pixels pixelClipboardState
 	// bar is how far the right-hand palette sidebar is open, 0 shut to 1
 	// wide. Eased every frame toward paint mode's on/off (V-151), and the
 	// one number the layout reads: the viewport ends where the bar begins.
@@ -253,6 +254,12 @@ func (a *App) ExitPaint() {
 	a.paint.edges = a.paint.edges[:0]
 	a.paint.hoverEdge = -1
 	a.paint.wandMask = nil
+	a.paint.pixels.selection = nil
+	a.paint.pixels.dragging = false
+	a.paint.pixels.menu = pasteMenuState{}
+	if a.paint.tool == paint.ToolPaste {
+		a.paint.tool = paint.ToolSelect
+	}
 	// The library belongs to the mode that opened it.
 	a.paint.browser.open = false
 }
@@ -448,6 +455,10 @@ func (a *App) canPaint() (bool, string) {
 
 // updatePaint runs one frame of paint mode with the pointer in the viewport.
 func (a *App) updatePaint(in InputFrame, vp render.Viewport) {
+	if !a.paint.awaitingLock && (a.paint.tool == paint.ToolSelect || a.paint.tool == paint.ToolPaste) {
+		a.updatePixelClipboard(in, vp)
+		return
+	}
 	// The edge tool picks edges rather than painting texels, so it takes the
 	// pointer before any of the brush machinery runs — except while the lock
 	// pick is armed: "Click a face…" has promised the next click chooses a
@@ -517,6 +528,8 @@ func (a *App) setPaintTool(t paint.Tool) {
 	if t != a.paint.tool {
 		a.finishStroke()
 		a.finishTileStamp()
+		a.paint.pixels.dragging = false
+		a.paint.pixels.menu = pasteMenuState{}
 	}
 	a.paint.tool = t
 }
@@ -528,6 +541,9 @@ func (a *App) setPaintTool(t paint.Tool) {
 // the sticky one stays, so a control that acts on the face you were pointing at
 // is still armed when you reach it.
 func (a *App) paintChromeFrame(in InputFrame) {
+	if !in.Down[MouseLeft] {
+		a.paint.pixels.dragging = false
+	}
 	a.clearPaintHover(false)
 	// The hovered edge is a viewport thing too: left stale it kept its accent
 	// glow while the pointer was over the panel, pointing at nothing.
@@ -1006,6 +1022,9 @@ func (a *App) FaceView() bool {
 
 // paintCursorOverlay is the texel cursor for this frame, or nil.
 func (a *App) paintCursorOverlay() *render.Overlay {
+	if a.paint.tool == paint.ToolPaste && !a.paint.awaitingLock {
+		return a.pixelPastePreview()
+	}
 	// The tile tool's cursor is the tile itself: the armed pixels, half
 	// strength, at the cell the click would fill (Tile_paint.md TP3).
 	if a.paint.tool == paint.ToolTile && !a.paint.awaitingLock {
@@ -1055,7 +1074,7 @@ func (a *App) paintCursorOverlay() *render.Overlay {
 			v.FaceRect = paint.FaceRect(f.body.Mesh, f.face, h.paint)
 		}
 	}
-	if a.paint.tool == paint.ToolPick || a.paint.tool == paint.ToolWand {
+	if a.paint.tool == paint.ToolPick || a.paint.tool == paint.ToolWand || a.paint.tool == paint.ToolSelect {
 		// The dropper and the wand take rather than leave, so they show the
 		// texel they would read and nothing about the brush.
 		v.Erasing, v.Size = true, 1
@@ -1082,12 +1101,19 @@ var paintToolKeys = []struct {
 	{rl.KeyK, paint.ToolEdge},
 	{rl.KeyW, paint.ToolWand},
 	{rl.KeyT, paint.ToolTile},
+	{rl.KeyU, paint.ToolSelect},
 }
 
 // handlePaintKeys is the paint-mode keyboard map: the tools, the colour swap,
 // and Escape stepping back out (SPEC-UX §1, §13).
 func (a *App) handlePaintKeys(in InputFrame) {
 	if in.Ctrl {
+		if in.KeyPressed(rl.KeyC) {
+			a.CopySelectedPixels()
+		}
+		if in.KeyPressed(rl.KeyV) {
+			a.BeginPixelPaste()
+		}
 		return
 	}
 	for _, k := range paintToolKeys {
@@ -1108,6 +1134,7 @@ func (a *App) handlePaintKeys(in InputFrame) {
 		switch {
 		case a.closeBrowserIfOpen():
 		case a.CancelStroke():
+		case a.cancelPixelClipboard():
 		case a.ClearWandSelection():
 		case a.ClearEdgeSelection():
 		case a.CancelLockPick():
@@ -1122,6 +1149,14 @@ func (a *App) handlePaintKeys(in InputFrame) {
 // paintHint is what the hint bar says in paint mode.
 func (a *App) paintHint() string {
 	st := &a.paint
+	if !st.awaitingLock {
+		if st.tool == paint.ToolPaste {
+			return "Click to paste · right-click: corner / rotation · Ctrl+wheel rotates · Esc cancels"
+		}
+		if st.tool == paint.ToolSelect {
+			return "Drag to select pixels · Shift makes a square · Ctrl+C copies · Ctrl+V pastes"
+		}
+	}
 	if st.awaitingLock {
 		if st.hover.ok {
 			return "Click this face to lock to it · Esc to cancel"

@@ -15,6 +15,23 @@ func at(x, y float64) geom.Vec2i { return geom.Vec2i{X: sub(x), Y: sub(y)} }
 // the 7 px endpoint radius reaches 70 subunits — a quarter of a unit.
 func cfg() Config { return DefaultConfig(10) }
 
+func TestOffsetGridInferenceAndFreeSnap(t *testing.T) {
+	c := cfg()
+	c.GridOrigin = at(-2.5, 1.25)
+	from := at(0.5, 0.25)
+	for _, cursor := range []geom.Vec2i{at(4.4, 0.3), at(0.55, 4.1)} {
+		got := Resolve(cursor, nil, &from, c)
+		if !got.HasGuide() || (got.Point.X-c.GridOrigin.X)%c.GridStep != 0 || (got.Point.Y-c.GridOrigin.Y)%c.GridStep != 0 {
+			t.Fatalf("inference left the shifted grid: %+v", got)
+		}
+		c.Suppressed = true
+		if free := Resolve(cursor, nil, &from, c); free.Kind != SnapFree || free.Point != cursor {
+			t.Fatalf("Alt no longer allows free placement: %+v", free)
+		}
+		c.Suppressed = false
+	}
+}
+
 func TestSnapToGridByDefault(t *testing.T) {
 	got := Resolve(geom.Vec2i{X: sub(2) + 40, Y: sub(3) - 30}, nil, nil, cfg())
 	if got.Kind != SnapGrid {

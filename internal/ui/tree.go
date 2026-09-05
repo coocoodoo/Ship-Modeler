@@ -70,9 +70,9 @@ func (c *Context) TreeRow(id ID, r rl.Rectangle, spec TreeRowSpec) TreeRowResult
 	// Background: selection wins over hover.
 	switch {
 	case spec.Selected:
-		FillRect(r, Fade(ColorAccent, 0.22))
+		c.FillRounded(InsetXY(r, c.Px(4), c.Px(1)), CornerRadius, Fade(ColorAccent, 0.16))
 	case rowIt.Hovered || spec.Hovered:
-		FillRect(r, ColorHover)
+		c.FillRounded(InsetXY(r, c.Px(4), c.Px(1)), CornerRadius, ColorHover)
 	}
 	if spec.Selected {
 		FillRect(Rect(r.X, r.Y, c.Px(2), r.Height), ColorAccent)
@@ -192,8 +192,10 @@ func (c *Context) TreeSection(id ID, r rl.Rectangle, label string, count int, ex
 
 	// The count is always shown, including zero: "Sketches · 0" says the
 	// section is empty, where a bare heading leaves the reader guessing.
-	title := label + " · " + itoa(count)
-	c.Text(rest, title, FontSizeHeader, ColorTextDim)
+	badge, rest := SplitRight(InsetXY(rest, 0, c.Px(5)), c.Px(26))
+	c.FillRounded(badge, 4, ColorCard)
+	c.TextCentered(badge, itoa(count), FontSizeSmall, ColorTextDim)
+	c.Text(rest, label, FontSizeUI, ColorText)
 	return it.Clicked
 }
 

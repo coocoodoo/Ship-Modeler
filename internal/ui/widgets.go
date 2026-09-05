@@ -98,7 +98,8 @@ func (c *Context) IconButton(id ID, r rl.Rectangle, icon IconFunc, opts IconOpts
 	// The active tool gets a soft accent wash as well as its underline, so the
 	// current mode reads from across the room and not only from two pixels.
 	if opts.Active {
-		c.FillRounded(r, CornerRadius, Fade(Soft(accent), 0.55))
+		c.FillRounded(r, CornerRadius, Fade(Soft(accent), 0.8))
+		c.StrokeRounded(r, CornerRadius, Fade(accent, 0.35))
 	}
 	if it.Hovered && !it.Disabled {
 		c.FillRounded(r, CornerRadius, ColorHover)
@@ -113,8 +114,6 @@ func (c *Context) IconButton(id ID, r rl.Rectangle, icon IconFunc, opts IconOpts
 		tint = accent
 	case it.Hovered:
 		tint = ColorText
-	case opts.Accent.A > 0:
-		tint = Fade(accent, 0.75)
 	}
 	tint = textColorFor(tint, it)
 
@@ -127,12 +126,6 @@ func (c *Context) IconButton(id ID, r rl.Rectangle, icon IconFunc, opts IconOpts
 	center := Center(iconBox)
 	if icon != nil {
 		icon(float64(center.X), float64(center.Y), IconSize*c.Scale, tint)
-	}
-
-	if opts.Active {
-		// Accent underline, inset a little so it reads as a tab indicator.
-		u := Rect(r.X+c.Px(4), r.Y+r.Height-c.Px(2), r.Width-c.Px(8), c.Px(2))
-		FillRect(u, accent)
 	}
 
 	c.queueTooltip(id, r, it, opts.Tooltip, opts.Shortcut, opts.DisabledWhy)

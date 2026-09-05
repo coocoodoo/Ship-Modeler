@@ -19,7 +19,7 @@
   {"op":"drag","from":[1150,310],"to":[1100,350],"segs":4},
   {"op":"dump"},
 
-  {"op":"click","at":[1095,455]},
+  {"op":"click","at":[1095,467]},
   {"op":"dump"},
   {"op":"shot","name":"picker_picked"}
 ]

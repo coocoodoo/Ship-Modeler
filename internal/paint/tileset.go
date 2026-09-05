@@ -115,6 +115,13 @@ func (o Orientation) Flipped() Orientation {
 	return o
 }
 
+// FlippedVertical mirrors the currently oriented image top-to-bottom.
+func (o Orientation) FlippedVertical() Orientation {
+	o = o.Flipped()
+	o.Rot = (o.Rot + 2) % 4
+	return o
+}
+
 // Oriented returns tile i's pixels under an orientation, as a fresh image
 // with bounds at the origin. Rot 1 and 3 swap the tile's dimensions.
 func (t *Tileset) Oriented(i int, o Orientation) *image.RGBA {
@@ -122,6 +129,17 @@ func (t *Tileset) Oriented(i int, o Orientation) *image.RGBA {
 	if r.Empty() {
 		return image.NewRGBA(image.Rect(0, 0, 0, 0))
 	}
+	return OrientPixels(t.Img.SubImage(r).(*image.RGBA), o)
+}
+
+// OrientPixels rotates a detached pixel snapshot in exact quarter turns,
+// preserving every color and alpha value without filtering.
+func OrientPixels(src *image.RGBA, o Orientation) *image.RGBA {
+	if src == nil {
+		return nil
+	}
+	r := src.Bounds()
+	o.Rot %= 4
 	w, h := r.Dx(), r.Dy()
 	ow, oh := w, h
 	if o.Rot%2 == 1 {
@@ -134,7 +152,7 @@ func (t *Tileset) Oriented(i int, o Orientation) *image.RGBA {
 			if o.FlipX {
 				sx = w - 1 - x
 			}
-			c := t.Img.RGBAAt(r.Min.X+sx, r.Min.Y+y)
+			c := src.RGBAAt(r.Min.X+sx, r.Min.Y+y)
 			// Where (x, y) of the flipped tile lands after Rot clockwise
 			// quarter turns.
 			var dx, dy int

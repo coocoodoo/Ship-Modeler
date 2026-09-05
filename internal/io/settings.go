@@ -93,7 +93,7 @@ type Settings struct {
 
 	GridStep float64 `json:"gridStep"`
 	MSAA     bool    `json:"msaa"`
-	// AO scales the baked ambient occlusion, 0 (off) to 1. It is a setting
+	// AO scales screen-space ambient occlusion, 0 (off) to 1. It is a setting
 	// like MSAA: how the viewport reads, not what the document holds.
 	AO float64 `json:"ao"`
 	// PaletteName is the library palette the custom page is showing, so the

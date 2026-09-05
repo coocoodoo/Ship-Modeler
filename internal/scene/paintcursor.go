@@ -176,9 +176,21 @@ func traceRectDashed(o *render.Overlay, p *mesh.FacePaint, r image.Rectangle, co
 // TileGhostView is what the tile stamp's preview needs: the face mapping, the
 // cell the stamp would land on, and the oriented tile pixels themselves.
 type TileGhostView struct {
-	Paint *mesh.FacePaint
-	Cell  image.Point
-	Tile  *image.RGBA
+	Paint         *mesh.FacePaint
+	Cell          image.Point
+	Tile          *image.RGBA
+	PreserveAlpha bool
+	Clip          *image.Rectangle
+}
+
+func BuildPixelSelection(p *mesh.FacePaint, rect image.Rectangle) *render.Overlay {
+	if p == nil || rect.Empty() {
+		return nil
+	}
+	o := &render.Overlay{}
+	traceRect(o, p, rect, ui.ColorBG, 3)
+	traceRectDashed(o, p, rect, ui.ColorAccent, 2)
+	return o
 }
 
 // BuildTileGhost draws the armed tile as a translucent preview at its cell —
@@ -193,21 +205,40 @@ func BuildTileGhost(v TileGhostView) *render.Overlay {
 		return nil
 	}
 	o := &render.Overlay{}
-	for y := 0; y < b.Dy(); y++ {
-		for x := 0; x < b.Dx(); x++ {
+	// Clip before walking the clipboard, and merge equal-colour runs. Large
+	// solid selections then need one quad per row rather than one per pixel.
+	visible := image.Rect(0, 0, b.Dx(), b.Dy())
+	if v.Clip != nil {
+		visible = visible.Intersect(v.Clip.Sub(v.Cell))
+	}
+	for y := visible.Min.Y; y < visible.Max.Y; y++ {
+		for x := visible.Min.X; x < visible.Max.X; x++ {
 			px := v.Tile.RGBAAt(b.Min.X+x, b.Min.Y+y)
-			if px.A < paint.StampAlphaThreshold {
+			if px.A == 0 || (!v.PreserveAlpha && px.A < paint.StampAlphaThreshold) {
 				continue
 			}
 			fill := px
 			fill.A = 0x8C
-			c := liftedCorners(v.Paint, v.Cell.Add(image.Point{X: x, Y: y}))
+			if v.PreserveAlpha {
+				fill.A = uint8(int(px.A) * 140 / 255)
+			}
+			end := x + 1
+			if v.PreserveAlpha {
+				for end < visible.Max.X && v.Tile.RGBAAt(b.Min.X+end, b.Min.Y+y) == px {
+					end++
+				}
+			}
+			c := rectCorners(v.Paint, image.Rect(x, y, end, y+1).Add(v.Cell))
 			o.Fills = append(o.Fills,
 				render.OverlayTri{A: c[0], B: c[1], C: c[2], Color: fill},
 				render.OverlayTri{A: c[0], B: c[2], C: c[3], Color: fill})
+			x = end - 1
 		}
 	}
 	outline := image.Rectangle{Min: v.Cell, Max: v.Cell.Add(image.Point{X: b.Dx(), Y: b.Dy()})}
+	if v.Clip != nil {
+		outline = outline.Intersect(*v.Clip)
+	}
 	traceRect(o, v.Paint, outline, ui.ColorText, 2)
 	if o.Empty() {
 		return nil

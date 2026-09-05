@@ -721,6 +721,14 @@ func (s *Sketch) Frame() geom.Frame {
 	return geom.PlaneFrame(s.Plane)
 }
 
+// GridOrigin projects the world origin into the sketch's coordinates. Face
+// frames are centered on their faces, so snapping about local zero would shift
+// the lattice between drawings. Keep the saved frame and geometry intact and
+// share this subunit-precise origin between snapping and the visible grid.
+func (s *Sketch) GridOrigin() geom.Vec2i {
+	return geom.Vec2iFromUnits(s.Frame().ToLocal(geom.Vec3{}))
+}
+
 // Where names the sketch's plane for toasts and the tree.
 func (s *Sketch) Where() string {
 	if s.OnFace {

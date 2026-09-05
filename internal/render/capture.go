@@ -82,8 +82,19 @@ func (r *Renderer) drawSceneNoBackground(s *Scene, vp Viewport) {
 	if vp.W <= 0 || vp.H <= 0 {
 		return
 	}
+	ao := float32(0)
+	r.shadedMat.GetMap(rl.MapOcclusion).Texture = r.whiteTex
+	if r.prepareAO(s, vp) {
+		ao = float32(s.AO)
+		r.shadedMat.GetMap(rl.MapOcclusion).Texture = r.ambient.rt.Texture
+	}
+	rl.SetShaderValue(r.shaded, r.locAOStrength, []float32{ao}, rl.ShaderUniformFloat)
+	rl.SetShaderValue(r.shaded, r.locAOViewport,
+		[]float32{float32(vp.X), float32(r.fbH - vp.Y - vp.H), float32(vp.W), float32(vp.H)}, rl.ShaderUniformVec4)
 	r.begin3D(s.Camera, vp)
 	r.drawShadedPass(s)
+	// Overlays and translucent previews do not receive screen-space shadows.
+	rl.SetShaderValue(r.shaded, r.locAOStrength, []float32{0}, rl.ShaderUniformFloat)
 	r.drawEdgePass(s, vp)
 	r.drawTranslucentPass(s, vp)
 	r.drawOverlayPass(s, vp)

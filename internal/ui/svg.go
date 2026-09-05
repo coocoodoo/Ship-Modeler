@@ -25,7 +25,9 @@ import (
 // The engine reads the subset good icon files are made of: <path d="..."/>
 // with M L H V C S Q T Z (absolute and relative), viewBox, and nothing else.
 // No arcs — author arcs as cubics, which is what icon tools export anyway.
-// Fills only: an icon is a silhouette; its colour belongs to the theme.
+// Filled silhouettes and uniformly stroked outline paths are supported. Outline
+// paths use round joins/caps; closed outlines repeat their starting point.
+// Colour belongs to the theme, so the SVG only supplies shape and weight.
 
 //go:embed icons/*.svg
 var iconFS embed.FS
@@ -33,6 +35,9 @@ var iconFS embed.FS
 // svgShape is one parsed icon: closed contours in viewBox space.
 type svgShape struct {
 	contours [][]svgPt
+	// Outline icons use open, round-capped paths at one consistent weight.
+	strokes     [][]svgPt
+	strokeWidth float64
 	// view is the viewBox: minX, minY, width, height.
 	view [4]float64
 }
@@ -130,8 +135,8 @@ func rasterizeSVG(s *svgShape, px int) rl.Texture2D {
 		for i := range c {
 			a, b := c[i], c[(i+1)%len(c)]
 			edges = append(edges, edge{
-				(a.x - s.view[0]) * scale + offX, (a.y - s.view[1]) * scale + offY,
-				(b.x - s.view[0]) * scale + offX, (b.y - s.view[1]) * scale + offY,
+				(a.x-s.view[0])*scale + offX, (a.y-s.view[1])*scale + offY,
+				(b.x-s.view[0])*scale + offX, (b.y-s.view[1])*scale + offY,
 			})
 		}
 	}
@@ -168,7 +173,40 @@ func rasterizeSVG(s *svgShape, px int) rl.Texture2D {
 	}
 
 	img := image.NewRGBA(image.Rect(0, 0, px, px))
+	if len(s.strokes) > 0 {
+		mask := make([]bool, w*w)
+		radius := s.strokeWidth * scale / 2
+		for _, path := range s.strokes {
+			for i := 1; i < len(path); i++ {
+				a, b := path[i-1], path[i]
+				ax, ay := (a.x-s.view[0])*scale+offX, (a.y-s.view[1])*scale+offY
+				bx, by := (b.x-s.view[0])*scale+offX, (b.y-s.view[1])*scale+offY
+				dx, dy := bx-ax, by-ay
+				length2 := dx*dx + dy*dy
+				for y := max(0, int(math.Floor(math.Min(ay, by)-radius))); y < min(w, int(math.Ceil(math.Max(ay, by)+radius))); y++ {
+					for x := max(0, int(math.Floor(math.Min(ax, bx)-radius))); x < min(w, int(math.Ceil(math.Max(ax, bx)+radius))); x++ {
+						qx, qy := float64(x)+0.5-ax, float64(y)+0.5-ay
+						t := 0.0
+						if length2 > 0 {
+							t = math.Max(0, math.Min(1, (qx*dx+qy*dy)/length2))
+						}
+						if (qx-t*dx)*(qx-t*dx)+(qy-t*dy)*(qy-t*dy) <= radius*radius {
+							mask[y*w+x] = true
+						}
+					}
+				}
+			}
+		}
+		for y := 0; y < w; y++ {
+			for x := 0; x < w; x++ {
+				if mask[y*w+x] {
+					cover[(y/ss)*px+x/ss]++
+				}
+			}
+		}
+	}
 	for i, c := range cover {
+		c = min(c, ss*ss)
 		a := uint8(math.Round(float64(c) * 255 / (ss * ss)))
 		if a == 0 {
 			continue
@@ -196,12 +234,24 @@ func sortFloats(v []float64) {
 // ---------------------------------------------------------------------------
 
 var (
-	svgViewBoxRe = regexp.MustCompile(`viewBox\s*=\s*"([^"]+)"`)
-	svgPathRe    = regexp.MustCompile(`<path[^>]*\sd\s*=\s*"([^"]+)"`)
+	svgViewBoxRe     = regexp.MustCompile(`viewBox\s*=\s*"([^"]+)"`)
+	svgPathRe        = regexp.MustCompile(`<path[^>]*\sd\s*=\s*"([^"]+)"`)
+	svgStrokeWidthRe = regexp.MustCompile(`stroke-width\s*=\s*"([^"]+)"`)
 )
 
 func parseSVG(text string) (*svgShape, error) {
 	s := &svgShape{view: [4]float64{0, 0, 24, 24}}
+	outline := strings.Contains(text, `fill="none"`)
+	if outline {
+		s.strokeWidth = 1.75
+		if m := svgStrokeWidthRe.FindStringSubmatch(text); m != nil {
+			v, err := strconv.ParseFloat(m[1], 64)
+			if err != nil || v <= 0 {
+				return nil, fmt.Errorf("invalid stroke width")
+			}
+			s.strokeWidth = v
+		}
+	}
 	if m := svgViewBoxRe.FindStringSubmatch(text); m != nil {
 		f := strings.Fields(strings.ReplaceAll(m[1], ",", " "))
 		if len(f) == 4 {
@@ -223,7 +273,11 @@ func parseSVG(text string) (*svgShape, error) {
 		if err != nil {
 			return nil, err
 		}
-		s.contours = append(s.contours, contours...)
+		if outline {
+			s.strokes = append(s.strokes, contours...)
+		} else {
+			s.contours = append(s.contours, contours...)
+		}
 	}
 	return s, nil
 }
@@ -246,7 +300,7 @@ func parsePathData(d string) ([][]svgPt, error) {
 	const flat = 16 // segments per curve: plenty at icon sizes
 
 	closeContour := func() {
-		if len(cur) >= 3 {
+		if len(cur) >= 2 {
 			out = append(out, cur)
 		}
 		cur = nil

@@ -2,19 +2,22 @@ package ui
 
 import (
 	"image/color"
+	"os"
+	"path/filepath"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
+	"golang.org/x/image/font/gofont/gomedium"
 	"golang.org/x/image/font/gofont/goregular"
 )
 
-// Fonts holds the embedded UI typeface rasterised at the exact pixel sizes the
+// Fonts holds the UI typeface rasterised at the exact pixel sizes the
 // current display scale needs (D-11, SPEC-UX §3). Loading at the scaled size
 // rather than scaling a smaller atlas is what keeps text crisp at 1.25x-2x.
 type Fonts struct {
 	scale  float64
-	Small  rl.Font // 11 px logical: hints and badges
-	UI     rl.Font // 13 px logical: the default
-	Header rl.Font // 15 px logical: section headers
+	Small  rl.Font // hints and badges
+	UI     rl.Font // default labels and controls
+	Header rl.Font // semibold section and card headers
 }
 
 // glyphRange is the codepoint set baked into each atlas: ASCII plus the few
@@ -61,8 +64,19 @@ func FirstUnrenderable(s string) (rune, bool) {
 func LoadFonts(scale float64) *Fonts {
 	scale = Scale(scale)
 	px := func(logical float64) int32 { return int32(logical*scale + 0.5) }
-	load := func(logical float64) rl.Font {
-		f := rl.LoadFontFromMemory(".ttf", goregular.TTF, px(logical), glyphRange)
+	regular, medium := goregular.TTF, gomedium.TTF
+	// Native Windows typography, with embedded fallbacks for portable builds.
+	// System font files stay on the user's machine and are never redistributed.
+	if windows := os.Getenv("WINDIR"); windows != "" {
+		if data, err := os.ReadFile(filepath.Join(windows, "Fonts", "segoeui.ttf")); err == nil {
+			regular = data
+		}
+		if data, err := os.ReadFile(filepath.Join(windows, "Fonts", "seguisb.ttf")); err == nil {
+			medium = data
+		}
+	}
+	load := func(logical float64, data []byte) rl.Font {
+		f := rl.LoadFontFromMemory(".ttf", data, px(logical), glyphRange)
 		// Bilinear keeps scaled-up glyph edges smooth; the pixel-art crispness
 		// rule applies to paint textures, not to UI text.
 		rl.SetTextureFilter(f.Texture, rl.FilterBilinear)
@@ -70,9 +84,9 @@ func LoadFonts(scale float64) *Fonts {
 	}
 	return &Fonts{
 		scale:  scale,
-		Small:  load(FontSizeSmall),
-		UI:     load(FontSizeUI),
-		Header: load(FontSizeHeader),
+		Small:  load(FontSizeSmall, regular),
+		UI:     load(FontSizeUI, regular),
+		Header: load(FontSizeHeader, medium),
 	}
 }
 

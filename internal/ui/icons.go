@@ -14,6 +14,14 @@ import (
 // IconFunc is the shape every icon shares, so widgets can take one as a value.
 type IconFunc func(cx, cy, size float64, col color.RGBA)
 
+// DrawAOIcon depicts a sphere above its contact shadow.
+func DrawAOIcon(cx, cy, size float64, col color.RGBA) {
+	w := strokeWidth(size)
+	ring(cx, cy-size*0.12, size*0.27, w, col)
+	poly(w, col, v2(cx-size*0.4, cy+size*0.3), v2(cx-size*0.26, cy+size*0.4),
+		v2(cx+size*0.26, cy+size*0.4), v2(cx+size*0.4, cy+size*0.3))
+}
+
 // strokeWidth scales the 1.5 px nominal stroke to the current size.
 func strokeWidth(size float64) float32 {
 	w := size / IconSize * IconStroke
