@@ -2226,3 +2226,123 @@ palette would simply stop being in the browser one day with nothing to say why.
 `TestPixelShipIsInTheBundle` is the tripwire; if it ever fails, the fix is to
 put `Pixel Ship.hex` in the source folder before regenerating, not to delete the
 test.
+
+**V-160 · Ambient occlusion moved to the GPU, and started telling the truth
+about separate bodies.** Written up after the fact, from the code and the
+PROGRESS entries: the work was done by another agent (GPT-Astra) in sessions
+that logged the journal but not this file.
+
+The old AO was a CPU bake into vertex colours, which meant it could only
+darken where there were vertices to darken. The renderer carried a
+tessellation pass that existed for no other reason than to give that bake
+somewhere to interpolate. And a bake is per body, so two bodies sitting on one
+another cast nothing on each other — the one case where contact shading is
+what tells you they are touching.
+
+It is now a screen-space pass over the depth of every opaque body together, so
+bodies occlude each other and the result follows an edit as it happens rather
+than after a rebake. Depth is packed into RGB24 rather than sampled from a
+depth attachment, which is what lets it run on ordinary GL 3.3 RGBA8 render
+targets; view positions and normals are reconstructed from that, 32 hemisphere
+directions are sampled, and a depth-aware 5×5 filter takes the noise off
+without bleeding across silhouettes. The sampling rotation is keyed to the
+pixel's position rather than to time, because a random rotation per frame is
+how screen-space AO ends up shimmering while the camera sits still.
+
+AO attenuates the ambient term only. Direct light, paint, selection outlines
+and translucent previews are left alone, which is what keeps it a lighting
+effect rather than a filter over the picture. The pass restores the
+framebuffer and matrices it found, so a headless shot or a transparent PNG
+export nested inside a frame still comes out right. Off, or flat view, skips
+both passes entirely.
+
+The radius follows the model's own size, clamped to 0.2–5 world units, and
+does not change with zoom: contact shading that grew as you leaned in would
+read as the model changing rather than the camera.
+
+*It is screen space, and the doc says so.* Occluders off-screen or behind the
+visible depth surface cannot contribute, and thin contacts thin out with
+distance. `docs/AMBIENT-OCCLUSION.md` states that plainly rather than leaving
+someone to discover it, and credits the established technique it follows
+without incorporating its code.
+
+The toggle sits bottom-left and stays there with the scene panel collapsed,
+because a control that vanishes with a panel is a control you cannot find
+again. Turning it on from flat view restores lighting as well — flat view with
+AO armed and nothing to shade would be a switch that appears broken.
+
+**V-161 · The icons, redrawn as outlines — the second attempt.** The first
+one, V-154, was reverted on sight: converting the existing pictures to strokes
+dissolved recognisable objects into abstract geometry, and the verdict was
+"it went from basic icons to just geometric shapes". V-154 is a vacant number
+because the revert took its entry with it.
+
+This attempt kept the drawings and changed only the treatment: 52 icons at one
+1.75-unit weight with round caps and joins, drawn as open paths rather than
+filled silhouettes. The rasteriser grew an outline path mode to match, so the
+weight is a property of the drawing rather than something each icon achieves
+on its own; a closed outline repeats its starting point, and `fill="none"` in
+the source is what selects the mode.
+
+The rest of the pass is typography and chrome: the UI face is the system's own
+on Windows, read from `%WINDIR%\Fonts` at startup with the embedded Go faces
+as the fallback — a system font file stays on the user's machine and is never
+redistributed, which is the only arrangement that is both native-looking and
+shippable. Slightly larger labels, subdued borders on the active tool,
+section-count badges and cleaner card headings.
+
+Two coordinate-based click fixtures were moved to follow the revised
+colour-picker and sketch-flyout layout. 104 goldens were regenerated for the
+appearance change and reviewed by category rather than accepted in bulk.
+
+**V-162 · Pixels are copied by the face, not by the texture.** Paint gained a
+rectangular marquee (`U`, Shift for square), copy and repeated placement onto
+any face, with three icons beside the Paint heading and a sidebar section so
+none of it depends on knowing the shortcuts.
+
+The copy is taken through the face's polygon, not off the rectangle. A face's
+picture is a rectangle with a margin, and after a cut it can carry texture in
+holes that are no longer part of the face at all; copying the rectangle would
+lift paint that is not on the model and stamp it somewhere it never was. Each
+pixel is kept only when its centre falls inside the loops, which also settles
+the boundary cases without a special rule for them.
+
+The clipboard is a detached snapshot rather than a reference into the source
+picture. That is what lets it outlive editing, a resample, or leaving paint
+mode: the pixels you copied are the pixels you paste, whatever happened to
+where they came from. The marquee is the opposite — it is invalidated when its
+face's geometry or density changes, because a rectangle in texel coordinates
+means nothing once those coordinates have moved.
+
+Placement carries colour and partial alpha through unchanged and leaves the
+destination alone wherever the source was bare, so a paste is the shape that
+was copied rather than the rectangle it arrived in. One paste is one command
+with exact before-and-after snapshots.
+
+**V-163 · Placing a paste is a whole small tool.** Rotation, mirroring and
+which corner the cursor holds all arrived separately, and together they are
+the reason a paste can be put where it is wanted rather than merely put down.
+
+Ctrl+wheel turns the paste a quarter at a time. It is normalised to one turn
+per wheel event rather than scaled by the reported magnitude: a device that
+reports larger deltas would otherwise skip angles, or wrap a whole turn and
+appear to do nothing. The wheel is read as the vector's vertical component
+instead of raylib's dominant-axis scalar, because a horizontal signal larger
+than the vertical one made that helper alternate its answer and the paste flip
+between two angles. Neither device was in hand; both are regressions written
+against a reproduction rather than against the reported hardware, and the
+journal says so.
+
+Rotation and both mirrors resolve through one cached orientation, so the
+preview and the pixels that land are the same transform rather than two that
+have to be kept in agreement. The mirrors act on the rotated preview's axes,
+which is the only reading where "flip horizontal" means what it looks like it
+means. A new copy resets orientation, because carrying the last paste's angle
+onto fresh pixels is a surprise.
+
+Right-click during placement opens a mini menu with the four anchor corners,
+the four angles and Cancel — a menu, rather than more chips in the sidebar,
+because the choice is about the thing under the cursor and belongs next to it.
+It clamps to the window, blocks the controls beneath it and freezes the
+preview while open. Right-drag still orbits: a menu on right-click that ate
+the camera gesture would cost more than it gave.
