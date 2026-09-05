@@ -91,3 +91,26 @@ func TestAKnownPaletteKeepsItsExactColours(t *testing.T) {
 		}
 	}
 }
+
+// Pixel Ship was read off a reference image and hand-added to the bundle
+// (V-159). The header of library.pal says to regenerate it with
+// bundle.py from a folder of .hex files — which would drop this line unless
+// the .hex is in that folder. This test is the tripwire for that: if the
+// bundle is ever rebuilt without it, something says so here rather than the
+// palette quietly vanishing from the browser.
+func TestPixelShipIsInTheBundle(t *testing.T) {
+	for _, p := range Library() {
+		if p.Name != "Pixel Ship" {
+			continue
+		}
+		if len(p.Colors) != 21 {
+			t.Errorf("Pixel Ship has %d colours, want 21", len(p.Colors))
+		}
+		if c := p.Colors[0]; c.R != 0x0d || c.G != 0x10 || c.B != 0x17 {
+			t.Errorf("Pixel Ship starts on #%02X%02X%02X, want #0D1017", c.R, c.G, c.B)
+		}
+		return
+	}
+	t.Error("Pixel Ship is not in the bundle — was library.pal regenerated " +
+		"from a folder that does not hold its .hex?")
+}

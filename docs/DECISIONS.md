@@ -2201,3 +2201,28 @@ asserts the first left nothing see-through and the second left every texel it
 touched see-through, and by unit tests for the compositor, the per-stroke
 accumulator against an unstamped control, and the exported textures being
 opaque with the hull in the bare corners.
+
+**V-159 · Pixel Ship is in the bundle, and it was read by eye rather than
+sampled.** A palette extracted from a reference image of a pixel-art cargo ship
+— nine cool blue-greys for the hull, six oranges for the thrusters and trim,
+five cyans for the lights, and the flat grey the art sat on. It joins the
+shipped library (V-152) rather than the user's own folder, so it survives a
+fresh install and travels with the program.
+
+Two things about it are worth writing down rather than assuming.
+
+*The colours are approximate.* The reference arrived as a conversation
+attachment and was never written to disk, so there was no file to run a colour
+count against. The ramps and hues are read from the image; individual values
+are close rather than exact, and a colour used for only a handful of pixels may
+be missing entirely. If the source PNG turns up, re-deriving it properly — count
+every distinct colour, rank by coverage, cut at a chosen size — replaces these
+values with measured ones and is the better palette.
+
+*A bundle regeneration would silently delete it.* `library.pal` carries a header
+saying to regenerate with `bundle.py <folder-of-hex-files>`, and this entry was
+added by hand, so it exists in no such folder. That is a quiet failure — the
+palette would simply stop being in the browser one day with nothing to say why.
+`TestPixelShipIsInTheBundle` is the tripwire; if it ever fails, the fix is to
+put `Pixel Ship.hex` in the source folder before regenerating, not to delete the
+test.

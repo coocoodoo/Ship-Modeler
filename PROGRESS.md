@@ -952,6 +952,30 @@ the contract holding on its own.
 
 ---
 
+## 2026-09-04 (content) — Pixel Ship palette
+
+Extracted from a reference image of a pixel-art cargo ship and added to the
+shipped library as "Pixel Ship": 21 colours — nine cool blue-greys for the
+hull, six oranges for thrusters and trim, five cyans for the lights, and the
+backdrop grey (V-159).
+
+**Read by eye, not sampled.** The reference came through as a conversation
+attachment and was never written to disk, so there was no file to run a colour
+count against. Said so plainly rather than presenting a guess as an extraction;
+if the PNG turns up it is a minute's work to redo it measured.
+
+It went into the bundle rather than the user's `%APPDATA%\Modeler\palettes`
+folder so it survives a fresh install — and the copy that had been sitting there
+was removed, because the browser prepends the user's folder to the library and
+the same name in both would have shown up twice.
+
+One hazard recorded with a test: `library.pal` says to regenerate with
+`bundle.py` from a folder of .hex files, and this line was added by hand, so a
+regeneration would drop it without a word. `TestPixelShipIsInTheBundle` fails
+if that ever happens.
+
+---
+
 ## 2026-08-28 (feature) — Mesh import: STL and OBJ, merged back into polygons
 
 "Can you make it so I can import *.step files?"
