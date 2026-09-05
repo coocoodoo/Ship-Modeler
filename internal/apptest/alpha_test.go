@@ -19,8 +19,8 @@ func TestGoldenPaintAlpha(t *testing.T) {
 func TestATranslucentStrokeLeavesPaintYouCanSeeThrough(t *testing.T) {
 	stdout, _ := runScript(t, "m7_alpha")
 	dumps := parseM7Dumps(t, stdout)
-	if len(dumps) != 5 {
-		t.Fatalf("expected 5 dumps, got %d:\n%s", len(dumps), stdout)
+	if len(dumps) != 6 {
+		t.Fatalf("expected 6 dumps, got %d:\n%s", len(dumps), stdout)
 	}
 	start, solid, armed, thin, layered := dumps[0], dumps[1], dumps[2], dumps[3], dumps[4]
 
@@ -95,5 +95,29 @@ func TestEveryTexelOfATranslucentStrokeIsSeeThrough(t *testing.T) {
 	if thin.thin != laid {
 		t.Errorf("%d of the %d texels the translucent stroke laid came out solid",
 			laid-thin.thin, laid)
+	}
+}
+
+// The bug the user caught in the first cut, reported with a screenshot: "The
+// alpha paint is only applying to every other pixel, see the pattern." A
+// dither was armed, and the dither was being fed the brush's alpha instead of
+// the dab's coverage, so a hard stroke at half alpha landed on half its texels.
+func TestADitheredTranslucentStrokeStillCoversItsTexels(t *testing.T) {
+	stdout, _ := runScript(t, "m7_alpha")
+	dumps := parseM7Dumps(t, stdout)
+	plain, dithered := dumps[3].pictures[0], dumps[5].pictures[0]
+	beforePlain, beforeDithered := dumps[1].pictures[0], dumps[4].pictures[0]
+
+	// The same drag across the same face, one with a dither armed and one
+	// without. A dither decides how a *coverage* is spent, and a hard dab
+	// covers its texels completely, so there is nothing for it to spend.
+	laidPlain := plain.opaque - beforePlain.opaque
+	laidDithered := dithered.opaque - beforeDithered.opaque
+	if laidDithered != laidPlain {
+		t.Errorf("the dithered stroke laid %d texels against the plain stroke's %d: "+
+			"the dither is thinning out the glaze", laidDithered, laidPlain)
+	}
+	if dithered.thin-beforeDithered.thin != laidDithered {
+		t.Error("some of the dithered stroke came out solid")
 	}
 }

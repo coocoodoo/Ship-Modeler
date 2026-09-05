@@ -302,8 +302,10 @@ The **Alpha** slider sits between the palette grid and the recents, and runs
 not of the colour: choosing a swatch never changes it. Below full, a dab
 composites source-over onto whatever is already on the texel rather than
 replacing it, and its coverage rides on the same alpha — half a dab of
-half-transparent paint is a quarter laid down. Dithering spends alpha on whole
-texels, the same way it spends coverage.
+half-transparent paint is a quarter laid down. Dithering spends the dab's *coverage* on
+whole texels, as it always did, and never the alpha: those are different
+questions, and a hard dab at half alpha is an even glaze under every dither
+mode rather than paint on every other texel.
 
 A stroke lays its alpha once. Overlapping dabs within one stroke accumulate to
 the alpha you asked for and no further, so a translucent line is even along its

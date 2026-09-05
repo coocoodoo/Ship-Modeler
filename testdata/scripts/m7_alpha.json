@@ -31,5 +31,12 @@
   {"op":"drag","from":[600,440],"to":[900,440],"segs":12},
   {"op":"settle"},
   {"op":"dump"},
-  {"op":"shot","name":"m7_alpha_layered"}
+  {"op":"shot","name":"m7_alpha_layered"},
+
+  {"op":"paint.dither","kind":"2x2"},
+  {"op":"paint.color","hex":"FFA51E"},
+  {"op":"drag","from":[600,410],"to":[900,410],"segs":12},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m7_alpha_dithered"}
 ]

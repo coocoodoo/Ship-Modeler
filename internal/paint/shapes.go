@@ -265,15 +265,21 @@ func put(p *mesh.FacePaint, b Brush, at image.Point, coverage float64) image.Rec
 	// onto the texel rather than replacing it, and its coverage rides on the
 	// same alpha: half a dab of half-transparent paint is a quarter laid down.
 	if c.A < 255 {
-		a := float64(c.A) / 255 * coverage
+		// Dithering spends the dab's *coverage* on whole texels rather than on
+		// a blend, which is what keeps a soft edge or a ramp inside the
+		// palette. It must not spend the alpha with it. The two are different
+		// questions - coverage is how much of this texel the brush is over,
+		// alpha is how much of the colour is being laid down - and putting
+		// alpha through the threshold turns an even glaze into paint on every
+		// other texel, which is what a hard dab at half alpha came out as
+		// while any dither was armed (V-158).
 		if b.Dither != DitherNone {
-			// Dithering spends a fraction on whole texels instead of on a
-			// blend, and that is as true of alpha as it is of coverage.
-			if !b.Dither.Covers(at.X, at.Y, a) {
+			if !b.Dither.Covers(at.X, at.Y, coverage) {
 				return image.Rectangle{}
 			}
-			a = float64(c.A) / 255
+			coverage = 1
 		}
+		a := float64(c.A) / 255 * coverage
 		if b.Once != nil {
 			// How much this texel has already taken from this stroke. Going
 			// from that to a total of a means adding only the difference the

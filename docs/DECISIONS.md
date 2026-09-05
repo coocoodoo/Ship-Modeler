@@ -2184,6 +2184,18 @@ shows what the viewport showed. It is also the only thing that could make
 translucent paint survive the trip, since a glaze is only a glaze against
 something.
 
+**Corrected the same day, from a screenshot: "the alpha paint is only applying
+to every other pixel, see the pattern."** The first cut fed the dither the
+brush's alpha instead of the dab's coverage, on the reasoning that dithering
+spends a fraction on whole texels and alpha is a fraction. It is the wrong
+fraction. Coverage is how much of this texel the brush is over; alpha is how
+much of the colour is being laid down. A hard dab covers its texels
+completely, so a dither has nothing to spend on it - but half alpha put
+through a 2x2 threshold clears two of its four ranks, which is a checkerboard
+exactly half laid. Dither now takes the coverage, as it always did, and the
+alpha lands on whatever survives it. A soft brush's falloff still breaks up
+into whole texels, which is what dithering is actually for.
+
 Pinned by `m7_alpha`, which paints a solid stroke and a glaze on one face and
 asserts the first left nothing see-through and the second left every texel it
 touched see-through, and by unit tests for the compositor, the per-stroke

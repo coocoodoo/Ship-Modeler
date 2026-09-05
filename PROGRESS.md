@@ -43,9 +43,19 @@ picture over the body colour on the way out, so the file shows what the
 viewport shows - and it is also the only thing that could carry translucent
 paint out at all.
 
+**Caught by the user, same day, with a screenshot:** "the alpha paint is only
+applying to every other pixel, see the pattern." A dither was armed, and the
+first cut fed the dither the brush's alpha rather than the dab's coverage - so
+half alpha through a 2x2 threshold cleared two ranks of four and laid an exact
+checkerboard. Reproduced headless first (34 texels where 68 were expected),
+then fixed: the dither takes the coverage, as it always did, and the alpha
+lands on whatever survives it. A soft brush's falloff still breaks up into
+whole texels, which is what dithering is for.
+
 **Verified:** `m7_alpha` paints a solid stroke and a glaze on one face and
 checks the first left nothing see-through and the second left every texel it
-touched see-through; unit tests cover the compositor, the accumulator against
+touched see-through, and repeats the glaze with a dither armed to check it
+covers the same texel count; unit tests cover the compositor, the accumulator against
 an unstamped control, and the exported textures being opaque with the hull in
 their bare corners. Both sidebar scripts were relocated for the taller panel,
 and the picker's popover now flips above the colour row, which its goldens

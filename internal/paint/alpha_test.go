@@ -145,3 +145,54 @@ func TestATranslucentGradientStaysTranslucentEndToEnd(t *testing.T) {
 		t.Fatalf("the ramp did not travel: %v to %v", a, z)
 	}
 }
+
+// Reported against the first cut of V-158, with a screenshot: "The alpha paint
+// is only applying to every other pixel, see the pattern."
+//
+// The cause was dithering being fed the alpha instead of the dab's coverage.
+// They are different questions - coverage is how much of this texel the brush
+// is over, alpha is how much of the colour is being laid down - and putting
+// alpha through the threshold turns an even glaze into a checkerboard. A hard
+// dab covers its texels completely, so a dither has nothing to spend and every
+// one of them must take paint.
+func TestADitherDoesNotThinOutATranslucentDab(t *testing.T) {
+	for _, d := range []Dither{Dither2x2, Dither4x4, Dither8x8} {
+		p := testPaint(t, 8)
+		b := Brush{Color: halfRed, Size: 1, Dither: d, Once: NewStamp(halfRed)}
+		Stroke(p, b, image.Point{X: 2, Y: 2}, image.Point{X: 12, Y: 2})
+
+		for x := 2; x <= 12; x++ {
+			if At(p, image.Point{X: x, Y: 2}).A == 0 {
+				t.Fatalf("%s left texel (%d,2) bare: the glaze came out as a checkerboard",
+					d.String(), x)
+			}
+		}
+	}
+}
+
+func TestADitherStillBreaksUpASoftTranslucentEdge(t *testing.T) {
+	// The other half of the same claim: coverage still goes through the
+	// threshold, so a soft brush's falloff is spent on whole texels rather
+	// than on a blend, which is what dithering is for.
+	p := testPaint(t, 16)
+	b := Brush{Color: halfRed, Size: 8, Soft: true, Dither: Dither4x4, Once: NewStamp(halfRed)}
+	at := image.Point{X: 8, Y: 8}
+	Stroke(p, b, at, at)
+
+	painted, bare := 0, 0
+	for y := 8; y < 16; y++ {
+		for x := 8; x < 16; x++ {
+			if At(p, image.Point{X: x, Y: y}).A == 0 {
+				bare++
+			} else {
+				painted++
+			}
+		}
+	}
+	if bare == 0 {
+		t.Error("the soft dab filled its whole square: the dither is not breaking up the falloff")
+	}
+	if painted == 0 {
+		t.Error("the soft dab painted nothing at all")
+	}
+}
