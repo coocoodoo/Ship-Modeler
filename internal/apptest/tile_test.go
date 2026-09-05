@@ -31,7 +31,7 @@ func TestTileStampsSnapTurnAndUndo(t *testing.T) {
 	//   undo ............................... 192
 	var opaque []string
 	var sums []string
-	re := regexp.MustCompile(`^facepaint .* opaque=(\d+) sum=([0-9a-f]+)$`)
+	re := regexp.MustCompile(`^facepaint .* opaque=(\d+) thin=\d+ sum=([0-9a-f]+)$`)
 	for _, raw := range strings.Split(stdout, "\n") {
 		if m := re.FindStringSubmatch(strings.TrimRight(raw, "\r")); m != nil {
 			opaque = append(opaque, m[1])

@@ -148,6 +148,14 @@ func Gradient(p *mesh.FacePaint, region image.Rectangle, a, z image.Point,
 	if p == nil || region.Empty() {
 		return image.Rectangle{}
 	}
+	// A caller that never set an alpha means an opaque ramp, which is the
+	// same reading the brush gives a bare colour.
+	if from.A == 0 {
+		from.A = 255
+	}
+	if to.A == 0 {
+		to.A = 255
+	}
 	dx, dy := float64(z.X-a.X), float64(z.Y-a.Y)
 	lenSq := dx*dx + dy*dy
 
@@ -167,17 +175,62 @@ func Gradient(p *mesh.FacePaint, region image.Rectangle, a, z image.Point,
 			c := to
 			if d == DitherNone {
 				c = lerpColor(from, to, t)
+				// lerpColor stores an opaque result, which is what the
+				// coverage blend it was written for wants and the opposite of
+				// what a translucent ramp wants: the alpha is the brush's and
+				// has to survive the mix (V-158).
+				c.A = uint8(float64(from.A) + (float64(to.A)-float64(from.A))*t + 0.5)
 			} else if !d.Covers(x, y, t) {
 				c = from
 			}
-			c.A = 255
 			at := image.Point{X: x, Y: y}
+			if c.A < 255 {
+				c = Over(At(p, at), c)
+			} else {
+				c.A = 255
+			}
 			if Set(p, at, c) {
 				dirty = union(dirty, oneTexel(at))
 			}
 		}
 	}
 	return dirty
+}
+
+// Over composites src onto dst by src's alpha, the ordinary source-over rule.
+//
+// A texel's alpha is what the viewport mixes the body's own colour through, so
+// a partly transparent result is paint you can see the hull beneath — which is
+// exactly what an alpha below full is asking for. Fully opaque src replaces
+// dst outright, which is the path every tool took before alpha existed and
+// still takes whenever the slider is at the top (V-158).
+func Over(dst, src color.RGBA) color.RGBA {
+	sa := float64(src.A) / 255
+	if sa >= 1 {
+		return color.RGBA{R: src.R, G: src.G, B: src.B, A: 255}
+	}
+	if sa <= 0 {
+		return dst
+	}
+	da := float64(dst.A) / 255
+	outA := sa + da*(1-sa)
+	if outA <= 0 {
+		return color.RGBA{}
+	}
+	ch := func(s, d uint8) uint8 {
+		v := (float64(s)*sa + float64(d)*da*(1-sa)) / outA
+		if v < 0 {
+			v = 0
+		}
+		if v > 255 {
+			v = 255
+		}
+		return uint8(v + 0.5)
+	}
+	return color.RGBA{
+		R: ch(src.R, dst.R), G: ch(src.G, dst.G), B: ch(src.B, dst.B),
+		A: uint8(outA*255 + 0.5),
+	}
 }
 
 // put writes one texel at a coverage, which is the single place the brush's
@@ -205,7 +258,45 @@ func put(p *mesh.FacePaint, b Brush, at image.Point, coverage float64) image.Rec
 	}
 
 	c := b.Color
-	c.A = 255
+	if c.A == 0 {
+		c.A = 255 // a caller that never set an alpha means an opaque brush
+	}
+	// A translucent brush lays paint you can see through, so it composites
+	// onto the texel rather than replacing it, and its coverage rides on the
+	// same alpha: half a dab of half-transparent paint is a quarter laid down.
+	if c.A < 255 {
+		a := float64(c.A) / 255 * coverage
+		if b.Dither != DitherNone {
+			// Dithering spends a fraction on whole texels instead of on a
+			// blend, and that is as true of alpha as it is of coverage.
+			if !b.Dither.Covers(at.X, at.Y, a) {
+				return image.Rectangle{}
+			}
+			a = float64(c.A) / 255
+		}
+		if b.Once != nil {
+			// How much this texel has already taken from this stroke. Going
+			// from that to a total of a means adding only the difference the
+			// stroke has left to give, which is what keeps the joins between
+			// overlapping dabs from stacking up darker than the dabs.
+			had := b.Once[at]
+			if a <= had {
+				return image.Rectangle{}
+			}
+			b.Once[at] = a
+			a = (a - had) / (1 - had)
+		}
+		src := c
+		src.A = uint8(a*255 + 0.5)
+		if src.A == 0 {
+			return image.Rectangle{}
+		}
+		out := Over(At(p, at), src)
+		if !Set(p, at, out) {
+			return image.Rectangle{}
+		}
+		return oneTexel(at)
+	}
 	switch {
 	case coverage >= 1:
 	case b.Dither != DitherNone:

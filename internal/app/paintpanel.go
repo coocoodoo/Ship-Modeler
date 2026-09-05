@@ -31,6 +31,13 @@ const (
 	paintRecentsCount = 8
 )
 
+// The brush alpha's range (V-158). The floor is 1 and not 0: alpha zero is not
+// faint paint but no paint, which is the eraser's job.
+const (
+	MinPaintAlpha = 1
+	MaxPaintAlpha = 255
+)
+
 // buildPaintBar draws the sidebar and runs the palette inside it.
 //
 // While the bar is still moving its contents are laid out at the width they
@@ -215,6 +222,9 @@ func (a *App) buildPaintPanel(bar rl.Rectangle) {
 	if !showTiles {
 		a.UI.Text(row(line), "Palette", ui.FontSizeSmall, ui.ColorTextDim)
 		a.paintPaletteGrid(row(float32(paintPaletteRows)*(swatch+gap)), swatch, gap)
+		space(6)
+
+		a.buildAlphaSection(row, line)
 		space(6)
 
 		a.UI.Text(row(line), "Recents", ui.FontSizeSmall, ui.ColorTextDim)
@@ -571,11 +581,19 @@ func (a *App) paintColorRow(r rl.Rectangle) {
 	sw := a.px(paintSwatchSize)
 	gap := a.px(4)
 
+	// The armed slots, unlike the palette grid, show the brush's alpha: these
+	// two are what the next stroke actually lays down, and a chip that says
+	// solid while the slider says glaze is a chip that lies (V-158).
+	tipAlpha := ""
+	if st.alpha < 255 {
+		tipAlpha = fmt.Sprintf(" at %d%%", alphaPercent(st.alpha))
+	}
 	slot := func(i int, c color.RGBA, tip string, x float32) {
 		box := ui.Rect(x, r.Y+(r.Height-sw)/2, sw, sw)
 		if a.UI.ColorSwatch(ui.MakeID("paint.slot"+itoa(i)), box, c, ui.SwatchOpts{
-			Tooltip:  tip + ": #" + paint.Hex(c),
+			Tooltip:  tip + ": #" + paint.Hex(c) + tipAlpha,
 			Selected: st.slot == i,
+			Alpha:    st.alpha,
 		}) {
 			if st.slot == i {
 				// A second click on the slot already armed opens the mixer,
@@ -663,4 +681,67 @@ func (a *App) drawPaintPicker() {
 // sameColor compares two colours ignoring alpha, which the palette never uses.
 func sameColor(a, b color.RGBA) bool {
 	return a.R == b.R && a.G == b.G && a.B == b.B
+}
+
+// buildAlphaSection is the brush's opacity, between the palette and the
+// recents because it is the other half of choosing a colour: the grid says
+// which colour, this says how much of it (SPEC-UX §13.1, V-158).
+//
+// The value reads as a percentage rather than as 0..255. "How much of this
+// colour lands" is the question being asked, and 0..255 is only how the answer
+// is stored.
+//
+// The slider stops at 1 rather than 0. Alpha zero is not faint paint, it is no
+// paint at all — that is what the eraser is for, and a brush that silently
+// became an eraser at the bottom of its own range would be a trap.
+func (a *App) buildAlphaSection(row func(float32) rl.Rectangle, line float32) {
+	st := &a.paint
+	head := row(line)
+	note, label := ui.SplitRight(head, a.px(104))
+	a.UI.Text(label, "Alpha", ui.FontSizeSmall, ui.ColorTextDim)
+	a.UI.Text(note, describeAlpha(st.alpha), ui.FontSizeSmall,
+		ui.Fade(ui.ColorTextDim, 0.9))
+
+	r := row(a.px(24))
+	// Wider than the wand's readout and with a gap before it: "100%" is four
+	// glyphs, and at the top of the range the knob sits at the very end of the
+	// track, where it would otherwise sit on top of them.
+	valueBox, sliderBox := ui.SplitRight(r, a.px(46))
+	sliderBox.Width -= a.px(8)
+	if v, changed := a.UI.Slider(ui.MakeID("paint.alpha"), sliderBox,
+		float64(st.alpha), MinPaintAlpha, MaxPaintAlpha, ui.ButtonOpts{
+			Tooltip: "How much of the colour a stroke lays down — full is solid, less lets what is under it show through",
+		}); changed {
+		st.alpha = uint8(clampInt(int(v+0.5), MinPaintAlpha, MaxPaintAlpha))
+	}
+	a.UI.Text(valueBox, fmt.Sprintf("%d%%", alphaPercent(st.alpha)),
+		ui.FontSizeUI, ui.ColorText)
+}
+
+// alphaPercent is an alpha as the percentage the readout shows. It rounds to
+// nearest so the top of the slider says 100 and the bottom does not say 0 —
+// a stroke that lands is never nothing.
+func alphaPercent(v uint8) int {
+	p := int(float64(v)/255*100 + 0.5)
+	if p < 1 {
+		p = 1
+	}
+	return p
+}
+
+// describeAlpha names what an alpha means, so the slider is a sentence rather
+// than a bare number — the same courtesy the wand's tolerance gets.
+func describeAlpha(v uint8) string {
+	switch {
+	case v >= 255:
+		return "solid"
+	case v >= 208:
+		return "nearly solid"
+	case v >= 144:
+		return "translucent"
+	case v >= 72:
+		return "a glaze"
+	default:
+		return "a faint tint"
+	}
 }

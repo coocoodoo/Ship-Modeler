@@ -70,11 +70,12 @@ STL (both encodings) and OBJ, read into triangle soup by `io.ReadMeshFile` and a
 - **OBJ + MTL + PNGs** (primary): triangulated; `v` floats; `vt` per painted-face texel mapping; one material per painted face (`map_Kd paint/<uid>.png`), one shared material per body color for unpainted faces; Y-up, -Z forward note in header comment; README documents "set texture filtering to nearest in your engine".
 - **STL** (binary): geometry only; note in dialog "no colors in STL".
 - **PNG screenshot**: current camera, 1×/2×/4× (nearest upscale — crisp pixel look preserved), optional transparent background (skip gradient, alpha framebuffer RT).
+- Exported paint textures are **flattened**: each face's picture is composited over its body's own colour and written opaque (V-158). Exported materials name one base colour texture with nothing to blend it against, so a transparent texel would draw black — an unpainted texel has to leave carrying the hull. This is also what carries translucent paint out correctly.
 - Export never mutates the document; overwrite prompts via one modal (UX §4's rare-modal allowance).
 
 ## 6. Settings, autosave, recovery
 
-- `%APPDATA%\Modeler\settings.json`: window rect, ui scale override, grid step, recent files (≤8, MRU), palette custom page + recents, tips counters (push/pull hint), MSAA toggle, autosave interval (default 120 s).
+- `%APPDATA%\Modeler\settings.json`: window rect, ui scale override, grid step, recent files (≤8, MRU), palette custom page + recents, brush alpha (V-158), tips counters (push/pull hint), MSAA toggle, autosave interval (default 120 s).
 - Autosave: if dirty, every interval → `%APPDATA%\Modeler\autosave\<docStem>-<pid>.ship`; deleted on clean save/exit.
 - Crash-save: `main` wraps the loop in recover → attempt autosave → write `crash-<ts>.log` (stack) → re-panic to OS. Next launch: if autosave newer than its document (or orphaned) → recovery modal: Restore / Discard.
 

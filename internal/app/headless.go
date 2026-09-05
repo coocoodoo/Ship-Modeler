@@ -700,7 +700,7 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		"paint.textures", "paint.faceview", "paint.color2", "paint.swap",
 		"paint.dither", "paint.shapefill", "paint.lock", "paint.unlock",
 		"paint.edges", "paint.edgewidth", "paint.creases", "paint.pickedge",
-		"paint.wand", "paint.wandclear",
+		"paint.wand", "paint.wandclear", "paint.alpha",
 		"tile.import", "tile.grid", "tile.select", "tile.orient", "tile.stamp":
 		if err := r.paintOp(op); err != nil {
 			return err
@@ -1414,6 +1414,12 @@ func (r *ScriptRunner) paintOp(op io.Op) error {
 		}
 		a.paint.size = op.Size
 
+	case "paint.alpha":
+		if op.Size < MinPaintAlpha || op.Size > MaxPaintAlpha {
+			return op.Errorf("paint.alpha needs %d..%d", MinPaintAlpha, MaxPaintAlpha)
+		}
+		a.paint.alpha = uint8(op.Size)
+
 	case "paint.textures":
 		a.paint.hideTextures = !*op.Visible
 
@@ -1932,12 +1938,12 @@ func (r *ScriptRunner) dumpPaint() {
 	st := &a.paint
 	fmt.Printf("paint mode=%d tool=%q size=%d res=%d color=%q color2=%q "+
 		"dither=%q fill=%d slot=%d textures=%d locked=%d lockface=%d target=%d "+
-		"awaitlock=%d\n",
+		"awaitlock=%d alpha=%d\n",
 		boolBit(a.InPaint()), st.tool.String(), st.size, st.res,
 		paint.Hex(st.color), paint.Hex(st.colorB), st.dither.String(),
 		boolBit(st.fillShape), st.slot, boolBit(!st.hideTextures),
 		boolBit(st.locked), st.lockFace.Seq(), stickyTargetSeq(a),
-		boolBit(st.awaitingLock))
+		boolBit(st.awaitingLock), st.alpha)
 
 	if on, res := a.paintResMismatch(); on {
 		fmt.Printf("resprompt offer=%d armed=%d\n", res, st.res)
@@ -1971,10 +1977,10 @@ func (r *ScriptRunner) dumpPaint() {
 			seen[p] = true
 			bounds := p.TexelBounds()
 			fmt.Printf("facepaint body=%d face=%d faces=%d res=%d texel=%.8f "+
-				"rect=%d,%d,%d,%d opaque=%d sum=%08x\n",
+				"rect=%d,%d,%d,%d opaque=%d thin=%d sum=%08x\n",
 				b.ID, b.Mesh.Faces[fi].ID.Seq(), facesSharing(b.Mesh, p), p.Res, p.Texel,
 				bounds.Min.X, bounds.Min.Y, bounds.Max.X, bounds.Max.Y,
-				opaqueTexels(p), pictureSum(p))
+				opaqueTexels(p), thinTexels(p), pictureSum(p))
 		}
 	}
 }
@@ -2024,6 +2030,22 @@ func opaqueTexels(p *mesh.FacePaint) int {
 	n := 0
 	for i := 3; i < len(p.Img.Pix); i += 4 {
 		if p.Img.Pix[i] != 0 {
+			n++
+		}
+	}
+	return n
+}
+
+// thinTexels counts the texels a stroke laid down but did not fill: paint you
+// can see the hull through (V-158). Opaque and bare texels are both zero here,
+// which is what makes it the direct claim a translucent brush is making.
+func thinTexels(p *mesh.FacePaint) int {
+	if p == nil || p.Img == nil {
+		return 0
+	}
+	n := 0
+	for i := 3; i < len(p.Img.Pix); i += 4 {
+		if a := p.Img.Pix[i]; a != 0 && a != 255 {
 			n++
 		}
 	}

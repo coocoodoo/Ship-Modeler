@@ -60,9 +60,13 @@ type paintState struct {
 	// browser is the palette library's list (V-152).
 	browser paletteBrowser
 
-	tool  paint.Tool
-	size  int
-	res   int
+	tool paint.Tool
+	size int
+	res  int
+	// alpha is how much of the armed colour a stroke lays down, 0..255. It
+	// belongs to the brush rather than to the colour: clicking a swatch is
+	// choosing a hue, not undoing the transparency you set (V-158).
+	alpha uint8
 	color color.RGBA
 	// colorB is the gradient's far end. It is a second armed colour rather than
 	// a gradient setting, because picking one up with the eyedropper and
@@ -196,6 +200,7 @@ func (a *App) initPaint() {
 	// The far end of a ramp defaults to the palette's near-black, so a gradient
 	// straight out of the box fades into shadow rather than into nothing.
 	a.paint.colorB = paint.DefaultPalette()[0]
+	a.paint.alpha = 255
 	a.paint.edgeWidth = paint.DefaultEdgeWidth
 	a.paint.wandTolerance = DefaultWandTolerance
 	a.paint.hoverEdge = -1
@@ -736,6 +741,20 @@ func (a *App) setPaintColor(c color.RGBA) {
 
 // activeColor is the colour the palette, the eyedropper and the picker are
 // currently pointed at.
+// brushColor is the armed colour at the brush's alpha: what a stroke lays
+// down, as opposed to what the swatches show.
+func (a *App) brushColor() color.RGBA {
+	c := a.activeColor()
+	c.A = a.paint.alpha
+	if c.A == 0 {
+		// Nothing at all is not a useful brush, and a slider dragged to the
+		// floor is far more likely to be on its way somewhere than to be a
+		// request to paint invisibly.
+		c.A = 1
+	}
+	return c
+}
+
 func (a *App) activeColor() color.RGBA {
 	if a.paint.slot == 1 {
 		return a.paint.colorB
@@ -810,7 +829,7 @@ func (a *App) applyStroke() {
 		Body:   a.paint.strokeBody,
 		Face:   a.paint.strokeFace,
 		Tool:   a.paint.tool,
-		Color:  a.paint.color,
+		Color:  a.brushColor(),
 		ColorB: a.paint.colorB,
 		Size:   a.paint.size,
 		Res:    a.allocResFor(a.paint.strokeBody),
@@ -877,7 +896,7 @@ func (a *App) CancelStroke() bool {
 func (a *App) PaintFace(bodyID uint32, uid mesh.FaceUID, pts []image.Point) bool {
 	return a.Run(&paint.StrokeFace{
 		Body: bodyID, Face: uid,
-		Tool: a.paint.tool, Color: a.paint.color, ColorB: a.paint.colorB,
+		Tool: a.paint.tool, Color: a.brushColor(), ColorB: a.paint.colorB,
 		Size: a.paint.size, Res: a.allocResFor(bodyID),
 		Dither: a.paint.dither, Fill: a.paint.fillShape,
 		Points: pts,
@@ -1027,7 +1046,7 @@ func (a *App) paintCursorOverlay() *render.Overlay {
 		Paint:   h.paint,
 		Texel:   h.texel,
 		Size:    a.paint.size,
-		Color:   a.paint.color,
+		Color:   a.brushColor(),
 		Erasing: a.paint.tool == paint.ToolEraser,
 		Filling: a.paint.tool == paint.ToolFill,
 	}

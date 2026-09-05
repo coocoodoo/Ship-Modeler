@@ -2135,3 +2135,57 @@ decode is the last reason a modelling program should refuse to start.
 `rsrc` was already in the module graph as an indirect dependency, so the
 resource regenerates offline; the command is recorded at the top of
 `assets/mkicon.py` next to the drawing it consumes.
+
+**V-158 . Alpha belongs to the brush, not to the colour.** Asked for as
+"between Palette and Recent, can you add an alpha slider? and make alpha
+colors functional?". The slider is the small half. Every paint tool used to
+force alpha to 255 in about a dozen places, deliberately: a texel's alpha is
+what the viewport mixes the body's own colour through, so a partial alpha
+meant the hull showing through paint that was supposed to be on top of it.
+
+Making it functional is one branch in `put`, the single texel writer every
+tool funnels through. Below full alpha the dab composites source-over instead
+of replacing, and its coverage rides on the same alpha - half a dab of
+half-transparent paint is a quarter laid down. The opaque path above it is
+untouched byte for byte, which is what lets a hundred goldens stay true.
+
+The setting lives on the brush rather than on the swatch. Clicking a colour is
+choosing a hue, and it would be a surprise if that also undid the transparency
+you had just set; it is the same reasoning that keeps the brush size off the
+palette. So a gradient takes the brush's alpha at *both* ends - a translucent
+ramp fades between two hues, not from thin paint to thick - and `lerpColor`,
+which stores an opaque result because the coverage blend it was written for
+wants one, has its alpha put back afterwards.
+
+The catch is that a freehand stroke is dozens of dabs that share their
+endpoints, so every interior texel is written twice and composites twice. That
+is a line visibly blotched at its own joins. `Brush.Once` records how much each
+texel has already taken during this one stroke and lays only the difference
+`(a - had) / (1 - had)`, which is exact for source-over; the map is nil for an
+opaque brush, which has nothing to accumulate. Edge lines get one accumulator
+per face, not per command: texel coordinates only mean something against the
+image they index, and two faces have two images.
+
+The slider stops at 1. Alpha zero is not faint paint but no paint, which is
+the eraser's job, and a brush that silently became an eraser at the bottom of
+its own range would be a trap. The two armed chips draw over a checkerboard so
+they show what the next stroke lays down rather than the hue in the abstract,
+and the cursor's colour preview fades with the brush - a glaze looks like a
+glaze before it lands. The palette grid stays opaque: it holds hues.
+
+Fixing this exposed an older bug in the exports. A face's texture only carries
+the texels that were painted, and the viewport shows the body's colour through
+the rest - but a glTF or OBJ material names one base colour texture and has
+nothing to blend it with, so a transparent texel under an opaque material is
+black in a conforming renderer. One painted pixel blackened the rest of its
+face on the way out. `flattenPaint` composites the picture over the body's
+colour at export time, so the hull leaves *inside* the texture and the file
+shows what the viewport showed. It is also the only thing that could make
+translucent paint survive the trip, since a glaze is only a glaze against
+something.
+
+Pinned by `m7_alpha`, which paints a solid stroke and a glaze on one face and
+asserts the first left nothing see-through and the second left every texel it
+touched see-through, and by unit tests for the compositor, the per-stroke
+accumulator against an unstamped control, and the exported textures being
+opaque with the hull in the bare corners.

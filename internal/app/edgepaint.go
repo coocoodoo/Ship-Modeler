@@ -168,7 +168,7 @@ func (a *App) PaintSelectedEdges() bool {
 		cmd := &paint.StrokeEdges{
 			Body:  id,
 			Edges: byBody[id],
-			Color: a.paint.color,
+			Color: a.brushColor(),
 			Size:  a.paint.edgeWidth,
 			Res:   a.allocResFor(id),
 		}

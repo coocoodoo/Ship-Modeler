@@ -2,12 +2,54 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** The executable and its window carry the program's own
-icon (V-157). The colour picker applies what you pick (V-156) and the wheel
-over the palette list no longer zooms the model (V-155). Suite green, exe
-rebuilt, pushed.
+**Current state:** The brush has an alpha slider and translucent paint that
+composites properly, and exports no longer blacken unpainted texels (V-158).
+The executable and its window carry the program's own icon (V-157). Suite
+green, exe rebuilt, pushed.
 
 ---
+
+## 2026-09-04 - A brush you can see through (V-158)
+
+**Request:** "between Palette and Recent, can you add an alpha slider? and
+make alpha colors functional?"
+
+**The slider was the small half.** Every tool used to force alpha to 255 in
+about a dozen places, on purpose - a texel's alpha is what the viewport mixes
+the body's colour through. Functional alpha is one branch in `put`, the single
+texel writer every tool goes through: below full alpha the dab composites
+source-over and its coverage rides on the same alpha. The opaque path above it
+is unchanged byte for byte, which is why no golden had to be re-judged for the
+paint itself - only for the panel getting two rows taller.
+
+**Alpha is a brush setting, not a colour's.** Clicking a swatch is choosing a
+hue and must not undo the transparency you just set. So the gradient takes the
+brush's alpha at both ends, and `lerpColor`'s forced-opaque result has its
+alpha restored after the mix.
+
+**The one that bit:** a freehand stroke is dozens of dabs sharing their
+endpoints, so interior texels composite twice and a translucent line comes out
+blotched at its own joins. `Brush.Once` records what each texel has already
+taken this stroke and lays only the remaining difference, which is exact for
+source-over. Nil for an opaque brush. Edge lines get one accumulator per face,
+not per command - texel coordinates only mean something against their own
+image.
+
+**Found while in here, and older than the request:** glTF and OBJ wrote the
+face texture as-is under an opaque material with no `alphaMode`, so every
+unpainted texel exported as transparent black. One painted pixel blackened the
+rest of its face in any conforming viewer. `flattenPaint` now composites the
+picture over the body colour on the way out, so the file shows what the
+viewport shows - and it is also the only thing that could carry translucent
+paint out at all.
+
+**Verified:** `m7_alpha` paints a solid stroke and a glaze on one face and
+checks the first left nothing see-through and the second left every texel it
+touched see-through; unit tests cover the compositor, the accumulator against
+an unstamped control, and the exported textures being opaque with the hull in
+their bare corners. Both sidebar scripts were relocated for the taller panel,
+and the picker's popover now flips above the colour row, which its goldens
+were re-judged against. Suite green.
 
 ## 2026-09-04 - The program has a face (V-157)
 

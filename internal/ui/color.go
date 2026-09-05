@@ -36,6 +36,11 @@ type SwatchOpts struct {
 	// Empty draws the chip as an unfilled slot, for a recents strip that has
 	// not filled up yet.
 	Empty bool
+	// Alpha, below full, draws the colour over a transparency checkerboard so
+	// the chip shows how much of it a stroke would actually lay down. Zero
+	// means the chip is opaque, which is what a palette entry is: the palette
+	// holds hues, and how solid they go on is the brush's business (V-158).
+	Alpha uint8
 }
 
 // ColorSwatch draws a colour chip and reports a click on it.
@@ -45,7 +50,12 @@ func (c *Context) ColorSwatch(id ID, r rl.Rectangle, col color.RGBA, opts Swatch
 		c.StrokeRounded(r, 4, Fade(ColorStroke, 0.7))
 		return false
 	}
-	c.FillRounded(r, 4, col)
+	if opts.Alpha > 0 && opts.Alpha < 255 {
+		c.FillChecker(r, 4)
+		c.FillRounded(r, 4, WithAlpha(col, opts.Alpha))
+	} else {
+		c.FillRounded(r, 4, col)
+	}
 
 	border := ColorStroke
 	switch {

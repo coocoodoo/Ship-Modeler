@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"image"
+	"image/color"
 	"math"
 	"os"
 	"path/filepath"
@@ -27,6 +28,42 @@ import (
 //
 // The textures land in a `paint/` folder beside the OBJ and are referenced
 // relatively, so the three move together.
+// flattenPaint composites a face's picture over the body's own colour and
+// returns an opaque copy of it.
+//
+// A face's texture only carries the texels that were painted; everywhere else
+// it is transparent, and the viewport shows the body's colour through that
+// (SPEC-GEOMETRY §8.2). An exported material has no such shader. It names one
+// base colour texture and nothing to blend it with, so a transparent texel
+// under an opaque material is black in a conforming renderer — which meant a
+// single painted pixel used to blacken the rest of its face on export.
+//
+// Flattening resolves it in the one place that knows both halves: the picture
+// leaves with the hull already behind it, so what the file shows is what the
+// viewport showed. It is also what makes translucent paint survive the trip at
+// all, since a glaze is only a glaze against something (V-158).
+func flattenPaint(img *image.RGBA, under color.RGBA) *image.RGBA {
+	if img == nil {
+		return nil
+	}
+	b := img.Bounds()
+	out := image.NewRGBA(b)
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			i, o := img.PixOffset(x, y), out.PixOffset(x, y)
+			a := float64(img.Pix[i+3]) / 255
+			mix := func(src, dst uint8) uint8 {
+				return uint8(float64(src)*a + float64(dst)*(1-a) + 0.5)
+			}
+			out.Pix[o+0] = mix(img.Pix[i+0], under.R)
+			out.Pix[o+1] = mix(img.Pix[i+1], under.G)
+			out.Pix[o+2] = mix(img.Pix[i+2], under.B)
+			out.Pix[o+3] = 255
+		}
+	}
+	return out
+}
+
 func ExportOBJ(objPath string, doc *model.Document) error {
 	bodies := visibleBodies(doc)
 	if len(bodies) == 0 {
@@ -63,7 +100,7 @@ func ExportOBJ(objPath string, doc *model.Document) error {
 			name := fmt.Sprintf("paint_%d", uint64(e.Owner))
 			rel := "paint/" + name + ".png"
 			paintMat[e.Paint] = name
-			textures[rel] = e.Paint.Img
+			textures[rel] = flattenPaint(e.Paint.Img, b.Color)
 			fmt.Fprintf(mtl, "\nnewmtl %s\n", name)
 			// White base so the texture's own colours come through unchanged.
 			fmt.Fprintf(mtl, "Kd 1.000000 1.000000 1.000000\n")

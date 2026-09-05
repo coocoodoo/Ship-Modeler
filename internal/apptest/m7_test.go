@@ -26,7 +26,9 @@ type facePaintDump struct {
 	texel  float64
 	rect   [4]int
 	opaque int
-	sum    string
+	// thin counts texels laid down but not filled: paint you can see through.
+	thin int
+	sum  string
 }
 
 // paintDump is the brush state and, when the pointer is over a face, what it is
@@ -49,6 +51,8 @@ type paintDump struct {
 	target int
 	// awaiting is the Lock button armed and waiting for a face to be clicked.
 	awaiting bool
+	// alpha is how much of the armed colour a stroke lays down, 1..255.
+	alpha int
 
 	hovering  bool
 	hoverBody int
@@ -67,13 +71,13 @@ var (
 	m7ModeLine = regexp.MustCompile(
 		`^paint mode=(\d) tool="(\w+)" size=(\d+) res=(\d+) color="(\w+)" color2="(\w+)" ` +
 			`dither="(\w+)" fill=(\d) slot=(\d) textures=(\d) locked=(\d) lockface=(\d+) ` +
-			`target=(\d+) awaitlock=(\d)$`)
+			`target=(\d+) awaitlock=(\d) alpha=(\d+)$`)
 	m7HoverLine = regexp.MustCompile(
 		`^painthover body=(\d+) face=(\d+) texel=(-?\d+),(-?\d+) res=(\d+) ` +
 			`allocated=(\d) oblique=([\d.]+)$`)
 	m7PaintLine = regexp.MustCompile(
 		`^facepaint body=(\d+) face=(\d+) faces=(\d+) res=(\d+) texel=([\d.]+) ` +
-			`rect=(-?\d+),(-?\d+),(-?\d+),(-?\d+) opaque=(\d+) sum=([0-9a-f]+)$`)
+			`rect=(-?\d+),(-?\d+),(-?\d+),(-?\d+) opaque=(\d+) thin=(\d+) sum=([0-9a-f]+)$`)
 	m7HintLine  = regexp.MustCompile(`^hint "(.*)"$`)
 	m7ToastLine = regexp.MustCompile(`^toast "(.*)"$`)
 )
@@ -113,6 +117,7 @@ func parseM7Dumps(t *testing.T, stdout string) []paintDump {
 			cur.lockFace = atoi(t, m[12])
 			cur.target = atoi(t, m[13])
 			cur.awaiting = m[14] == "1"
+			cur.alpha = atoi(t, m[15])
 		case strings.HasPrefix(line, "painthover "):
 			m := m7HoverLine.FindStringSubmatch(line)
 			if m == nil {
@@ -139,7 +144,8 @@ func parseM7Dumps(t *testing.T, stdout string) []paintDump {
 				rect: [4]int{m7Int(t, m[6]), m7Int(t, m[7]),
 					m7Int(t, m[8]), m7Int(t, m[9])},
 				opaque: atoi(t, m[10]),
-				sum:    m[11],
+				thin:   atoi(t, m[11]),
+				sum:    m[12],
 			})
 		case strings.HasPrefix(line, "toast "):
 			if m := m7ToastLine.FindStringSubmatch(line); m != nil {

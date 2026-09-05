@@ -37,7 +37,8 @@ type PaintCursorView struct {
 	// Size is the brush's edge in texels.
 	Size int
 	// Color is what the brush would write, drawn as a fill inside the outline
-	// so the cursor is also a preview of the colour.
+	// so the cursor is also a preview of the colour. Its alpha is the brush's
+	// own, so a glaze looks like a glaze before it lands (V-158).
 	Color color.RGBA
 	// Erasing draws the cursor as an outline with no fill, because an eraser
 	// has no colour to preview.
@@ -64,7 +65,7 @@ func BuildPaintCursor(v PaintCursorView) *render.Overlay {
 	// The colour preview sits inside the outline rather than replacing it: a
 	// fill alone would be indistinguishable from paint already on the face.
 	if !v.Erasing && !v.Filling {
-		fill := ui.WithAlpha(v.Color, 0x99)
+		fill := ui.WithAlpha(v.Color, cursorFillAlpha(v.Color.A))
 		for dy := 0; dy < size; dy++ {
 			for dx := 0; dx < size; dx++ {
 				t := v.Texel.Add(image.Point{X: dx, Y: dy})
@@ -100,6 +101,29 @@ func BuildPaintCursor(v PaintCursorView) *render.Overlay {
 		return nil
 	}
 	return o
+}
+
+// CursorFillAlpha is how solid the cursor's colour preview is at a full-alpha
+// brush. It is well short of opaque on purpose: the cursor is a preview of
+// paint, and paint you cannot see through the cursor is a cursor you cannot
+// aim.
+const CursorFillAlpha = 0x99
+
+// cursorFillMin keeps the preview visible at the bottom of the alpha slider.
+// A brush at 1/255 writes almost nothing, but the cursor still has to say
+// where the brush is.
+const cursorFillMin = 0x20
+
+// cursorFillAlpha scales the preview by the brush's alpha.
+func cursorFillAlpha(a uint8) uint8 {
+	if a == 0 {
+		return CursorFillAlpha // a caller that set no alpha means an opaque brush
+	}
+	v := int(float64(a)/255*CursorFillAlpha + 0.5)
+	if v < cursorFillMin {
+		v = cursorFillMin
+	}
+	return uint8(v)
 }
 
 // liftedCorners is a texel's four world corners, floated clear of the face.

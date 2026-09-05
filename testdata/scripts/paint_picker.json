@@ -12,14 +12,14 @@
   {"op":"paint.color","hex":"FF0000"},
   {"op":"dump"},
 
-  {"op":"click","at":[1200,459]},
+  {"op":"click","at":[1200,509]},
   {"op":"dump"},
   {"op":"shot","name":"picker_open"},
 
-  {"op":"drag","from":[1150,560],"to":[1100,600],"segs":4},
+  {"op":"drag","from":[1150,310],"to":[1100,350],"segs":4},
   {"op":"dump"},
 
-  {"op":"click","at":[1100,672]},
+  {"op":"click","at":[1095,455]},
   {"op":"dump"},
   {"op":"shot","name":"picker_picked"}
 ]

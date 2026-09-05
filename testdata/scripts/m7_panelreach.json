@@ -11,7 +11,7 @@
   {"op":"paint.res","res":4},
   {"op":"dump"},
 
-  {"op":"click","at":[1145,522]},
+  {"op":"click","at":[1145,573]},
   {"op":"dump"},
   {"op":"shot","name":"m7_reach_armed"},
 

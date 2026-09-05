@@ -209,7 +209,8 @@ var knownOps = map[string]bool{
 	"paint.shapefill": true, "paint.lock": true, "paint.unlock": true,
 	"paint.edges": true, "paint.edgewidth": true, "paint.creases": true,
 	"paint.wand": true, "paint.wandclear": true,
-	"file.new": true, "file.save": true, "file.open": true,
+	"paint.alpha": true,
+	"file.new":    true, "file.save": true, "file.open": true,
 	"file.importmesh": true, "import.scale": true, "import.center": true,
 	"import.commit": true, "import.cancel": true,
 	"file.export": true, "file.autosave": true, "file.recover": true,
@@ -359,6 +360,10 @@ func (o Op) validate() error {
 	case "paint.size":
 		if o.Size == 0 {
 			return o.Errorf("needs a size")
+		}
+	case "paint.alpha":
+		if o.Size == 0 {
+			return o.Errorf("needs an alpha, 1..255")
 		}
 	case "paint.pixel":
 		if o.Body == "" || o.UV == nil {

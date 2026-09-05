@@ -261,7 +261,15 @@ func (c *StrokeFace) apply(m *mesh.Mesh, fi int, p *mesh.FacePaint) image.Rectan
 		return r
 	}
 	if c.Tool == ToolGradient {
-		return Gradient(p, region(), first, last, c.Color, c.ColorB, c.Dither, c.Mask)
+		// Both ends of the ramp take the brush's alpha. Alpha belongs to the
+		// brush, not to either colour, so a translucent gradient fades from
+		// one hue to the other and not from thin paint to thick (V-158).
+		to := c.ColorB
+		to.A = c.Color.A
+		if to.A == 0 {
+			to.A = 255
+		}
+		return Gradient(p, region(), first, last, c.Color, to, c.Dither, c.Mask)
 	}
 
 	b := Brush{
@@ -272,6 +280,7 @@ func (c *StrokeFace) apply(m *mesh.Mesh, fi int, p *mesh.FacePaint) image.Rectan
 		Dither: c.Dither,
 		Under:  c.under,
 		Mask:   c.Mask,
+		Once:   NewStamp(c.Color),
 	}
 	if b.Size < 1 {
 		b.Size = 1

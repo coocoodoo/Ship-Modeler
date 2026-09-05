@@ -164,6 +164,24 @@ type Brush struct {
 	// Under is the colour a partial dab blends into where nothing is painted:
 	// the body's own colour, because that is what shows through.
 	Under color.RGBA
+	// Once, when set, records how much translucent paint each texel has already
+	// taken during this one stroke, so a texel two overlapping dabs both cover
+	// ends up the same shade as a texel only one of them reached (V-158). A
+	// freehand drag is dozens of dabs that share their endpoints, and without
+	// this a half-transparent line comes out blotchy along its own joins.
+	//
+	// Nil for an opaque brush, which has nothing to accumulate: laying the same
+	// solid colour twice is already the same as laying it once.
+	Once map[image.Point]float64
+}
+
+// NewStamp is the accumulator a translucent stroke passes in Brush.Once. An
+// opaque stroke wants nil: the map costs a lookup per texel and buys nothing.
+func NewStamp(c color.RGBA) map[image.Point]float64 {
+	if c.A == 0 || c.A >= 255 {
+		return nil
+	}
+	return map[image.Point]float64{}
 }
 
 // Stroke paints from one texel to another and returns the texel rectangle it
@@ -251,9 +269,19 @@ func Fill(p *mesh.FacePaint, region image.Rectangle, start image.Point, to color
 	if mask != nil && !mask.Contains(start) {
 		return 0
 	}
-	to.A = 255
+	if to.A == 0 {
+		to.A = 255
+	}
 	from := At(p, start)
-	if from == to {
+	// A translucent fill composites onto each texel it reaches rather than
+	// replacing it, so the region it floods keeps whatever was under it
+	// showing through. The flood still spreads by the colour it started on:
+	// what stops it is a change in the picture, not a change in the paint.
+	laid := to
+	if to.A < 255 {
+		laid = Over(from, to)
+	}
+	if from == laid {
 		return 0
 	}
 	seen := map[image.Point]bool{start: true}
@@ -262,7 +290,7 @@ func Fill(p *mesh.FacePaint, region image.Rectangle, start image.Point, to color
 	for len(queue) > 0 {
 		t := queue[0]
 		queue = queue[1:]
-		if !Set(p, t, to) {
+		if !Set(p, t, laid) {
 			continue
 		}
 		changed++
@@ -288,7 +316,8 @@ func Fill(p *mesh.FacePaint, region image.Rectangle, start image.Point, to color
 // (SPEC-UX §13.2).
 func Sample(p *mesh.FacePaint, t image.Point, body color.RGBA) color.RGBA {
 	if c := At(p, t); c.A != 0 {
-		c.A = 255
+		// The alpha comes back with the colour: picking up a translucent
+		// texel and painting it somewhere else has to give the same texel.
 		return c
 	}
 	body.A = 255

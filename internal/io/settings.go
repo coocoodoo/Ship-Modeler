@@ -56,6 +56,10 @@ type PaintSettings struct {
 	Dither string     `json:"dither"`
 	Color  color.RGBA `json:"color"`
 	ColorB color.RGBA `json:"colorB"`
+	// Alpha is how much of the armed colour a stroke lays down, 0..255. It is
+	// omitted when full, so a settings file written before alpha existed reads
+	// back as an opaque brush rather than as an invisible one (V-158).
+	Alpha uint8 `json:"alpha,omitempty"`
 }
 
 // TileSettings is the tile stamp's setup between sessions (Tile_paint.md §3):

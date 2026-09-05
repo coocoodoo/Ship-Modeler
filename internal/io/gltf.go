@@ -297,9 +297,12 @@ func buildGLTFBody(b *gltfBuilder, body *model.Body, embed bool,
 			continue
 		}
 		img := gltfImage{Name: fmt.Sprintf("paint_%d", uint64(e.Owner))}
+		// The hull goes into the picture rather than under it: the material
+		// below is opaque and has nothing to blend an unpainted texel with.
+		flat := flattenPaint(e.Paint.Img, body.Color)
 		if embed {
 			buf := new(bytes.Buffer)
-			if err := encodePNG(buf, e.Paint.Img); err != nil {
+			if err := encodePNG(buf, flat); err != nil {
 				return gltfNode{}, fmt.Errorf("write the paint on face %d: %w", e.Owner, err)
 			}
 			bv := b.view(buf.Bytes(), 0)
@@ -308,7 +311,7 @@ func buildGLTFBody(b *gltfBuilder, body *model.Body, embed bool,
 		} else {
 			rel := "paint/" + img.Name + ".png"
 			img.URI = rel
-			external[rel] = e.Paint.Img
+			external[rel] = flat
 		}
 		b.doc.Images = append(b.doc.Images, img)
 		b.doc.Textures = append(b.doc.Textures, gltfTexture{

@@ -658,6 +658,7 @@ func (a *App) gatherPaintSettings() {
 		Dither: st.dither.String(),
 		Color:  st.color,
 		ColorB: st.colorB,
+		Alpha:  st.alpha,
 	}
 }
 
@@ -686,6 +687,12 @@ func (a *App) restorePaint() {
 	}
 	if p.ColorB.A != 0 {
 		st.colorB = p.ColorB
+	}
+	// Zero is what a settings file written before alpha existed carries, and
+	// also what "omitted because it was full" means. Either way the answer is
+	// an opaque brush, which initPaint has already set.
+	if p.Alpha > 0 {
+		st.alpha = uint8(clampInt(int(p.Alpha), MinPaintAlpha, MaxPaintAlpha))
 	}
 }
 

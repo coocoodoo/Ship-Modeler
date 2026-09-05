@@ -1,0 +1,35 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"select","kind":"body","body":"Hull"},
+  {"op":"camera.view","view":"front"},
+  {"op":"camera.frame"},
+  {"op":"deselect"},
+  {"op":"settle"},
+
+  {"op":"paint.begin"},
+  {"op":"paint.res","res":4},
+  {"op":"paint.size","size":2},
+  {"op":"paint.color","hex":"FFA51E"},
+  {"op":"dump"},
+
+  {"op":"paint.alpha","size":255},
+  {"op":"drag","from":[600,380],"to":[900,380],"segs":12},
+  {"op":"settle"},
+  {"op":"dump"},
+
+  {"op":"paint.alpha","size":110},
+  {"op":"dump"},
+  {"op":"shot","name":"m7_alpha_panel"},
+
+  {"op":"drag","from":[600,440],"to":[900,440],"segs":12},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m7_alpha_painted"},
+
+  {"op":"paint.color","hex":"3CA0FF"},
+  {"op":"drag","from":[600,440],"to":[900,440],"segs":12},
+  {"op":"settle"},
+  {"op":"dump"},
+  {"op":"shot","name":"m7_alpha_layered"}
+]

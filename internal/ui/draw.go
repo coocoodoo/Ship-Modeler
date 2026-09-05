@@ -106,6 +106,90 @@ func (c *Context) FillRounded(r rl.Rectangle, radius float64, col color.RGBA) {
 	rl.DrawRectangleRounded(r, roundness(r, rp), 6, col)
 }
 
+// CheckerCell is the checkerboard square's edge in logical pixels. Small
+// enough that a 22px swatch shows several of them, because one square is a
+// two-tone chip and four is a checkerboard.
+const CheckerCell = 5
+
+// FillChecker fills a rounded rectangle with the transparency checkerboard,
+// which is the one convention every drawing program shares for "you can see
+// through this" (V-158).
+//
+// Cells that would spill out of a rounded corner are simply not drawn: the
+// light ground shows there instead. That reads as a light square at the
+// corner, which the pattern already has plenty of, and it avoids the corner
+// pixels poking outside the chip.
+func (c *Context) FillChecker(r rl.Rectangle, radius float64) {
+	// Mid greys rather than the white-and-silver a paint program on a white
+	// canvas uses: the point is to be legible under a colour, not to be the
+	// brightest thing on a dark panel.
+	light := Shade(ColorText, 0.55)
+	dark := Shade(ColorText, 0.34)
+	c.FillRounded(r, radius, light)
+
+	cell := c.Px(CheckerCell)
+	if cell < 2 {
+		cell = 2
+	}
+	rp := c.Px(radius)
+	for iy := 0; float32(iy)*cell < r.Height; iy++ {
+		for ix := 0; float32(ix)*cell < r.Width; ix++ {
+			if (ix+iy)%2 == 0 {
+				continue
+			}
+			x, y := r.X+float32(ix)*cell, r.Y+float32(iy)*cell
+			w, h := cell, cell
+			if x+w > r.X+r.Width {
+				w = r.X + r.Width - x
+			}
+			if y+h > r.Y+r.Height {
+				h = r.Y + r.Height - y
+			}
+			box := Rect(x, y, w, h)
+			if !insideRounded(r, rp, box) {
+				continue
+			}
+			FillRect(box, dark)
+		}
+	}
+}
+
+// insideRounded reports whether a box lies wholly within a rounded rectangle.
+func insideRounded(r rl.Rectangle, radius float32, box rl.Rectangle) bool {
+	if radius <= 0 {
+		return true
+	}
+	// Only the four corner quadrants can fail, and within one the farthest
+	// point of the box from the corner's centre is the one to test.
+	corners := [4][2]float32{
+		{r.X + radius, r.Y + radius},
+		{r.X + r.Width - radius, r.Y + radius},
+		{r.X + radius, r.Y + r.Height - radius},
+		{r.X + r.Width - radius, r.Y + r.Height - radius},
+	}
+	for i, cn := range corners {
+		cx, cy := cn[0], cn[1]
+		px, py := box.X, box.Y
+		if i == 1 || i == 3 {
+			px = box.X + box.Width
+		}
+		if i == 2 || i == 3 {
+			py = box.Y + box.Height
+		}
+		if (i%2 == 0 && px > cx) || (i%2 == 1 && px < cx) {
+			continue // the box does not reach into this corner horizontally
+		}
+		if (i < 2 && py > cy) || (i >= 2 && py < cy) {
+			continue // nor vertically
+		}
+		dx, dy := px-cx, py-cy
+		if dx*dx+dy*dy > radius*radius {
+			return false
+		}
+	}
+	return true
+}
+
 // StrokeRounded outlines a rounded rectangle.
 func (c *Context) StrokeRounded(r rl.Rectangle, radius float64, col color.RGBA) {
 	rp := c.Px(radius)

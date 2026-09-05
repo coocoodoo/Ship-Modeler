@@ -283,6 +283,7 @@ Tools  [✏ Pencil][◻ Eraser][▨ Fill][💧 Pick]
 Size   (1)(2)(4)
 Res    (1)(2)(4)(8)(16)(32)      texels per unit
 Palette  [32 swatches, 8×4]
+Alpha    [------o---]  43%        how much of the colour a stroke lays down
          [+ custom] [recents ×8]
 [Import .hex]      [Textures 👁]
 ```
@@ -293,6 +294,32 @@ Palette  [32 swatches, 8×4]
 - If the view angle to the face is >70° oblique, a hint chip offers **Face view** (camera normal-on animation). Manual button too. Painting still allowed at any angle.
 - Textures render nearest-neighbor always (Crisp pillar). "Textures 👁" toggles paint visibility (inspect bare geometry).
 - Strokes are undo steps (coalesced per mouse-down); palette edits are not document state (app settings).
+
+### 13.2a Alpha (V-158)
+
+The **Alpha** slider sits between the palette grid and the recents, and runs
+1..255 shown as a percentage. It is a property of the brush, like the size,
+not of the colour: choosing a swatch never changes it. Below full, a dab
+composites source-over onto whatever is already on the texel rather than
+replacing it, and its coverage rides on the same alpha — half a dab of
+half-transparent paint is a quarter laid down. Dithering spends alpha on whole
+texels, the same way it spends coverage.
+
+A stroke lays its alpha once. Overlapping dabs within one stroke accumulate to
+the alpha you asked for and no further, so a translucent line is even along its
+own joins; the same holds for two chosen edges meeting at a corner. A gradient
+takes the brush's alpha at both ends. The slider cannot reach 0 — that is
+not faint paint but no paint, which is the eraser.
+
+The two armed chips draw over a transparency checkerboard, and the texel
+cursor's colour preview fades with the brush, so what you are about to lay
+down is visible before you lay it. The palette grid stays opaque: it holds
+hues. The eyedropper reads a texel's alpha back into the brush.
+
+Exports flatten: a face's picture is composited over the body's own colour on
+the way into a `.gltf`, `.glb` or `.obj`, because those materials have nothing
+to blend a transparent texel with and would draw it black. What the file shows
+is what the viewport showed.
 
 ### 13.3 Palette
 Default: embedded original 32-color palette tuned for spaceship greys/hull/accent/glow ramps (author in code, document in README). Custom colors via HSV popover; recents auto-track 8. **Import .hex** (Lospec format: one RRGGBB per line) via file dialog, replaces "custom" page, never the built-in page.

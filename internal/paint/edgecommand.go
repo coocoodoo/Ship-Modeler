@@ -201,7 +201,13 @@ func (c *StrokeEdges) Do(doc *model.Document) error {
 		}
 		prior := SubImage(p, planned)
 
+		// One accumulator per face, because two chosen edges that meet at a
+		// corner band the same texels there and translucent paint laid twice
+		// on that corner would come out darker than the lines it joins. Per
+		// face and not per command: texel coordinates only mean anything
+		// against the image they index (V-158).
 		wrote := image.Rectangle{}
+		brush.Once = NewStamp(c.Color)
 		for _, s := range work[fi] {
 			wrote = union(wrote, EdgeBand(m, fi, p, brush, s.a, s.b))
 		}
