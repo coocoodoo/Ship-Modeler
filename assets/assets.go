@@ -18,3 +18,12 @@ import _ "embed"
 //
 //go:embed sample_ship.json
 var SampleShip []byte
+
+// WindowIcon is the program's mark, shown on the window and in the taskbar
+// while it runs. The executable carries the same drawing as a Windows
+// resource (cmd/modeler/*.syso, built from modeler.ico): that one is what
+// Explorer shows, this one is what the running window shows, and they have to
+// be the same picture or the program looks like two programs.
+//
+//go:embed window_icon.png
+var WindowIcon []byte

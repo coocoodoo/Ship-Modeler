@@ -2108,3 +2108,30 @@ its drawing has to hand its outcome back the same way.
 Pinned by `paint_picker`, which arms red, opens the mixer, drags the field
 and clicks a preset, and asserts the brush colour moved at each step -
 written failing first, against the reported behaviour.
+
+**V-157 . The program has a face.** The executable shipped with the Go
+toolchain's blank default icon, which in a folder of files is indistinguishable
+from anything else built the same way.
+
+The mark is the program's own subject: an isometric solid with a grid of
+texels on its lit face, four of them painted in the mode accents. Every colour
+in it is a theme token - the panel ground, a body's auto colour on the three
+faces, the paint pink, the model blue, sketch gold and extrude teal - so the
+icon is a small picture of what the program does rather than a generic cube.
+It is drawn by `assets/mkicon.py` at seven sizes, supersampled 8x and reduced,
+with the texel grid dropped below 32 px where it would only be mud.
+
+Windows wants it twice and the two are different mechanisms. Explorer reads a
+resource compiled into the executable: `assets/modeler.ico` becomes
+`cmd/modeler/modeler_windows_amd64.syso` via `rsrc`, which the Go linker picks
+up from the main package with no build tag or flag - the GOOS/GOARCH suffix on
+the filename is what keeps it off other platforms. The running window reads an
+image handed to raylib at startup, so a 64 px PNG is embedded beside the
+sample ship and set by `setWindowIcon` after `InitWindow`. They are generated
+from the same drawing on purpose: two marks would make one program look like
+two. A failure to load the window icon is swallowed - a picture that will not
+decode is the last reason a modelling program should refuse to start.
+
+`rsrc` was already in the module graph as an indirect dependency, so the
+resource regenerates offline; the command is recorded at the top of
+`assets/mkicon.py` next to the drawing it consumes.

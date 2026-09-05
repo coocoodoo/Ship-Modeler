@@ -2,11 +2,35 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** The custom colour picker applies what you pick (V-156)
-and the wheel over the palette list no longer zooms the model (V-155). Suite
-green, exe rebuilt, pushed.
+**Current state:** The executable and its window carry the program's own
+icon (V-157). The colour picker applies what you pick (V-156) and the wheel
+over the palette list no longer zooms the model (V-155). Suite green, exe
+rebuilt, pushed.
 
 ---
+
+## 2026-09-04 - The program has a face (V-157)
+
+**Request:** compile with a nice icon.
+
+**Drawn from the app's own tokens:** an isometric solid with a grid of texels
+on its lit face, four painted in the mode accents - pixel art on a solid,
+which is the whole program in one mark. `assets/mkicon.py` renders seven
+sizes, supersampled and reduced, dropping the grid below 32 px where it would
+only be mud.
+
+**Two mechanisms, one drawing.** Explorer reads a resource compiled into the
+exe (`assets/modeler.ico` -> `cmd/modeler/modeler_windows_amd64.syso` via
+`rsrc`, which the linker picks up automatically from the main package; the
+filename suffix keeps it off other platforms). The running window reads an
+image handed to raylib, so a 64 px PNG is embedded and set after
+`InitWindow`. Generated from the same source so the program does not look
+like two programs.
+
+**Verified, not assumed:** the icon was read back out of the built exe and
+looked at. A test pins that the embedded PNG decodes, is square, and is big
+enough for a taskbar. `rsrc` was already in the module graph, so this
+regenerates offline.
 
 ## 2026-09-04 - The custom colour picker did nothing (V-156)
 

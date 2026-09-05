@@ -3,6 +3,7 @@ package app
 import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"modeler/assets"
 	"modeler/internal/ui"
 )
 
@@ -31,8 +32,22 @@ func OpenWindow(w, h int, msaa, hidden bool) {
 	rl.SetConfigFlags(flags)
 	rl.SetTraceLogLevel(rl.LogWarning)
 	rl.InitWindow(int32(w), int32(h), WindowTitle)
+	setWindowIcon()
 	rl.SetWindowMinSize(ui.MinWindowW, ui.MinWindowH)
 	rl.SetExitKey(0) // Esc is the app's back-one-level key, not quit
+}
+
+// setWindowIcon puts the program's mark on the window and the taskbar.
+//
+// A failure here is cosmetic and silent: an icon that will not load is the
+// last reason a modelling program should refuse to start.
+func setWindowIcon() {
+	img := rl.LoadImageFromMemory(".png", assets.WindowIcon, int32(len(assets.WindowIcon)))
+	if img == nil {
+		return
+	}
+	defer rl.UnloadImage(img)
+	rl.SetWindowIcon(*img)
 }
 
 // Run drives the interactive frame loop until the window closes.
