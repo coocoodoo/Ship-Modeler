@@ -134,6 +134,17 @@ type Context struct {
 	// itself.
 	claims []rl.Rectangle
 
+	// wheelClaims are rectangles that took the mouse wheel last frame: a list
+	// that scrolls under the pointer rather than the camera behind it.
+	//
+	// It is asked separately from the cards because the answers differ. A card
+	// deliberately lets navigation through — orbiting from wherever the pointer
+	// happens to be is how this program moves (SPEC-UX §1) — but a panel with a
+	// scrolling list cannot, or one wheel notch both scrolls the list and zooms
+	// the model behind it.
+	wheelClaims     []rl.Rectangle
+	lastWheelClaims []rl.Rectangle
+
 	// popoverBox is where it landed last frame so hit-testing can see it.
 	popover    popoverState
 	popoverBox rl.Rectangle
@@ -170,6 +181,7 @@ func (c *Context) Begin(in Input) {
 	c.nextHot = NoID
 	c.wantMouse = false
 	c.lastCards, c.cards = c.cards, c.cards[:0]
+	c.lastWheelClaims, c.wheelClaims = c.wheelClaims, c.wheelClaims[:0]
 	c.claims = c.claims[:0]
 	c.wantKeyboard = c.focus != NoID
 	c.overlays = c.overlays[:0]
@@ -368,3 +380,20 @@ func (c *Context) CardCapturesPointer(x, y float64) bool {
 // registerCard records a floating panel's rectangle for the next frame's
 // hit-testing.
 func (c *Context) registerCard(r rl.Rectangle) { c.cards = append(c.cards, r) }
+
+// ClaimWheel marks a rectangle as owning the mouse wheel, for a panel that
+// scrolls. Call it every frame the panel is up; it is read the frame after,
+// the same way cards are.
+func (c *Context) ClaimWheel(r rl.Rectangle) { c.wheelClaims = append(c.wheelClaims, r) }
+
+// WheelCaptured reports whether something drawn last frame took the wheel at
+// a window pixel, so the camera can leave it alone.
+func (c *Context) WheelCaptured(x, y float64) bool {
+	p := rl.Vector2{X: float32(x), Y: float32(y)}
+	for _, r := range c.lastWheelClaims {
+		if rl.CheckCollisionPointRec(p, r) {
+			return true
+		}
+	}
+	return false
+}

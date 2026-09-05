@@ -73,6 +73,8 @@ type ScriptRunner struct {
 	// moved marks that the next frame should report pointer motion, which is
 	// what wakes the throttled hover pick.
 	moved bool
+	// wheel is a notch waiting to be spent on the next frame.
+	wheel float64
 	// mods are the modifier keys the next pointer op holds down.
 	mods mods
 	// held keeps the left button down across ops, so a drag can be paused
@@ -185,6 +187,16 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 	case "hover":
 		r.mouse = [2]float64{op.At[0], op.At[1]}
 		r.mods = mods{shift: op.Shift, ctrl: op.Ctrl, alt: op.Alt}
+
+	// A wheel notch at a point: `at` moves the pointer there first, so a
+	// script says where it is scrolling as well as how far.
+	case "wheel":
+		if op.At != nil {
+			r.mouse = [2]float64{op.At[0], op.At[1]}
+			r.moved = true
+		}
+		r.wheel = op.Degrees
+		r.step()
 
 	case "click":
 		r.mods = mods{shift: op.Shift, ctrl: op.Ctrl, alt: op.Alt}
@@ -735,6 +747,8 @@ func (r *ScriptRunner) frame() InputFrame {
 	in.MouseX, in.MouseY = r.mouse[0], r.mouse[1]
 	in.Shift, in.Ctrl, in.Alt = r.mods.shift, r.mods.ctrl, r.mods.alt
 	in.Down[MouseLeft] = r.held
+	// One frame's worth, then spent: a wheel notch is an event, not a state.
+	in.Wheel, r.wheel = r.wheel, 0
 	if r.moved {
 		// A nominal delta so hover picking treats this as real motion.
 		in.MouseDX, in.MouseDY = 1, 0
@@ -1832,9 +1846,10 @@ func (r *ScriptRunner) dump() {
 				shown++
 			}
 		}
-		fmt.Printf("palette open=%d shown=%d of %d query=%q applied=%q colours=%d\n",
-			boolBit(b.open), shown, len(lib), b.query, b.applied, len(a.paint.custom))
+		fmt.Printf("palette open=%d shown=%d of %d query=%q applied=%q colours=%d first=%d\n",
+			boolBit(b.open), shown, len(lib), b.query, b.applied, len(a.paint.custom), b.first)
 	}
+	fmt.Printf("zoom ortho=%.4f dist=%.4f\n", a.Camera.OrthoScale, a.Camera.Dist)
 	if t := a.boolean.tool; t != nil {
 		fmt.Printf("boolean op=%q target=%d tools=%d keep=%d\n",
 			t.Op.String(), t.Target, len(t.Tools), boolBit(t.KeepTools))

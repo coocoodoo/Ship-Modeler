@@ -234,6 +234,11 @@ func (a *App) buildPaletteBrowser(viewport rl.Rectangle) {
 		viewport.Y+(viewport.Height-h)/2,
 		w, h)
 
+	// The whole panel takes the wheel, not just the rows: a notch spent over
+	// the search box or the footer should still scroll the list rather than
+	// zoom the model behind the card.
+	a.UI.ClaimWheel(box)
+
 	card := a.UI.FloatingCard(ui.MakeID("palette.card"), box, "Palettes", ui.FloatingCardOpts{})
 	body := card.Body
 
@@ -263,7 +268,7 @@ func (a *App) buildPaletteBrowser(viewport rl.Rectangle) {
 	if maxFirst < 0 {
 		maxFirst = 0
 	}
-	if a.UI.In.Wheel != 0 && rl.CheckCollisionPointRec(a.UI.MousePos(), list) {
+	if a.UI.In.Wheel != 0 && rl.CheckCollisionPointRec(a.UI.MousePos(), box) {
 		b.first -= int(a.UI.In.Wheel) * paletteWheelRows
 	}
 	if b.first > maxFirst {

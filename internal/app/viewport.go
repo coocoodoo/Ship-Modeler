@@ -520,7 +520,11 @@ func (a *App) handleCameraInput(in InputFrame, vp render.Viewport) {
 		a.Anim.Cancel()
 		a.Camera.Pan(in.MouseDX, in.MouseDY, float64(vp.W), float64(vp.H))
 	}
-	if in.Wheel != 0 && inViewport {
+	// A panel that scrolls owns the wheel over itself: without this one notch
+	// over the palette list both scrolls the list and zooms the model behind
+	// it (reported 2026-09-04). Orbit and pan still work over a card — it is
+	// only the wheel that a scrolling list has to take.
+	if in.Wheel != 0 && inViewport && !a.UI.WheelCaptured(in.MouseX, in.MouseY) {
 		a.Anim.Cancel()
 		a.Camera.ZoomToCursor(in.Wheel, vp.Local(in.MouseX, in.MouseY),
 			float64(vp.W), float64(vp.H))

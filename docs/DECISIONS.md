@@ -2051,3 +2051,31 @@ Shift+F rather than a bare letter: F already means "frame", the shifted key
 reads as a stronger version of it, and it cannot collide with the mode-local
 letters (the sketch and paint tool keys own most of the alphabet between
 them). `camera.lookat` drives it from a script.
+
+**V-155 . One wheel notch does one thing.** Scrolling the palette list also
+zoomed the model behind it. Both were working as written: a card deliberately
+lets camera navigation through - orbiting from wherever the pointer happens to
+be is how this program moves (SPEC-UX 1) - and the list reads the same wheel
+to scroll. Two correct rules, one input, and the user gets both answers at
+once.
+
+The rule that gives is the narrow one. Orbit and pan over a card are still
+right: you may well want to turn the model while an options card is up, and
+those gestures start with a button that the card already owns. A wheel notch
+has no such button, so nothing distinguishes "scroll this list" from "zoom
+that model" except which one is under the pointer.
+
+So a panel that scrolls claims the wheel over itself - `ClaimWheel` and
+`WheelCaptured` on the context, read a frame late exactly as the card
+rectangles are - and the camera skips the wheel where something else took it.
+The claim is the whole panel rather than just the rows, because a notch spent
+over the search box or the footer should still scroll the list. Nothing else
+in the program consumes the wheel, so this is one claimant today; the
+mechanism exists because the next scrolling panel would otherwise repeat the
+bug rather than inherit the fix.
+
+A `wheel` op carries a notch into a headless run, and the regression is
+pinned by arithmetic rather than by a picture: over the open panel the list
+row advances while the camera's ortho scale does not move at all, and once
+the panel closes the same notch zooms again - so a fix that cured the
+collision by breaking zoom would fail too.

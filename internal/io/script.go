@@ -218,10 +218,11 @@ var knownOps = map[string]bool{
 	"body.visible": true, "plane.visible": true, "sketch.visible": true,
 	"deselect": true, "delete": true, "undo": true, "redo": true,
 	"hover": true, "click": true, "drag": true, "drag.release": true,
+	"wheel":       true,
 	"ui.tree":     true,
 	"camera.view": true, "camera.frame": true, "camera.orbit": true,
 	"camera.lookat": true,
-	"camera.zoom": true, "camera.project": true,
+	"camera.zoom":   true, "camera.project": true,
 	"settle": true, "shot": true, "pick": true, "dump": true,
 	"view.ao": true, "view.shading": true,
 	"palette.browse": true, "palette.search": true, "palette.apply": true,
@@ -278,6 +279,10 @@ func (o Op) validate() error {
 	case "view.shading":
 		if o.On == nil {
 			return o.Errorf("needs on (true for shaded, false for flat)")
+		}
+	case "wheel":
+		if o.Degrees == 0 {
+			return o.Errorf("needs degrees: the notches to scroll, positive is up")
 		}
 	case "palette.browse":
 		if o.On == nil {

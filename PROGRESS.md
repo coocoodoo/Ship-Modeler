@@ -2,10 +2,35 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** 4,442 palettes ship with the program, chosen from a
-searchable list (V-152). The palette sidebar (V-151), live cut previews
-(V-150) and the colour system (V-149) shipped just before. Suite green, exe
-rebuilt, pushed.
+**Current state:** The wheel over the palette list scrolls it without also
+zooming the model (V-155). Shift+F looks square-on (V-153), 4,442 palettes
+ship in a searchable list (V-152), and the palette is a sliding sidebar
+(V-151). Suite green, exe rebuilt, pushed.
+
+---
+
+## 2026-09-04 - The wheel did two things at once (V-155)
+
+**Reported:** "When I scroll on palettes, is also zooming out or in on the 3D
+model."
+
+**Both halves were working as written.** A floating card deliberately lets
+camera navigation through, and the palette list reads the same wheel to
+scroll - so one notch got both answers.
+
+**Fix:** a scrolling panel claims the wheel over itself (`ClaimWheel` /
+`WheelCaptured`, read a frame late like the card rectangles), and the camera
+skips the wheel where something else took it. Orbit and pan over a card are
+untouched: those start with a button the card already owns, while a wheel
+notch has nothing to tell the two intents apart but position. The claim
+covers the whole panel, so a notch over the search box scrolls too.
+
+**Pinned by arithmetic, not pixels:** new `wheel` op, and `palette_wheel`
+asserts the list row advances while the camera's ortho scale holds at
+17.4027 - then that the same notch zooms again once the panel closes, so a
+fix that broke zoom would fail as well. The dump grew `first=` on the palette
+line and a `zoom` line of its own (the camera line is end-anchored by an
+unrelated parser).
 
 ---
 
