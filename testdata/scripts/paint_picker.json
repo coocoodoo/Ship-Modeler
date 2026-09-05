@@ -1,0 +1,25 @@
+[
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"select","kind":"body","body":"Hull"},
+  {"op":"camera.view","view":"iso"},
+  {"op":"camera.frame"},
+  {"op":"deselect"},
+  {"op":"settle"},
+
+  {"op":"paint.begin"},
+  {"op":"paint.res","res":8},
+  {"op":"paint.color","hex":"FF0000"},
+  {"op":"dump"},
+
+  {"op":"click","at":[1200,459]},
+  {"op":"dump"},
+  {"op":"shot","name":"picker_open"},
+
+  {"op":"drag","from":[1150,560],"to":[1100,600],"segs":4},
+  {"op":"dump"},
+
+  {"op":"click","at":[1100,672]},
+  {"op":"dump"},
+  {"op":"shot","name":"picker_picked"}
+]

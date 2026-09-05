@@ -2079,3 +2079,32 @@ pinned by arithmetic rather than by a picture: over the open panel the list
 row advances while the camera's ortho scale does not move at all, and once
 the panel closes the same notch zooms again - so a fix that cured the
 collision by breaking zoom would fail too.
+
+**V-156 . The custom colour picker returned a result it could not have had.**
+Dragging the picker's field or clicking one of its presets did nothing: the
+brush stayed on whatever colour it was armed with. The mixer drew, the cursor
+ring moved, the hue bar tracked - everything looked live, and none of it
+reached the brush.
+
+The picker draws deferred, because a popover has to land on top of the panel
+that opened it. So its widgets - the saturation field, the hue strip, the
+preset swatches - do not run inside `ColorPicker` at all; they run later, in
+`End()`. But `ColorPicker` set `out.Changed` from inside that closure and
+returned `out` by value on the way past, so the value the caller received was
+copied before the closure had run and `Changed` was always false. The one
+field that did work was `Color`, because it is computed from the popover's
+own state rather than from the closure.
+
+The fix is to report from state rather than from a variable that has already
+been copied: the closure records `changed` on the popover, and the next call
+picks it up and clears it. The result is a frame late, which for a mixer you
+are dragging is invisible and is anyway the same lag the colour itself
+already had.
+
+The lesson generalises past this widget: a deferred closure cannot deliver
+anything through a return value, and any other widget in this kit that defers
+its drawing has to hand its outcome back the same way.
+
+Pinned by `paint_picker`, which arms red, opens the mixer, drags the field
+and clicks a preset, and asserts the brush colour moved at each step -
+written failing first, against the reported behaviour.

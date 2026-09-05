@@ -2,10 +2,33 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** The wheel over the palette list scrolls it without also
-zooming the model (V-155). Shift+F looks square-on (V-153), 4,442 palettes
-ship in a searchable list (V-152), and the palette is a sliding sidebar
-(V-151). Suite green, exe rebuilt, pushed.
+**Current state:** The custom colour picker applies what you pick (V-156)
+and the wheel over the palette list no longer zooms the model (V-155). Suite
+green, exe rebuilt, pushed.
+
+---
+
+## 2026-09-04 - The custom colour picker did nothing (V-156)
+
+**Reported:** "Custom color function is not working."
+
+**Confirmed by script before touching anything:** arm red, open the mixer,
+drag the field, click a preset - the brush stayed FF0000 through all of it.
+
+**Cause:** the picker draws deferred, so a popover lands above the panel that
+opened it. Its widgets therefore run in `End()`, not inside `ColorPicker` -
+but `ColorPicker` set `out.Changed` from inside that closure and returned
+`out` by value beforehand, so the caller always got a copy made before any
+interaction had happened. `Changed` could never be true. `Color` worked,
+being read from the popover's own state, which is why the mixer looked live.
+
+**Fix:** the closure records `changed` on the popover; the next call reports
+and clears it. One frame late, which for a mixer you are dragging is
+invisible. The lesson is general: a deferred closure cannot deliver anything
+through a return value.
+
+**Test:** `paint_picker` (written failing first) plus a golden of the open
+mixer. Full suite green with no churn elsewhere.
 
 ---
 

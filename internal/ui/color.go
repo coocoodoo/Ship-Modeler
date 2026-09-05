@@ -18,6 +18,11 @@ type popoverState struct {
 	// hsv is the live colour while the picker is open.
 	h, s, v float64
 	alpha   uint8
+	// changed records that the picker's own widgets moved the colour. They
+	// run in the deferred pass, after ColorPicker has already returned, so
+	// the frame that reads a drag is not the frame that can report it: it is
+	// left here and picked up on the next call (V-156).
+	changed bool
 }
 
 // SwatchOpts configures a colour chip.
@@ -121,6 +126,12 @@ func (c *Context) ColorPicker(id ID, presets []color.RGBA) ColorPickerResult {
 		return ColorPickerResult{Closed: true}
 	}
 
+	// What the widgets below did reaches the caller one frame late, because
+	// they do not run until End(). Reporting it from the state they wrote is
+	// what makes the returned result true rather than always empty.
+	out.Changed = c.popover.changed
+	c.popover.changed = false
+
 	c.Defer(func() {
 		c.Card(box)
 		inner := Inset(box, c.Px(pickerPadding))
@@ -131,7 +142,7 @@ func (c *Context) ColorPicker(id ID, presets []color.RGBA) ColorPickerResult {
 		if c.dragInside(id.Child("sv"), sv) {
 			c.popover.s = clamp01(float64((float32(c.In.MouseX) - sv.X) / sv.Width))
 			c.popover.v = 1 - clamp01(float64((float32(c.In.MouseY)-sv.Y)/sv.Height))
-			out.Changed = true
+			c.popover.changed = true
 		}
 		cx := sv.X + float32(c.popover.s)*sv.Width
 		cy := sv.Y + float32(1-c.popover.v)*sv.Height
@@ -142,7 +153,7 @@ func (c *Context) ColorPicker(id ID, presets []color.RGBA) ColorPickerResult {
 		c.drawHueBar(hue)
 		if c.dragInside(id.Child("hue"), hue) {
 			c.popover.h = clamp01(float64((float32(c.In.MouseX)-hue.X)/hue.Width)) * 360
-			out.Changed = true
+			c.popover.changed = true
 		}
 		hx := hue.X + float32(c.popover.h/360)*hue.Width
 		rl.DrawRectangleLinesEx(Rect(hx-c.Px(2), hue.Y-c.Px(1), c.Px(4), hue.Height+c.Px(2)),
@@ -158,7 +169,7 @@ func (c *Context) ColorPicker(id ID, presets []color.RGBA) ColorPickerResult {
 				Tooltip: "#" + hexOf(p),
 			}) {
 				c.popover.h, c.popover.s, c.popover.v = rgbToHSV(p)
-				out.Changed = true
+				c.popover.changed = true
 			}
 		}
 	})
