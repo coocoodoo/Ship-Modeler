@@ -19,6 +19,30 @@ pushed to both remotes on 2026-09-07; README restructured to cover it all.
 
 ---
 
+## 2026-09-07 — Patina is now reachable from the published repository
+
+**Reported:** "is using Patina Library but is not reflected in github."
+
+**Found:** The Patina repository itself was already fully pushed —
+`github.com/coocoodoo/Patina` matched the local checkout to the commit. What
+was missing was on Modeler's side: every reference to Patina went through a
+local disk path. `tools/patina-assets/go.mod` replaced the module with
+`../../../../Golang UI Lib`, `tools/patina-motion/Cargo.toml` used
+`path = ".../Golang UI Lib/core"`, and the attribution README said the library
+was "supplied from C:/Users/quant/Documents/Golang UI Lib". A clone of
+Ship-Modeler could not build either asset tool and carried no link to Patina.
+
+**Fixed:** Both tools now pin Patina at revision `28143d51`, the one the
+embedded icons and atlases were generated from. The Go tool replaces
+`github.com/patina-ui/patina` (the path Patina's own go.mod declares) with
+`github.com/coocoodoo/Patina` at a pseudo-version; `go mod tidy` fetched it
+through the proxy and the tool builds. The Rust tool depends on `patina-core`
+as a git dependency at that rev; `cargo fetch` changed one line of Cargo.lock
+and `cargo check` compiled it. The attribution README and the main README
+credits link to the GitHub repository. Modeler's own `go.mod` is unchanged:
+the app embeds baked assets and imports nothing from Patina at runtime, which
+is a deliberate choice, so it is not a module dependency of the app.
+
 ## 2026-09-07 — Optional glow, animated effects and upgraded menus
 
 **Implemented:** Added Settings → Effects with a live button/progress/SVG

@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-patina-core = { path = "../../../../Golang UI Lib/core" }
+# Patina's Rust core, from GitHub, pinned to the revision the embedded atlases
+# were rendered with.
+patina-core = { git = "https://github.com/coocoodoo/Patina.git", rev = "28143d519861dcf3d5eebdbf1109c7888529c18e" }
 tiny-skia = "0.12"
 
 [workspace]

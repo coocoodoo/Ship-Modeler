@@ -1,7 +1,9 @@
 # Patina integration
 
 Modeler's refreshed interface uses the user's Patina library, created with
-Fable 5.1, supplied from `C:/Users/quant/Documents/Golang UI Lib`.
+Fable 5.1: <https://github.com/coocoodoo/Patina>. The embedded assets were
+generated from revision `28143d51` (2026-09-07), and both asset tools below pin
+that revision, so a fresh clone of this repository regenerates the same pixels.
 
 - The dark surface/text palette and indigo accent come from `core/src/theme.rs`.
 - Rounded controls, tonal selections, focus rings and exponential hover easing
@@ -35,13 +37,17 @@ The generated assets are included in the executable; the app needs no Patina
 DLL or source directory at runtime.
 
 To regenerate icons, run `go run .` inside `tools/patina-assets`. Its separate
-module points to the supplied sibling Patina checkout. For another location,
-update that module's `replace` directive and set `PATINA_LIBRARY` to the built
-core DLL when necessary. Normal Modeler builds do not run this tool.
+module requires Patina under its declared path, `github.com/patina-ui/patina`,
+and a `replace` directive points that at the GitHub repository at the pinned
+revision, so `go` fetches it like any other module. To work against a local
+checkout instead, change the `replace` target to that directory. Set
+`PATINA_LIBRARY` to the built core DLL when necessary. Normal Modeler builds
+do not run this tool.
 
-Regenerate the animated atlases with `cargo run --offline --manifest-path
+Regenerate the animated atlases with `cargo run --manifest-path
 tools/patina-motion/Cargo.toml`. The small tool uses Patina's public Rust
 `SvgDoc::render_at` API, validates that the documents animate, and writes the
-embedded PNGs. Its dependency path points to the supplied Go UI Library checkout.
-Keep Cargo build output under an ignored temporary directory using
-`CARGO_TARGET_DIR=testdata/tmp/patina-motion-build`.
+embedded PNGs. Its `patina-core` dependency is a git dependency on the GitHub
+repository at the pinned revision; the first run fetches it, after which
+`--offline` works. Keep Cargo build output under an ignored temporary directory
+using `CARGO_TARGET_DIR=testdata/tmp/patina-motion-build`.

@@ -159,7 +159,8 @@ colour. The viewport itself never tints, so painted colours stay true.
   the left sidebar or Settings to reach controls at larger sizes.
 
 The palettes, gradient surfaces, rounded controls, click ripples, hover easing
-and line icons are adapted from **Patina**; see
+and line icons are adapted from [**Patina**](https://github.com/coocoodoo/Patina),
+a Go UI toolkit with a Rust rendering core; see
 [Patina integration](third_party/patina/README.md) for attribution and for
 rebuilding the embedded assets. Icons are a consistent outline set, and text
 uses native Windows typography with embedded fallbacks.
@@ -360,7 +361,7 @@ Modeler stands on:
 | [Manifold](https://github.com/elalish/manifold) v3.5.2 | the boolean kernel, the same one OpenSCAD uses — Apache-2.0 |
 | [Clipper2](https://github.com/AngusJohnson/Clipper2), vendored inside Manifold | BSL-1.0 |
 | [zenity](https://github.com/ncruces/zenity) | native file dialogs — MIT |
-| Patina | the interface's palettes, controls, motion and icon renderer, adapted — MIT |
+| [Patina](https://github.com/coocoodoo/Patina) | the interface's palettes, controls, motion and icon renderer, adapted; its SVG renderer and SMIL engine generated the embedded icons and atlases — MIT |
 | [Go Regular and Go Medium](https://go.dev/blog/go-fonts) via `golang.org/x/image` | the embedded UI typefaces — BSD-3-Clause |
 
 On Windows the interface uses Segoe UI from the system's own font folder at

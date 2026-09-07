@@ -1141,6 +1141,7 @@ dependencies = [
 [[package]]
 name = "patina-core"
 version = "0.1.0"
+source = "git+https://github.com/coocoodoo/Patina.git?rev=28143d519861dcf3d5eebdbf1109c7888529c18e#28143d519861dcf3d5eebdbf1109c7888529c18e"
 dependencies = [
  "fontdue",
  "resvg",
