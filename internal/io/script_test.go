@@ -85,6 +85,7 @@ func TestParseScriptRequiredFields(t *testing.T) {
 		{"camera.project with a bad kind", `[{"op":"camera.project","kind":"fisheye"}]`, "ortho or perspective"},
 		{"body.visible without a body", `[{"op":"body.visible","visible":true}]`, "body and visible"},
 		{"pick without a point", `[{"op":"pick"}]`, "at [x,y]"},
+		{"wait without a frame count", `[{"op":"wait"}]`, "frames"},
 		{"an op with no name", `[{"plane":"Front"}]`, "missing op name"},
 	}
 	for _, c := range cases {

@@ -74,6 +74,10 @@ type Op struct {
 	Tolerance int      `json:"tolerance,omitempty"`
 	Points    [][2]int `json:"points,omitempty"`
 	Size      int      `json:"size,omitempty"`
+	// Frames is how many frames a wait lets pass. Nothing else in a script
+	// spends time on purpose: settle stops the moment nothing is animating,
+	// and a toast is not an animation.
+	Frames int `json:"frames,omitempty"`
 
 	// Tile ops (Tile_paint.md TP2). Path is shared with the file ops below;
 	// Tile is the selected tile's index in the sheet, named so because the
@@ -230,7 +234,7 @@ var knownOps = map[string]bool{
 	"camera.view": true, "camera.frame": true, "camera.orbit": true,
 	"camera.lookat": true,
 	"camera.zoom":   true, "camera.project": true,
-	"settle": true, "shot": true, "pick": true, "dump": true,
+	"settle": true, "wait": true, "shot": true, "pick": true, "dump": true,
 	"view.ao": true, "view.shading": true,
 	"palette.browse": true, "palette.search": true, "palette.apply": true,
 }
@@ -298,6 +302,10 @@ func (o Op) validate() error {
 	case "wheel":
 		if o.Degrees == 0 {
 			return o.Errorf("needs degrees: the notches to scroll, positive is up")
+		}
+	case "wait":
+		if o.Frames <= 0 {
+			return o.Errorf("needs frames: how many 1/60 s frames to let pass")
 		}
 	case "palette.browse":
 		if o.On == nil {

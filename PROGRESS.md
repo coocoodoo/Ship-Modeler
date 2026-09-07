@@ -19,6 +19,28 @@ pushed to both remotes on 2026-09-07; README restructured to cover it all.
 
 ---
 
+## 2026-09-07 — The README hero shows the current interface
+
+**Reported:** "update the screenshot as well in github, is using old UI."
+`docs/shots/v1_hero.png` was from the August look: old icons, no AO or
+Settings controls, the old palette.
+
+**The obvious source was not good enough.** The regenerated `m9_sample`
+golden has the new interface, but it also has the three toasts the build
+leaves behind ("Sketch 6 hidden — find it in the tree" and its siblings)
+stacked across the bottom, and the old hero had them too. `settle` cannot
+clear them: it returns the moment nothing is animating, and a toast counting
+down its three seconds is not an animation. No op let time pass on purpose.
+
+**Added a `wait` op** (`{"op":"wait","frames":N}`) to the script runner —
+registered in `io/script.go` and dispatched in `app/headless.go`, N virtual
+frames at the fixed 1/60 s step. `testdata/scripts/readme_hero.json` is the
+sample ship with 200 frames let pass before the shot, and its output is the
+new hero. The script sits with the others, so the every-script invariants
+run over it; `TestTheHeroShotHasNoToastsOnIt` pins the clean shot, with the
+unwaited sample ship as the negative control proving the wait is doing the
+work. The op catalog the AI connection reports picks `wait` up on its own.
+
 ## 2026-09-07 — Patina is now reachable from the published repository
 
 **Reported:** "is using Patina Library but is not reflected in github."

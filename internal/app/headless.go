@@ -204,6 +204,15 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		r.mouse = [2]float64{op.At[0], op.At[1]}
 		r.mods = mods{shift: op.Shift, ctrl: op.Ctrl, alt: op.Alt}
 
+	// Lets time pass with nothing else happening. settle cannot do this: it
+	// returns the moment nothing is animating, and a toast counting down its
+	// three seconds is not an animation. A shot meant to stand on its own, the
+	// README's hero for one, needs those seconds to have gone by.
+	case "wait":
+		for i := 0; i < op.Frames; i++ {
+			r.step()
+		}
+
 	// A wheel notch at a point: `at` moves the pointer there first, so a
 	// script says where it is scrolling as well as how far.
 	case "wheel":
