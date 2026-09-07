@@ -281,7 +281,7 @@ func (c *ViewCube) Draw(fonts *ui.Fonts, scale float64) {
 		}
 		cx := (q.pts[0].X + q.pts[2].X) / 2
 		cy := (q.pts[0].Y + q.pts[2].Y) / 2
-		fonts.DrawCentered(fonts.Small, label, cx, cy, ui.FontSizeSmall, ui.ColorText)
+		fonts.DrawCentered(fonts.Small, label, cx, cy, ui.FontSizeSmall, ui.ColorCubeLabel)
 	}
 	rl.EnableBackfaceCulling()
 

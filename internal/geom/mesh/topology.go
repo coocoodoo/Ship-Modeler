@@ -156,6 +156,11 @@ func (m *Mesh) ClassifyEdge(ei int) EdgeKind {
 	n1 := m.FaceNormal(f1)
 	cos := math.Max(-1, math.Min(1, n0.Dot(n1)))
 	angle := math.Acos(cos)
+	// A bevel is an explicitly authored surface, even after another chamfer
+	// halves its angle below the display's ordinary smoothing threshold.
+	if angle > 1e-5 && (m.Faces[f0].HasAuthoredEdges() || m.Faces[f1].HasAuthoredEdges()) {
+		return EdgeCrease
+	}
 	if angle > CreaseAngleDeg*math.Pi/180 {
 		return EdgeCrease
 	}
@@ -168,6 +173,13 @@ func (m *Mesh) ClassifyEdge(ei int) EdgeKind {
 		return EdgeCrease
 	}
 	return EdgeSmooth
+}
+
+// HasAuthoredEdges identifies explicitly authored surface boundaries. Legacy
+// chamfer provenance is upgraded when loading, not here: temporary extrude
+// previews also use body zero and must retain their ordinary smooth facets.
+func (f *Face) HasAuthoredEdges() bool {
+	return f.KeepEdges
 }
 
 // DrawnEdges returns the edge indices the overlay pass should draw, sorted for

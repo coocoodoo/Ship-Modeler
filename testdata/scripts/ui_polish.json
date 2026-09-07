@@ -1,0 +1,13 @@
+[
+ {"op":"click","at":[150,707]},
+ {"op":"settle"},
+ {"op":"shot","name":"settings_midnight"},
+ {"op":"click","at":[745,274]},
+ {"op":"settle"},
+ {"op":"shot","name":"settings_ocean_dark"},
+ {"op":"click","at":[780,200]},
+ {"op":"settle"},
+ {"op":"click","at":[515,275]},
+ {"op":"settle"},
+ {"op":"shot","name":"settings_ocean_light"}
+]

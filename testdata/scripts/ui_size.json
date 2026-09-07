@@ -1,0 +1,19 @@
+[
+ {"op":"click","at":[150,707]},
+ {"op":"click","at":[638,411]}, {"op":"settle"},
+ {"op":"shot","name":"size_125"},
+ {"op":"click","at":[771,424]}, {"op":"settle"},
+ {"op":"shot","name":"size_150"},
+ {"op":"click","at":[953,483]}, {"op":"settle"},
+ {"op":"shot","name":"size_200"},
+ {"op":"wheel","at":[700,300],"degrees":-6},
+ {"op":"shot","name":"settings_scrolled_200"},
+ {"op":"click","at":[1100,658]},
+ {"op":"wheel","at":[100,300],"degrees":-6},
+ {"op":"shot","name":"sidebar_scrolled_200"},
+ {"op":"click","at":[300,694]},
+ {"op":"click","at":[197,339]}, {"op":"settle"},
+ {"op":"shot","name":"size_auto"},
+ {"op":"click","at":[870,600]}, {"op":"settle"},
+ {"op":"shot","name":"viewport_auto"}
+]

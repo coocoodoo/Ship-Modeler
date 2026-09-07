@@ -2,14 +2,399 @@
 
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
-**Current state:** Paint now supports rectangular pixel selection and copying
+**Current state:** A shared Parts Library saves named/category-tagged body
+snapshots across projects and restarts, with right-click Save to Library and
+independent insertion. Library assets stay outside project/export geometry.
+Bodies support Ctrl+C/Ctrl+V with independent paint and
+group undo/redo. Extrusion offers Distance, up to Face, Vertex and Edge.
+Solid edges support equal-distance chamfers with a live
+result preview, multiple edge selection, Apply/Cancel, and undo/redo.
+Paint supports rectangular pixel selection and copying
 between faces, with a placement preview, session clipboard and undo/redo.
 Plane/face grids share a world reference. The interface has
 consistent outline icons and clearer typography. Live screen-space ambient
 occlusion replaces the vertex bake, with a persistent bottom-left toggle.
-Full suite green; modeler.exe and modeler-release.exe rebuilt. Changes are local.
+Full suite green; modeler.exe and modeler-release.exe rebuilt. Committed and
+pushed to both remotes on 2026-09-07; README restructured to cover it all.
 
 ---
+
+## 2026-09-07 — Optional glow, animated effects and upgraded menus
+
+**Implemented:** Added Settings → Effects with a live button/progress/SVG
+preview, 14 saved switches, five press choices and three motion styles. Switches
+cover glow, color cycling, ripples, gradients, hover lift, icon spin/pulse,
+SVG/path playback, card/menu entrances, tooltips, theme fades and part-preview
+rotation. Whole-button transforms move captions and icons together while
+preserving hit areas. Ripple geometry clips to rounded corners. Normal, Slow
+and Reduced motion remain available; Reset effects restores the defaults.
+
+**Library integration:** Used the updated local Patina core to render two
+120-frame SMIL atlases. The orbit SVG uses an arc path, mpath and automatic
+tangent rotation. Modeler plays the embedded assets on its own animation clock,
+including first-frame freezing; arbitrary runtime SVG import is not added.
+The reproducible Rust asset tool and integration notes retain the library
+attribution. Springs use bounded substeps and preserve velocity; control
+positions stay within their tracks even when an interior target overshoots.
+
+**Menus and tooltips:** Dropdowns have trailing chevrons and flip upward when
+needed. Shared menus support keyboard navigation, checked/disabled/separator
+rows, window clamping and focus-loss dismissal. An early dropdown pass prevents
+upward-opening lists from activating controls beneath them. Tooltips wait
+500 ms, transfer between adjacent controls, and hide on click, key or scroll.
+
+**Validation:** Spring stability, menu traversal/blocking, tooltip behavior and
+saved true/false preferences passed. A live isolated app selected Gelatin and
+Bouncy spring through the keyboard and verified saved toggles. Reviewed Effects
+screens, dropdowns and scrolling at 200%. The first broad run caught a card
+entrance still moving during a chamfer screenshot comparison; finite UI
+animations now participate in settling. Refreshed references and reran the
+full suite without updates (app integration: 178.763 s). After the final track
+bound adjustment, app/UI/IO tests and Effects/live tests passed again (8.576 s).
+Both executables compiled with matching SHA-256
+`134698ADA4F7688BD4B73F8ADF950EC6000FC5636057165E21413007AD9B209F`.
+
+## 2026-09-07 — Patina palettes and further UI polish
+
+**Implemented:** Adapted all 20 named palettes from the updated Go UI Library
+into Modeler's raylib interface. Settings previews each palette and saves its
+selection, with interruptible 280 ms color transitions. Model/paint colors stay
+unchanged and the viewport keeps neutral light/dark backgrounds. Added gradient
+cards and primary/active controls, subtle press movement with fixed hit areas,
+click ripples, eased switches/sliders, and clearer selected-chip text. Gradients
+use a triangle fan rather than allocating offscreen textures per widget.
+
+**Preferences:** Normal, Slow and Reduced motion persist across restarts.
+Reduced motion snaps transitions and feedback, stops preview rotation, and
+disables sidebar sliding, caret blinking and toast fading. Settings scrolls at
+large UI sizes with a fixed Done/AI connection footer. Library dialogs show the
+latest notification instead of a stack that obscures their controls. Retained
+the external library's license and documented the visual adaptation; its SMIL
+and deforming native widget renderer are not runtime dependencies.
+
+**Validation:** Tested all palette mappings, unchanged model colors, interrupted
+and slow fades, reduced motion, invalid choices and preference persistence.
+An isolated live window selected palettes and motion options through Settings
+and verified the saved file. Reviewed dark/light palette screens, enlarged
+Settings through 200%, scrolling and return to Auto, plus paint and library
+screens. Refreshed global style references; full suite passed without updates
+(app integration: 160.841 s). After the final notification adjustment, app/UI
+tests and library/live-connection integration passed again (9.228 s), with the
+library references refreshed and checked. Both executables compiled with
+matching SHA-256
+`D8FE9069821612E5C40B2CA69554380B36604C1FDAFB0201579DDD80386D6275`.
+
+## 2026-09-07 — Live AI modeling and painting connection
+
+**Implemented:** Added an opt-in AI connection in Settings and a session-only
+launch flag. An authenticated loopback service queues work onto the window
+thread, exposing the command catalog, structured model and UI inspection,
+screenshots, modeling/painting operations, library operations, and visible UI
+controls with text and keyboard input. Request IDs prevent duplicate edits on
+retry; command batches save a recovery checkpoint before making changes and
+report partial completion if an operation fails. The connection starts off.
+
+**Workflow:** Added tools/modeler.ps1 for connecting, inspecting, issuing commands,
+capturing screenshots, checking jobs, disconnecting, and building both executables.
+Documented the protocol and modeling workflow in docs/AI_CONTROL.md and AGENTS.md.
+Build access stays in the local helper. Authentication tokens are not printed.
+
+**Validation:** Authentication, browser-origin rejection, retry protection and
+session cleanup tests passed. A live isolated app test verified geometry, saved
+paint, screenshots, undo, cross-request text focus and the PowerShell helper.
+Also inspected a screenshot from a separate release-executable smoke test that
+created and painted a solid through the helper. Fixed state serialization of
+toast callbacks and preservation of focused text fields between requests.
+Reviewed Settings reference updates. Full suite passed (app integration:
+150.775 s). Both executables compiled with matching SHA-256
+`B52CAB3DC133AD715468027CA3FCBF66EB6A20FEDDA4A926490B5AC462F3DFD4`.
+
+## 2026-09-07 — Edit and update shared library parts
+
+**Implemented:** Added Edit part and Update from selection to the library
+browser. Editing opens a working copy; Save library changes in the sidebar or
+body context menu opens a named update dialog. Updates retain the library ID
+and replace its geometry, paint, name and category. Reopening the same edit
+reselects its working bodies. New saves reject duplicate names within a category;
+explicit updates still support entries with pre-existing duplicate names.
+Existing project copies remain independent. Edit tracking is scoped to the
+current document; Update from selection also works with a previously saved model.
+
+**Storage:** New geometry is written to an immutable revision before publishing
+the metadata atomically. Earlier revisions remain readable by existing catalog
+readers, while only one catalog entry is shown. Invalid geometry and already
+stale update requests leave the saved part untouched.
+
+**Validation:** Persistence, edited geometry/paint, stable identity, repeated
+updates, duplicate prevention, invalid/stale saves and document replacement checks
+passed. Reviewed edit controls, save-back dialog and updated library preview.
+Full suite passed (app integration: 143.527 s). After the final duplicate-name
+handling adjustment, IO/app tests and both library UI tests passed again.
+Both executables compiled with matching SHA-256
+`3BF908DA095E4848BE3A097C2CAC2EFA17B407B54313812CDDBF96E6E9F00B1D`.
+
+## 2026-09-07 — UI size settings
+
+**Implemented:** Settings now offers Auto, 100%, 125%, 150% and 200% UI sizes,
+saved through the existing display-scale preference. Changes take effect on the
+next frame, rebuilding font atlases and resetting stale UI hit regions while
+preserving the document, active tool and notifications. Settings is centered on
+the window and drawn above the underlying controls so it remains accessible at
+200%. The sidebar now scrolls and clips both drawing and hit testing instead of
+stacking overflowing rows. Toolbar labels collapse to icons when space requires.
+
+**Validation:** Checked persistence and rejection of unsupported values. Reviewed
+125%, 150%, 200%, return to Auto, and sidebar scrolling at 200%, alongside both
+theme choices. Full regression suite passed without reference updates (app
+integration: 136.788 s). After the final sidebar footer ordering adjustment,
+appearance and size interaction tests passed against reviewed references.
+Both executables compiled with matching SHA-256
+`097732D9EE57D1FB0B9A3F980A813F84F62B3E30E7C705C8FD88130862B21DA9`.
+
+## 2026-09-06 — Dark / Light settings
+
+**Implemented:** Added a labeled Settings control beside AO at bottom left.
+The appearance dialog switches Dark / Light immediately, including panels,
+fields, mode accents, viewport background and grid lines. The choice is saved
+in settings.json and restored on startup; an explicit choice overrides legacy
+theme.json without modifying it. Done or Escape dismisses the dialog, which
+captures modeling input while open. Body and paint colors remain unchanged.
+View-cube labels stay light on their dark axis-colored faces in both themes.
+
+**Validation:** Persistence, custom-theme preservation and full palette reset
+tests passed. A contrast test initially caught a light-theme button at 4.34:1;
+using white button text corrected it. Light text/button contrast tests now pass.
+Reviewed Dark, Light, switched-back Dark and light sketch/grid screenshots.
+Full suite passed with refreshed UI references (app integration: 121.752 s);
+the appearance interaction test also passed against the reviewed references
+without updating them. Both executables compiled with matching SHA-256
+`852800C17DBCAC6DF7C0BBD57E8DD6F4CB2E71134DF74B9C39FECD82B0839F5A`.
+
+## 2026-09-06 — Patina visual integration
+
+**Implemented:** Adapted the user's Patina UI library into the existing raylib
+interface: charcoal surfaces, indigo accents, rounded panels, tonal buttons,
+smooth hover transitions and visible field focus. Fourteen embedded icons were
+generated with Patina's SVG renderer; CAD-specific icons remain available.
+Library search and refresh now use those icons. The original default saved theme
+automatically adopts the new palette; custom themes remain unchanged. Attribution,
+MIT license and a repeatable asset generator are included. Patina's separate
+native window runtime is not required by the application.
+
+**Validation:** Theme migration and mode-color checks passed. Reviewed library,
+attachment, sketch and chamfer screenshots and refreshed UI reference images.
+Full `go test ./... -count=1` then passed without baseline updates (app integration
+tests: 142.608 s). Both executables compiled with matching SHA-256
+`7807C8B288434C269563DA6600D0F79D2E326548DC63FBD831DE812A3C132742`.
+
+## 2026-09-06 — Attachment pair colors
+
+**Implemented:** Matching bracketed append text now determines the attachment
+color, independently of its A–Z letter. A deterministic text hash keeps colors
+stable across projects and restarts; matching ignores capitalization and outer
+whitespace. Unnamed attachments retain their default purple. Dots, direction
+ticks, viewport labels, sidebar names/icons and the live naming preview use the
+same color. Selected rows retain their pair color alongside the selection
+background. Renaming updates the color without changing saved/export metadata.
+
+**Validation:** Focused attachment checks passed. Reviewed matching Wing and
+Engine pairs, selected markers and the live dialog preview; refreshed only
+attachment screenshots. Full `go test ./... -count=1` passed without baseline
+updates (app integration tests: 133.9 s). Both executables compiled with matching SHA-256
+`1799CEE7784E5783ED30246FBA3777B7EF06A3C20CCBB5311AB9646F90FDE6FE`.
+
+## 2026-09-06 — A–Z modular ship attachment markers
+
+**Implemented:** Markers → Add ship part opens a dialog with A–Z choices,
+optional appended text, a live label preview, Place and Cancel. Clicking a
+face creates a named socket such as `Ship Part A[Left wing]`, storing the
+position and outward normal. Purple viewport dots carry letter labels and
+direction ticks. Selection uses the move gizmo; double-clicking a marker row
+edits its letter/text. Placement, movement, renaming and deletion are undoable.
+Four-row marker pages keep a complete A–Z set and the add controls accessible.
+Multiple sockets can share a letter without replacing one another.
+
+Project round-trips preserve attachment metadata. The game marker payload
+adds an optional `attachments` array. GLB/glTF exports include named empty
+nodes at each socket, local +Z facing outward, with metadata in node extras.
+Existing front/top/thruster marker values and old project compatibility remain.
+
+**Validation:** Model tests cover all letters, duplicates, invalid names and
+undo/redo. Export tests cover .ship/.pxm round-trips, game JSON, named glTF
+nodes and rotations toward axis-aligned and oblique normals. Headless tests
+exercise the real dialog, face clicks, live appended text, cancel, renaming,
+movement and all seven marker pages. Reviewed dialog and marker screenshots;
+refreshed sidebar baselines for the new add row. Final `go test ./... -count=1`
+passed without baseline updates (app integration tests: 144.5 s).
+Both executables rebuilt with
+matching SHA-256 `02AA8698E15B057D1B6FAB88F860D0DBE81B2A23220773C79FA5F4BB06D1BCCC`.
+
+## 2026-09-06 — Rotating library part preview
+
+**Implemented:** Clicking a library part shows a live 3D turntable beneath
+the paginated list, using its saved geometry, colors and paint. The preview
+has an independent camera and fits the whole assembly through every angle,
+including long, tall and off-origin parts. Only the selected asset is loaded;
+its GPU resources are released on refresh, selection change, dismissal or
+shutdown. Preview geometry remains outside the document and export scene.
+The inset clears its own depth region without switching render targets.
+
+**Validation:** Camera tests cover two complete turns at narrow, square and
+wide aspect ratios. Headless checks verify visible rotation, an unchanged
+model view, insertion, and clearing/restoring the preview through searches.
+Reviewed updated library screenshots. Full `go test ./... -count=1` passed
+(app integration tests: 176.3 s); the final library scenario also passed alone.
+Both Windows executables rebuilt with matching SHA-256
+`DCBAB885D1C32DC05BBA20DF328ABC4924D308B9666D66A28F39B941F00E2965`.
+
+## 2026-09-06 — Shared modular Parts Library
+
+**Implemented:** Right-click a viewport body or body row for Save to Library
+and Cancel. The save form accepts a part name and a new or existing category.
+The sidebar's Library section opens a searchable, paginated browser with
+Insert copy and Refresh; Save selected supports assemblies of multiple bodies.
+Right-drag still orbits, and file/close dialogs take priority over library UI.
+
+The user's clarification made this a library shared across modeling sessions,
+so assets live outside projects under the settings directory's `parts` folder.
+Each asset uses a unique ID, an atomic .ship snapshot with paint, and a separate
+metadata record. Same-name saves do not overwrite older parts, and separate
+session saves cannot replace each other's catalog entries. Saving leaves the
+original model untouched. Stored assets never join the active document or its
+render scene, so model exports (including PNG and the .ship game payload) cannot
+include them. Insert copy creates independent document bodies with fresh IDs
+and pixels, selects them for movement, and supports group undo/redo.
+
+**Validation:** Storage tests reload a fresh catalog and painted asset, check
+duplicate-name saves, unsafe IDs, and unchanged GLB/OBJ/STL exports. Application
+tests cover a second session, independent insertion, undo/redo, and preserving
+right-drag orbit. The rendered workflow checks tree and viewport right-click,
+typing name/category, selecting an existing category, canceling, browsing and
+inserting. Reviewed its eight new screenshots and representative updated
+sidebar baselines. Full suite passed during baseline refresh (application
+tests 121.1 s).
+The full suite then passed with baseline updates disabled (application tests
+143.9 s). Focused library UI and input tests also passed after the final
+file/close dialog priority adjustment.
+
+## 2026-09-06 — Body clipboard and extrusion end conditions
+
+**Implemented:** Ctrl+C snapshots the selected bodies (including bodies selected
+through faces/edges/vertices). Ctrl+V inserts independent copies with fresh body
+and face IDs, preserved color and authored edges, and deep-copied paint pixels.
+Each paste offsets the group another unit along X and selects it for movement.
+The clipboard survives later source edits/deletion and works across documents
+in the same session. Each group paste is one undo step with stable redo IDs.
+Paint mode retains its pixel clipboard shortcuts.
+
+Extrusion now has an End condition card with Distance, Face, Vertex and Edge.
+The target modes filter viewport picking to the requested kind and highlight
+the chosen geometry. Faces terminate the solid on their plane, including a
+sloped cap; vertices define a perpendicular stop plane at the vertex's depth;
+edges use the point clicked on the edge. The direction follows the target.
+Preview and commit share the same cap construction, including holes and draft.
+Parallel targets and targets crossing the profile are refused without edits.
+Changing target geometry through history invalidates the reference before a
+commit can use it. Through all, manual depth and direction remain available
+under Distance.
+
+**Validation:** Regression tests cover independent clipboard geometry/pixels,
+source deletion, repeated/group pastes, fresh IDs, undo/redo, target invalidation,
+direction, sloped/reverse/drafted caps, holes and invalid planes. A real rendered
+workflow exercises Ctrl+C/Ctrl+V, all three mode buttons, viewport face/vertex/edge
+picks, and committing the result. Reviewed its seven new screenshots and the
+three updated existing extrusion screenshots. The full suite passed while
+refreshing these baselines (application tests 119.2 s).
+The final full `go test ./... -count=1` run passed with baseline updates
+disabled (application tests 122.2 s).
+
+## 2026-09-05 — Sketch endpoint alignment guides
+
+While placing a sketch point, moving within six screen pixels of an existing
+endpoint's horizontal or vertical coordinate now snaps that coordinate and
+draws a green dashed guide back to the source point. A ring highlights the
+source. Both axes can track together, including corners of a supporting face.
+Curve tracking uses actual ends rather than internal tessellation vertices.
+Direct endpoint/midpoint snaps retain priority, existing segment-axis inference
+is preserved, and Alt releases all snapping. Idle selection is unaffected.
+
+**Validation:** Added coordinate, snap-priority, combined-axis, Alt, idle-hover,
+zoom-radius and face-reference regressions. Added a real headless drawing flow
+and inspected its four new baselines: vertical/horizontal guides, Alt free
+placement, and the committed edge. The full `go test ./... -count=1` suite
+passed (application tests 249.5 s). Both Windows executables compiled with
+matching SHA-256 `024346B1A97590913682BCE47AC3FDAD527496712E529BDB12113157CE767EC4`.
+
+## 2026-09-05 — Repeated chamfer edges and drag direction
+
+**Reproduced:** Chamfering a 45-degree bevel again creates 22.5-degree
+boundaries. The generic 25-degree smoothing threshold hid those boundaries
+from both the overlay and edge picking, despite valid, editable geometry.
+
+**Fixed:** Chamfer faces now retain explicit authored-edge metadata through
+CSG, cloning, folding and save/load. Their noncoplanar boundaries remain
+visible and pickable at shallow angles. The loader upgrades earlier chamfers
+using their construction-face lineage. That compatibility rule is confined
+to loading so temporary extrude tools do not gain unintended edge outlines.
+Ordinary cylinder smoothing and coplanar seams retain their prior behavior.
+
+The gizmo now follows the midpoint of the same two face offsets used by the
+chamfer geometry: inward on outside corners, outward into inside corners.
+Quarter-unit snapping, reverse dragging and Apply/Cancel are unchanged.
+
+**Validation:** A new regression first reproduced the hidden 22.5-degree
+edges, then passed with those edges selectable and accepting a third chamfer.
+Added legacy-file, explicit metadata round-trip, cylinder smoothing and
+coplanar-seam checks. The real gizmo workflow now drags in the corrected
+direction and matches exact 0.50/0.75 u previews.
+The full suite passed; after confining legacy detection to loading, the affected
+packages and chamfer/extrude UI workflows passed again. Both static Windows
+executables rebuilt after the final edits.
+
+## 2026-09-05 — Quarter-unit chamfer gizmo
+
+**Done:** Added an arrow on a selected chamfer edge, with a nearby distance
+readout. Dragging adjusts the absolute distance in 0.25 u increments, with
+twelve logical pixels per step at every zoom. The minimum drag distance is
+0.25 u; the numeric field still accepts precise typed distances. Reversing
+the drag restores earlier steps. A head-on arrow falls back to screen-up so
+it remains grabbable. The preview refreshes during dragging and flushes the
+latest distance on release; Apply/Cancel and one-step undo remain unchanged.
+Captured drags continue across chrome and outside the viewport, and their
+release cannot click a background control.
+
+**Validation:** Added tests for forward/reverse steps, return to the starting
+position, typed values joining the quarter-unit grid, display scaling, and
+release outside the viewport without changing geometry or undo history.
+The rendered workflow now drags the real gizmo, checks the held preview,
+and compares 0.50/0.75 u results against exact numeric previews.
+App, scene, tools, model, CSG and UI tests passed, along with the chamfer and
+both clipboard UI workflows. Both static Windows executables rebuilt.
+
+## 2026-09-05 — Solid-edge chamfer
+
+**Done:** Selecting a solid edge exposes Chamfer edges in the selection panel.
+The tool previews an equal-distance bevel, accepts dragged or typed distances,
+and lets further edge clicks add/remove targets. Apply/Enter commits the exact
+prepared preview; Cancel/Escape discards it. Distance changes are debounced so
+the kernel runs when inputs change, rather than every rendering frame.
+
+Local wedge tools support outside edges and inside corners, with incident end
+planes providing miters on slanted ends. Multiple edges and bodies are prepared
+atomically. Existing paint retains its mapping, and new bevel faces are bare.
+Closed solids and planar adjoining faces are required; excessive distances,
+invalid results and results that remove/split shells are rejected. This is the
+equal-distance chamfer option, not Onshape's entire feature set.
+
+**Validation:** Full `go test ./... -count=1` passed, including the rendered UI
+workflow. Coverage includes every box edge, all box edges together, slanted
+ends, inside corners, a faceted cylinder rim, locality across separate shells,
+paint retention, stale preview rejection, atomic failure, and undo/redo.
+The UI workflow clicks a visible edge and the Chamfer button, drags distance,
+checks invalid-distance feedback, and exercises Apply and Cancel. Its initial
+redo comparison included stacked toast messages; limiting the comparison to
+the unobstructed model area confirmed identical geometry. Both static Windows
+executables rebuilt after editing.
 
 ## 2026-09-05 — Paste corner and rotation mini menu
 

@@ -1,0 +1,12 @@
+[
+ {"op":"click","at":[150,707]}, {"op":"settle"},
+ {"op":"click","at":[418,600]}, {"op":"settle"},
+ {"op":"shot","name":"effects_top"},
+ {"op":"click","at":[665,408]},
+ {"op":"shot","name":"press_menu"},
+ {"op":"ui.key","name":"End"}, {"op":"ui.key","name":"Enter"},
+ {"op":"click","at":[500,210]},
+ {"op":"shot","name":"gelatin_press"},
+ {"op":"wheel","at":[750,400],"degrees":-6},
+ {"op":"shot","name":"effects_bottom"}
+]

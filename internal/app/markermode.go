@@ -29,7 +29,11 @@ type markerState struct {
 	// overlay glyphs rather than geometry, so the ID pass cannot report them
 	// and this is resolved in screen space instead — the same answer, and the
 	// same reason, as a sketch under the cursor (V-12).
-	hover int
+	hover            int
+	attachmentOpen   bool
+	slot, appendText string
+	editIndex        int
+	page             int
 }
 
 // AwaitingMarker reports whether a marker pick is armed.
@@ -37,6 +41,10 @@ func (a *App) AwaitingMarker() bool { return a.markers.armed }
 
 // BeginMarkerPick arms placement: the next click on a face places the dot.
 func (a *App) BeginMarkerPick(kind model.MarkerKind) {
+	if kind == model.MarkerAttachment {
+		a.beginAttachmentDialog(-1)
+		return
+	}
 	a.markers.armed = true
 	a.markers.awaiting = kind
 }
@@ -70,10 +78,19 @@ func (a *App) placeMarkerAt(hit render.PickResult, in InputFrame, vp render.View
 		At:   at,
 		Dir:  f.body.Mesh.FaceNormal(f.face),
 	}}
+	if kind == model.MarkerAttachment {
+		cmd.Marker.Slot, cmd.Marker.AppendText = a.markers.slot, a.markers.appendText
+	}
 	if !a.Run(cmd) {
 		return
 	}
-	a.toastWithUndo(fmt.Sprintf("%s dot placed on %s", kind.Label(), f.body.Name))
+	if kind == model.MarkerAttachment {
+		a.Sel.Clear()
+		a.selectMarker(len(a.Doc().Markers) - 1)
+		a.toastWithUndo(model.AttachmentName(cmd.Marker.Slot, cmd.Marker.AppendText) + " placed")
+	} else {
+		a.toastWithUndo(fmt.Sprintf("%s dot placed on %s", kind.Label(), f.body.Name))
+	}
 }
 
 // markerHint is the hint bar while a pick is armed.
@@ -83,6 +100,8 @@ func (a *App) markerHint() string {
 		return "Click the model where the FRONT of the ship is · Esc cancels"
 	case model.MarkerTop:
 		return "Click the model where the TOP of the ship is · Esc cancels"
+	case model.MarkerAttachment:
+		return "Click a face to place " + model.AttachmentName(a.markers.slot, a.markers.appendText) + " · Esc cancels"
 	default:
 		return "Click the model where a thruster fires from · Esc cancels"
 	}
@@ -95,6 +114,8 @@ func markerColor(k model.MarkerKind) rl.Color {
 		return ui.ColorSuccess
 	case model.MarkerTop:
 		return ui.ColorAccent
+	case model.MarkerAttachment:
+		return rl.Color{R: 196, G: 145, B: 255, A: 255}
 	default:
 		return ui.ColorWarn
 	}
@@ -141,6 +162,9 @@ func (a *App) markerAt(mouseX, mouseY float64, vp render.Viewport) int {
 // tree and the viewport already share.
 func (a *App) selectMarker(i int) {
 	a.selectRef(model.MarkerRef(i))
+	if len(a.Doc().Markers) > 4 {
+		a.markers.page = i / 4
+	}
 }
 
 // selectedMarkers is the dots the gizmo is anchored to.
@@ -174,7 +198,7 @@ func (a *App) buildMarkerOverlay() *render.Overlay {
 	}
 	d := &render.Overlay{}
 	for i, m := range a.Doc().Markers {
-		col := markerColor(m.Kind)
+		col := placedMarkerColor(m)
 		size := 9.0
 		if m.Kind == model.MarkerThruster {
 			size = 8
@@ -195,7 +219,7 @@ func (a *App) buildMarkerOverlay() *render.Overlay {
 		d.Markers = append(d.Markers, render.OverlayMarker{
 			P: m.At, Kind: render.MarkerVertex, Color: col, SizePx: size,
 		})
-		if m.Kind == model.MarkerThruster {
+		if m.Kind == model.MarkerThruster || m.Kind == model.MarkerAttachment {
 			d.Lines = append(d.Lines, render.OverlayLine{
 				A: m.At, B: m.At.Add(m.Dir.Mul(1.2)),
 				Color: ui.Fade(col, 0.8), WidthPx: 2,
@@ -205,6 +229,31 @@ func (a *App) buildMarkerOverlay() *render.Overlay {
 	return d
 }
 
+func (a *App) drawAttachmentLabels(vp render.Viewport) {
+	if a.Mode != ModeIdle {
+		return
+	}
+	for i, m := range a.Doc().Markers {
+		if m.Kind != model.MarkerAttachment {
+			continue
+		}
+		p, ok := a.Camera.WorldToViewport(m.At, float64(vp.W), float64(vp.H))
+		if !ok || p.X < 0 || p.Y < 0 || p.X > float64(vp.W) || p.Y > float64(vp.H) {
+			continue
+		}
+		label := m.Slot
+		if a.Sel.Contains(model.MarkerRef(i)) || a.markers.hover == i {
+			label = a.Doc().MarkerLabel(i)
+		}
+		x, y := float32(vp.X)+float32(p.X)+a.px(10), float32(vp.Y)+float32(p.Y)-a.px(10)
+		w := min(a.px(260), a.UI.TextWidth(label, ui.FontSizeSmall)+a.px(10))
+		x = max(float32(vp.X), min(x, float32(vp.X+vp.W)-w))
+		r := ui.Rect(x, y, w, a.px(20))
+		a.UI.FillRounded(r, 3, ui.ColorCard)
+		a.UI.Text(ui.InsetXY(r, a.px(5), 0), label, ui.FontSizeSmall, placedMarkerColor(m))
+	}
+}
+
 // buildMarkerRows is the tree's Markers section: the placed dots with delete
 // buttons, then one arming row per kind.
 func (a *App) buildMarkerRows(row func() rl.Rectangle, open bool) {
@@ -212,26 +261,45 @@ func (a *App) buildMarkerRows(row func() rl.Rectangle, open bool) {
 		return
 	}
 	doc := a.Doc()
-	thruster := 0
-	for i, m := range doc.Markers {
+	start, end := 0, len(doc.Markers)
+	pages := max(1, (len(doc.Markers)+3)/4)
+	if len(doc.Markers) > 4 {
+		a.markers.page = min(a.markers.page, pages-1)
+		start = a.markers.page * 4
+		end = min(start+4, len(doc.Markers))
+	}
+	for i := start; i < end; i++ {
+		m := doc.Markers[i]
 		label := m.Kind.Label()
+		if m.Kind == model.MarkerAttachment {
+			label = doc.MarkerLabel(i)
+		}
 		if m.Kind == model.MarkerThruster {
-			thruster++
-			label = fmt.Sprintf("Thruster %d", thruster)
+			label = doc.MarkerLabel(i)
+		}
+		iconColor := ui.AccentMarker
+		labelColor := rl.Color{}
+		if m.Kind == model.MarkerAttachment {
+			iconColor = placedMarkerColor(m)
+			labelColor = iconColor
 		}
 		ref := model.MarkerRef(i)
 		res := a.UI.TreeRow(ui.MakeID("tree.marker."+itoa(i)), row(), ui.TreeRowSpec{
-			Label:     label,
-			Icon:      ui.DrawMarkerIcon,
-			IconColor: ui.AccentMarker,
-			CanDelete: true,
-			Selected:  a.Sel.Contains(ref),
-			Indent:    1,
+			Label:         label,
+			Icon:          ui.DrawMarkerIcon,
+			IconColor:     iconColor,
+			LabelColor:    labelColor,
+			KeepIconColor: m.Kind == model.MarkerAttachment,
+			CanDelete:     true,
+			Selected:      a.Sel.Contains(ref),
+			Indent:        1,
 		})
 		if res.Hovered {
 			a.tree.hovered = ref
 		}
 		switch {
+		case res.DoubleClicked && m.Kind == model.MarkerAttachment:
+			a.beginAttachmentDialog(i)
 		case res.ClickedDelete:
 			idx := i
 			if a.Run(&model.DeleteMarker{Index: idx}) {
@@ -242,6 +310,22 @@ func (a *App) buildMarkerRows(row func() rl.Rectangle, open bool) {
 			// Selecting the row arms the gizmo on that dot, which is the same
 			// thing clicking it in the viewport does.
 			a.selectMarker(i)
+		}
+	}
+	if pages > 1 {
+		// Keep the navigation and add controls stationary on the last page.
+		for i := end; i < start+4; i++ {
+			row()
+		}
+		nav := row()
+		prev, rest := ui.SplitLeft(nav, a.px(54))
+		next, label := ui.SplitRight(rest, a.px(54))
+		if a.UI.Button(ui.MakeID("marker.prev"), prev, "Previous", ui.ButtonOpts{Disabled: a.markers.page == 0}) {
+			a.markers.page--
+		}
+		a.UI.TextCentered(label, fmt.Sprintf("%d / %d", a.markers.page+1, pages), ui.FontSizeSmall, ui.ColorTextDim)
+		if a.UI.Button(ui.MakeID("marker.next"), next, "Next", ui.ButtonOpts{Disabled: a.markers.page+1 == pages}) {
+			a.markers.page++
 		}
 	}
 
@@ -255,8 +339,8 @@ func (a *App) buildMarkerRows(row func() rl.Rectangle, open bool) {
 			Icon:      ui.DrawMarkerIcon,
 			IconColor: ui.AccentMarker,
 			Selected:  armed,
-			Indent:   1,
-			Dim:      !armed,
+			Indent:    1,
+			Dim:       !armed,
 		})
 		if res.Clicked {
 			if armed {
@@ -279,4 +363,5 @@ func (a *App) buildMarkerRows(row func() rl.Rectangle, open bool) {
 	arm(model.MarkerFront, frontLabel, "The direction the ship flies")
 	arm(model.MarkerTop, topLabel, "Pins the ship's roll")
 	arm(model.MarkerThruster, "Add thruster dot…", "Where an exhaust effect plays")
+	arm(model.MarkerAttachment, "Add ship part…", "A named attachment point for modular parts")
 }

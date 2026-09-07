@@ -13,24 +13,25 @@ import "image/color"
 // flat sheet; depth needs both the contrast here and the elevation cues the
 // draw layer now adds (V-88).
 var (
-	ColorBG      = rgb(0x11, 0x13, 0x19) // window background
-	ColorPanel   = rgb(0x1B, 0x1F, 0x27) // toolbar, tree, hint bar
-	ColorCard    = rgb(0x26, 0x2C, 0x36) // floating cards, fields
-	ColorStroke  = rgb(0x37, 0x40, 0x4D) // hairlines, borders
-	ColorText    = rgb(0xE8, 0xEA, 0xF0) // primary text
-	ColorTextDim = rgb(0x9C, 0xA6, 0xB6) // secondary text, hints
+	// Patina dark palette, adapted from core/src/theme.rs (MIT).
+	ColorBG      = rgb(0x0E, 0x10, 0x14)
+	ColorPanel   = rgb(0x18, 0x1B, 0x21)
+	ColorCard    = rgb(0x23, 0x27, 0x2F)
+	ColorStroke  = rgb(0x37, 0x3B, 0x43)
+	ColorText    = rgb(0xED, 0xEF, 0xF3)
+	ColorTextDim = rgb(0xA3, 0xAA, 0xB8)
 
-	ColorAccent     = rgb(0x53, 0xA4, 0xFF)        // selection, active tool
-	ColorAccentSoft = rgba(0x53, 0xA4, 0xFF, 0x33) // region fills, soft highlights
-	ColorWarn       = rgb(0xFF, 0xA6, 0x3C)        // clamped draft, bent face
-	ColorError      = rgb(0xFF, 0x5D, 0x5D)        // open ends, failed ops
-	ColorSuccess    = rgb(0x3D, 0xD6, 0x8C)        // confirm, valid states
+	ColorAccent     = rgb(0x7B, 0x7F, 0xF7)
+	ColorAccentSoft = rgba(0x7B, 0x7F, 0xF7, 0x33)
+	ColorWarn       = rgb(0xF8, 0xB8, 0x4E)
+	ColorError      = rgb(0xF2, 0x6B, 0x6F)
+	ColorSuccess    = rgb(0x4C, 0xC3, 0x8A)
 
 	// The viewport background is a vertical gradient between these two: light
 	// falls from above, so the top is the bright end. The old ramp ran the
 	// other way and was narrow enough to pass for flat.
-	ColorViewportTop    = rgb(0x2A, 0x30, 0x3C)
-	ColorViewportBottom = rgb(0x12, 0x14, 0x1A)
+	ColorViewportTop    = rgb(0x26, 0x2A, 0x32)
+	ColorViewportBottom = rgb(0x0E, 0x10, 0x14)
 
 	ColorGridMinor = rgba(0xFF, 0xFF, 0xFF, 0x0F)
 	ColorGridMajor = rgba(0xFF, 0xFF, 0xFF, 0x24)
@@ -41,8 +42,8 @@ var (
 	// ColorBevel is the one-pixel light along a raised surface's top edge, and
 	// ColorShadow the ink its drop shadow is layered from. Together they are
 	// what makes a card sit above the viewport instead of being pasted on it.
-	ColorBevel  = rgba(0xFF, 0xFF, 0xFF, 0x16)
-	ColorShadow = rgba(0x00, 0x00, 0x08, 0x12)
+	ColorBevel  = rgba(0xFF, 0xFF, 0xFF, 0x0C)
+	ColorShadow = rgba(0x00, 0x00, 0x00, 0x20)
 )
 
 // Mode accents (SPEC-UX §3.1, V-149). ColorAccent above is not a fixed colour:
@@ -58,10 +59,10 @@ var (
 // leaning on the warn amber. The viewport itself is never tinted — a pixel
 // artist needs it colour-true — so the accents live in the chrome only.
 var (
-	AccentModel   = rgb(0x53, 0xA4, 0xFF) // blue: idle, selection, move, files
-	AccentSketch  = rgb(0xFF, 0xD9, 0x4A) // gold: pencil on paper
+	AccentModel   = rgb(0x7B, 0x7F, 0xF7) // Patina indigo: selection, move, files
+	AccentSketch  = rgb(0xFF, 0xF1, 0x76) // light gold: pencil on paper
 	AccentExtrude = rgb(0x2E, 0xD0, 0xCC) // teal: things growing
-	AccentBoolean = rgb(0xB4, 0x8C, 0xFF) // violet: things combining
+	AccentBoolean = rgb(0xD2, 0x9D, 0xFF) // orchid: things combining
 	AccentPaint   = rgb(0xFF, 0x6F, 0xB5) // pink: paint
 	AccentMarker  = rgb(0xA6, 0xF0, 0x4E) // lime: highlighter, for the dots you place
 )
@@ -109,6 +110,9 @@ var BodyColors = []color.RGBA{
 	rgb(0x96, 0xB0, 0x8E),
 }
 
+// The view cube retains dark axis-colored faces in both appearances.
+var ColorCubeLabel = rgb(0xED, 0xEF, 0xF3)
+
 // BodyColor returns the auto color for the n-th body created.
 func BodyColor(n int) color.RGBA {
 	return BodyColors[((n%len(BodyColors))+len(BodyColors))%len(BodyColors)]
@@ -122,8 +126,8 @@ const (
 	MinWindowW    = 1280
 	MinWindowH    = 720
 	Spacing       = 8
-	CornerRadius  = 6
-	CardRadius    = 8
+	CornerRadius  = 8
+	CardRadius    = 12
 	IconSize      = 18
 	IconStroke    = 1.5
 

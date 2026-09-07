@@ -43,6 +43,8 @@ func (a *App) modeAccent() color.RGBA {
 // modeAccent, so the chip and the colour never disagree.
 func (a *App) modeName() string {
 	switch {
+	case a.InChamfer():
+		return "CHAMFER"
 	case a.InSketch() || a.sketch.awaitingPlane:
 		return "SKETCH"
 	case a.InExtrude() || a.InPushPull():

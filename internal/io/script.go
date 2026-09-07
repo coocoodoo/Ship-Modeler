@@ -189,14 +189,20 @@ var knownOps = map[string]bool{
 	"sketch.spline": true, "sketch.bezier": true,
 	"sketch.fillet": true, "sketch.chamfer": true, "sketch.offset": true,
 	"sketch.mirror": true, "sketch.pattern": true, "sketch.select": true,
-	"pushpull": true,
-	"extrude":  true, "extrude.begin": true, "extrude.commit": true,
+	"pushpull":      true,
+	"chamfer.begin": true, "chamfer.distance": true, "chamfer.commit": true, "chamfer.cancel": true,
+	"extrude": true, "extrude.begin": true, "extrude.commit": true,
 	"extrude.cancel": true,
-	"boolean":        true, "boolean.begin": true,
+	"extrude.pick":   true, "body.copy": true, "body.paste": true,
+	"library.testdir": true, "library.browse": true, "ui.type": true,
+	"ui.text": true, "ui.key": true,
+	"library.insert": true, "library.edit": true, "library.save": true, "library.update": true,
+	"boolean": true, "boolean.begin": true,
 	"boolean.commit": true, "boolean.cancel": true,
 	"select": true, "move": true, "rotate": true,
 	"marker.front": true, "marker.top": true, "marker.thruster": true,
-	"marker.clear": true, "marker.move": true,
+	"marker.attachment": true,
+	"marker.clear":      true, "marker.move": true,
 	"duplicate": true, "box.select": true,
 	"paint.begin": true, "paint.exit": true, "paint.res": true,
 	"paint.color": true, "paint.tool": true, "paint.size": true,
@@ -237,6 +243,14 @@ func (o Op) validate() error {
 		return o.Errorf("unknown op %q", o.Op)
 	}
 	switch o.Op {
+	case "ui.key":
+		if o.Name == "" {
+			return o.Errorf("needs a key name")
+		}
+	case "library.insert", "library.edit", "library.update":
+		if o.Target == "" {
+			return o.Errorf("needs the library part ID in target")
+		}
 	case "sketch.begin":
 		if o.Plane == "" {
 			return o.Errorf("needs a plane")

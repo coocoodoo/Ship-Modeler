@@ -16,8 +16,9 @@ import (
 // Snap radii in screen pixels (SPEC-UX §8.4). An endpoint pulls hardest, then
 // a midpoint; the grid is always available underneath both.
 const (
-	EndpointRadiusPx = 7.0
-	MidpointRadiusPx = 5.0
+	EndpointRadiusPx  = 7.0
+	MidpointRadiusPx  = 5.0
+	AlignmentRadiusPx = 6.0
 	// InferenceDegrees is how close to horizontal or vertical a direction has
 	// to be before the guide takes over.
 	InferenceDegrees = 4.0
@@ -36,6 +37,7 @@ const (
 	SnapEndpoint
 	// SnapMidpoint latched onto the middle of an existing segment.
 	SnapMidpoint
+	SnapAlignment
 )
 
 func (k SnapKind) String() string {
@@ -46,6 +48,8 @@ func (k SnapKind) String() string {
 		return "endpoint"
 	case SnapMidpoint:
 		return "midpoint"
+	case SnapAlignment:
+		return "aligned"
 	default:
 		return "free"
 	}
@@ -68,10 +72,19 @@ type Snap struct {
 	// The UI draws a dashed line between them (SPEC-UX §8.4).
 	Infer Inference
 	From  geom.Vec2i
+	// Guides are endpoint alignment tracks: X (vertical), then Y (horizontal).
+	Guides [2]AlignmentGuide
+}
+
+type AlignmentGuide struct {
+	Axis Inference
+	From geom.Vec2i
 }
 
 // HasGuide reports whether a dashed inference guide should be drawn.
-func (s Snap) HasGuide() bool { return s.Infer != InferNone }
+func (s Snap) HasGuide() bool {
+	return s.Infer != InferNone || s.Guides[0].Axis != InferNone || s.Guides[1].Axis != InferNone
+}
 
 // Config carries the tolerances for one snap query.
 type Config struct {
@@ -139,17 +152,17 @@ func Resolve(cursor geom.Vec2i, ents []model.Entity, from *geom.Vec2i, cfg Confi
 			case InferVertical:
 				p.Y = cfg.GridOrigin.Y + snapTo(cursor.Y-cfg.GridOrigin.Y, cfg.GridStep)
 			}
-			return Snap{Point: p, Kind: SnapGrid, Infer: inf, From: *from}
+			return alignEndpoints(Snap{Point: p, Kind: SnapGrid, Infer: inf, From: *from}, cursor, ents, from, cfg)
 		}
 	}
 
-	return Snap{
+	return alignEndpoints(Snap{
 		Point: cfg.GridOrigin.Add(geom.Vec2i{
 			X: snapTo(cursor.X-cfg.GridOrigin.X, cfg.GridStep),
 			Y: snapTo(cursor.Y-cfg.GridOrigin.Y, cfg.GridStep),
 		}),
 		Kind: SnapGrid,
-	}
+	}, cursor, ents, from, cfg)
 }
 
 // nearer picks whichever of two candidates is closer to the cursor, with a

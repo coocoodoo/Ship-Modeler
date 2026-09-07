@@ -55,6 +55,7 @@ type faceJSON struct {
 	Loops     [][]int `json:"loops"`
 	SrcFace   FaceUID `json:"src,omitempty"`
 	NonPlanar bool    `json:"nonPlanar,omitempty"`
+	KeepEdges bool    `json:"keepEdges,omitempty"`
 	Paint     int     `json:"paint,omitempty"`
 }
 
@@ -98,6 +99,7 @@ func (m *Mesh) MarshalJSON() ([]byte, error) {
 			Loops:     f.Loops,
 			SrcFace:   f.SrcFace,
 			NonPlanar: f.NonPlanar,
+			KeepEdges: f.KeepEdges,
 			Paint:     index[f.Paint],
 		}
 	}
@@ -130,6 +132,9 @@ func (m *Mesh) UnmarshalJSON(data []byte) error {
 			Loops:     f.Loops,
 			SrcFace:   f.SrcFace,
 			NonPlanar: f.NonPlanar,
+			// Older saved chamfers used construction body zero for their
+			// tool faces. Promote that durable lineage to the explicit flag.
+			KeepEdges: f.KeepEdges || (f.SrcFace != NoFace && f.SrcFace.BodyID() == 0),
 		}
 		if f.Paint > 0 {
 			out.Faces[i].Paint = paints[f.Paint-1]

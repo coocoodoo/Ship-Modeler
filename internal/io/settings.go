@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image/color"
+	"modeler/internal/appearance"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,6 +83,11 @@ type TileSettings struct {
 // Settings is the whole preferences file.
 type Settings struct {
 	Window WindowRect `json:"window"`
+	// Empty preserves a legacy custom theme; explicit choices use built-in palettes.
+	Theme             string              `json:"theme,omitempty"`
+	AppearancePalette string              `json:"appearancePalette,omitempty"`
+	UIMotion          string              `json:"uiMotion,omitempty"`
+	UIEffects         *appearance.Effects `json:"uiEffects,omitempty"`
 
 	// UIScaleOverride forces a UI scale instead of following the display.
 	// Zero means "follow the OS".
@@ -205,6 +211,16 @@ func LoadSettingsFrom(path string) (*Settings, error) {
 // normalize clamps loaded values into their legal ranges, so a hand-edited or
 // stale file cannot put the app into a broken state.
 func (s *Settings) normalize() {
+	if s.UIEffects != nil {
+		s.UIEffects.Normalize()
+	}
+	if s.UIMotion != "slow" && s.UIMotion != "off" {
+		s.UIMotion = ""
+	}
+	s.AppearancePalette = strings.TrimSpace(s.AppearancePalette)
+	if s.Theme != "light" && s.Theme != "dark" {
+		s.Theme = ""
+	}
 	if s.GridStep <= 0 {
 		s.GridStep = DefaultGridStep
 	}

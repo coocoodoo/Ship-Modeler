@@ -101,10 +101,13 @@ type ExtrudeTool struct {
 	// DepthUnits is the signed drag distance. Its sign is folded into Dir when
 	// the tool is read, so dragging back through zero flips the extrusion
 	// rather than producing a negative solid.
-	DepthUnits float64
-	Draft      float64
-	Dir        extrude.Direction
-	Result     Result
+	DepthUnits                float64
+	Draft                     float64
+	Dir                       extrude.Direction
+	Result                    Result
+	Extent                    Extent
+	TargetReady               bool
+	TargetPoint, TargetNormal geom.Vec3
 
 	// ThroughAll replaces the dragged depth with one that clears the whole
 	// scene (SPEC-UX §9.3). ThroughDepth is that distance, measured from the
@@ -164,6 +167,9 @@ func (t *ExtrudeTool) Flipped() bool { return t.DepthUnits < 0 }
 // splits the depth around the plane, so clearing the scene in both directions
 // takes twice the reach.
 func (t *ExtrudeTool) EffectiveDepth() float64 {
+	if t.Extent != ExtentDistance {
+		return math.Abs(t.DepthUnits)
+	}
 	if !t.ThroughAll {
 		return math.Abs(t.DepthUnits)
 	}
@@ -217,6 +223,8 @@ func (t *ExtrudeTool) ArrowDirection() geom.Vec3 {
 // run and "dragging through zero flips it" is a UI idea, not a geometric one.
 func (t *ExtrudeTool) BuildParams(frame geom.Frame) extrude.Params {
 	return extrude.Params{
+		EndPlane: t.Extent != ExtentDistance && t.TargetReady,
+		EndPoint: t.TargetPoint, EndNormal: t.TargetNormal,
 		Frame: frame,
 		Depth: geom.ToSubunits(t.EffectiveDepth()),
 		Draft: t.Draft,
@@ -253,6 +261,9 @@ func (t *ExtrudeTool) EffectiveDir() extrude.Direction {
 // afterwards is still theirs to make.
 func (t *ExtrudeTool) SetResult(r Result) {
 	t.Result = r
+	if t.Extent != ExtentDistance {
+		return
+	}
 	if !t.OnFace {
 		return
 	}
@@ -268,6 +279,9 @@ func (t *ExtrudeTool) SetResult(r Result) {
 // Valid reports whether the tool has enough to build, and why not if it does
 // not. Every disabled control has to say how to enable it (SPEC-UX §15).
 func (t *ExtrudeTool) Valid() (bool, string) {
+	if t.Extent != ExtentDistance && !t.TargetReady {
+		return false, "Select a target " + t.Extent.TargetName() + " in the viewport"
+	}
 	if len(t.Regions) == 0 {
 		return false, "Select a closed region — close the red endpoints first"
 	}

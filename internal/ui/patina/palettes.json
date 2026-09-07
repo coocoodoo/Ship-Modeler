@@ -1,0 +1,202 @@
+[
+  {
+    "Name": "Indigo",
+    "Dark": false,
+    "Background": "#F4F5F8",
+    "Surface": "#FFFFFF",
+    "Variant": "#EEF0F4",
+    "Text": "#171A21",
+    "Secondary": "#5B6472",
+    "Accent": "#5B5FEF"
+  },
+  {
+    "Name": "Ocean",
+    "Dark": false,
+    "Background": "#F2F7FA",
+    "Surface": "#FFFFFF",
+    "Variant": "#E3EEF5",
+    "Text": "#0F2A3A",
+    "Secondary": "#4A6478",
+    "Accent": "#0284C7"
+  },
+  {
+    "Name": "Forest",
+    "Dark": false,
+    "Background": "#F3F7F2",
+    "Surface": "#FFFFFF",
+    "Variant": "#E4EEE1",
+    "Text": "#14261A",
+    "Secondary": "#4E6656",
+    "Accent": "#16A34A"
+  },
+  {
+    "Name": "Sunset",
+    "Dark": false,
+    "Background": "#FFF6F0",
+    "Surface": "#FFFFFF",
+    "Variant": "#FFE9DC",
+    "Text": "#2E1A12",
+    "Secondary": "#6F5246",
+    "Accent": "#EA580C"
+  },
+  {
+    "Name": "Rose",
+    "Dark": false,
+    "Background": "#FDF2F5",
+    "Surface": "#FFFFFF",
+    "Variant": "#FBE3EA",
+    "Text": "#2C1220",
+    "Secondary": "#6E4A5A",
+    "Accent": "#E11D48"
+  },
+  {
+    "Name": "Lavender",
+    "Dark": false,
+    "Background": "#F6F3FB",
+    "Surface": "#FFFFFF",
+    "Variant": "#ECE6F7",
+    "Text": "#241A36",
+    "Secondary": "#5E5275",
+    "Accent": "#7C3AED"
+  },
+  {
+    "Name": "Sand",
+    "Dark": false,
+    "Background": "#F9F5EC",
+    "Surface": "#FFFDF8",
+    "Variant": "#F0E8D8",
+    "Text": "#2A241A",
+    "Secondary": "#6B6151",
+    "Accent": "#B45309"
+  },
+  {
+    "Name": "Slate",
+    "Dark": false,
+    "Background": "#F1F3F5",
+    "Surface": "#FFFFFF",
+    "Variant": "#E2E6EA",
+    "Text": "#111827",
+    "Secondary": "#4B5563",
+    "Accent": "#334155"
+  },
+  {
+    "Name": "Mint",
+    "Dark": false,
+    "Background": "#F0FAF7",
+    "Surface": "#FFFFFF",
+    "Variant": "#DDF3EC",
+    "Text": "#0F2A24",
+    "Secondary": "#476B62",
+    "Accent": "#0D9488"
+  },
+  {
+    "Name": "Mono",
+    "Dark": false,
+    "Background": "#FBFBFA",
+    "Surface": "#FFFFFF",
+    "Variant": "#F0F0EE",
+    "Text": "#1A1A1A",
+    "Secondary": "#555555",
+    "Accent": "#111111"
+  },
+  {
+    "Name": "Midnight",
+    "Dark": true,
+    "Background": "#0E1014",
+    "Surface": "#181B21",
+    "Variant": "#23272F",
+    "Text": "#EDEFF3",
+    "Secondary": "#A3AAB8",
+    "Accent": "#7B7FF7"
+  },
+  {
+    "Name": "Nord",
+    "Dark": true,
+    "Background": "#2E3440",
+    "Surface": "#3B4252",
+    "Variant": "#434C5E",
+    "Text": "#ECEFF4",
+    "Secondary": "#D8DEE9",
+    "Accent": "#88C0D0"
+  },
+  {
+    "Name": "Dracula",
+    "Dark": true,
+    "Background": "#282A36",
+    "Surface": "#2F3140",
+    "Variant": "#44475A",
+    "Text": "#F8F8F2",
+    "Secondary": "#BFC3D9",
+    "Accent": "#BD93F9"
+  },
+  {
+    "Name": "Ocean Dark",
+    "Dark": true,
+    "Background": "#0B1620",
+    "Surface": "#122130",
+    "Variant": "#1B2E40",
+    "Text": "#E6F0F7",
+    "Secondary": "#9FB6C8",
+    "Accent": "#38BDF8"
+  },
+  {
+    "Name": "Forest Dark",
+    "Dark": true,
+    "Background": "#0E1512",
+    "Surface": "#16211B",
+    "Variant": "#1F2E25",
+    "Text": "#E7F0EA",
+    "Secondary": "#A3B8AA",
+    "Accent": "#4ADE80"
+  },
+  {
+    "Name": "Ember",
+    "Dark": true,
+    "Background": "#171210",
+    "Surface": "#221A17",
+    "Variant": "#2E2320",
+    "Text": "#F5EDE8",
+    "Secondary": "#BFA9A0",
+    "Accent": "#FB923C"
+  },
+  {
+    "Name": "Rose Dark",
+    "Dark": true,
+    "Background": "#1A1116",
+    "Surface": "#241820",
+    "Variant": "#31212B",
+    "Text": "#F6EBF0",
+    "Secondary": "#C4A9B7",
+    "Accent": "#FB7185"
+  },
+  {
+    "Name": "Amethyst",
+    "Dark": true,
+    "Background": "#130F1D",
+    "Surface": "#1C1629",
+    "Variant": "#281F3A",
+    "Text": "#EFEAF7",
+    "Secondary": "#B4A8CB",
+    "Accent": "#A78BFA"
+  },
+  {
+    "Name": "Graphite",
+    "Dark": true,
+    "Background": "#1B1B1D",
+    "Surface": "#242427",
+    "Variant": "#2E2E32",
+    "Text": "#EDEDEF",
+    "Secondary": "#A9A9AF",
+    "Accent": "#E5E7EB"
+  },
+  {
+    "Name": "Carbon",
+    "Dark": true,
+    "Background": "#000000",
+    "Surface": "#0E0E0E",
+    "Variant": "#1A1A1A",
+    "Text": "#F4F4F5",
+    "Secondary": "#A1A1AA",
+    "Accent": "#22D3EE"
+  }
+]

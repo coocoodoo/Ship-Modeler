@@ -24,6 +24,8 @@ const (
 
 // ButtonOpts configures a button.
 type ButtonOpts struct {
+	Icon     IconFunc
+	IconEnd  IconFunc
 	Style    ButtonStyle
 	Disabled bool
 	// Tooltip and Shortcut are shown after the hover delay. A disabled control
@@ -37,23 +39,39 @@ type ButtonOpts struct {
 // Button draws a labelled button and reports whether it was clicked.
 func (c *Context) Button(id ID, r rl.Rectangle, label string, opts ButtonOpts) bool {
 	it := c.interact(id, r, opts.Disabled)
+	c.describeControl(id, "button", label)
+	r = c.buttonFeedback(id, r, it)
+	endVisual := c.buttonTransform(id, r, it)
+	defer endVisual()
+	hover := c.hoverAmount(id, it.Hovered && !it.Disabled)
 
 	var fill, text color.RGBA
 	switch opts.Style {
 	case ButtonPrimary:
-		fill, text = ColorAccent, ColorBG
+		fill = c.effectAccent(ColorAccent)
+		text = onAccent(fill)
 	case ButtonDanger:
-		fill, text = ColorError, ColorBG
+		fill, text = ColorError, onAccent(ColorError)
 	case ButtonGhost:
 		fill, text = color.RGBA{}, ColorText
-		if it.Hovered && !it.Disabled {
-			fill = ColorHover
-		}
+		fill = Fade(ColorHover, hover)
 	default:
-		fill, text = ColorCard, ColorText
+		fill, text = blendColor(ColorCard, ColorAccent, 0.06), ColorText
 	}
+	c.buttonGlow(r, fill, !it.Disabled && (opts.Style == ButtonPrimary || it.Hovered))
 	if fill.A > 0 {
-		c.FillRounded(r, CornerRadius, stateColor(fill, it))
+		if opts.Style != ButtonGhost {
+			fill = blendColor(fill, ColorText, hover*0.07)
+		}
+		visual := it
+		visual.Hovered = false
+		fill = stateColor(fill, visual)
+		if opts.Style == ButtonPrimary && !it.Disabled {
+			c.Shadow(Inset(r, c.Px(2)), CornerRadius, .45)
+			c.FillGradientRounded(r, CornerRadius, fill, blendColor(fill, ColorCard, .09))
+		} else {
+			c.FillRounded(r, CornerRadius, fill)
+		}
 	}
 	switch opts.Style {
 	case ButtonNormal:
@@ -62,10 +80,28 @@ func (c *Context) Button(id ID, r rl.Rectangle, label string, opts ButtonOpts) b
 		// A filled button carries the top-edge light every raised surface
 		// gets; disabled ones lie flat.
 		if !it.Disabled {
-			c.Bevel(r, CornerRadius)
+			c.StrokeRounded(r, CornerRadius, Fade(ColorText, 0.14))
 		}
 	}
-	c.TextCentered(r, label, FontSizeUI, textColorFor(text, it))
+	c.drawRipple(id, r, text)
+	if opts.Icon == nil {
+		labelBox := r
+		if opts.IconEnd != nil {
+			iconBox, rest := SplitRight(r, c.Px(26))
+			labelBox = rest
+			ctr := Center(iconBox)
+			c.animatedIcon(opts.IconEnd, float64(ctr.X), float64(ctr.Y), IconSize*c.Scale, textColorFor(text, it), false)
+		}
+		c.TextCentered(labelBox, label, FontSizeUI, textColorFor(text, it))
+	} else {
+		label = c.Truncate(label, FontSizeUI, r.Width-c.Px(28))
+		width := c.TextWidth(label, FontSizeUI) + c.Px(20)
+		content := Rect(r.X+(r.Width-width)/2, r.Y, width, r.Height)
+		icon, labelBox := SplitLeft(content, c.Px(20))
+		ctr := Center(icon)
+		c.animatedIcon(opts.Icon, float64(ctr.X), float64(ctr.Y), 15*c.Scale, textColorFor(text, it), !it.Disabled && (it.Hovered || opts.Style == ButtonPrimary))
+		c.Text(labelBox, label, FontSizeUI, textColorFor(text, it))
+	}
 
 	c.queueTooltip(id, r, it, opts.Tooltip, opts.Shortcut, opts.DisabledWhy)
 	return it.Clicked
@@ -89,24 +125,35 @@ type IconOpts struct {
 // The active tool gets an accent underline and a tinted icon (SPEC-UX §4).
 func (c *Context) IconButton(id ID, r rl.Rectangle, icon IconFunc, opts IconOpts) bool {
 	it := c.interact(id, r, opts.Disabled)
+	label := opts.Label
+	if label == "" {
+		label = opts.Tooltip
+	}
+	c.describeControl(id, "button", label)
+	r = c.buttonFeedback(id, r, it)
+	endVisual := c.buttonTransform(id, r, it)
+	defer endVisual()
 
 	accent := ColorAccent
 	if opts.Accent.A > 0 {
 		accent = opts.Accent
 	}
+	if opts.Active {
+		accent = c.effectAccent(accent)
+	}
+	c.buttonGlow(r, accent, !it.Disabled && (opts.Active || it.Hovered))
 
 	// The active tool gets a soft accent wash as well as its underline, so the
 	// current mode reads from across the room and not only from two pixels.
 	if opts.Active {
-		c.FillRounded(r, CornerRadius, Fade(Soft(accent), 0.8))
+		c.FillGradientRounded(r, CornerRadius, blendColor(ColorPanel, accent, .19), blendColor(ColorPanel, accent, .08))
 		c.StrokeRounded(r, CornerRadius, Fade(accent, 0.35))
 	}
-	if it.Hovered && !it.Disabled {
-		c.FillRounded(r, CornerRadius, ColorHover)
-	}
+	c.FillRounded(r, CornerRadius, Fade(ColorHover, c.hoverAmount(id, it.Hovered && !it.Disabled)))
 	if it.Pressed && !it.Disabled {
 		c.FillRounded(r, CornerRadius, Fade(ColorHover, 1.6))
 	}
+	c.drawRipple(id, r, accent)
 
 	tint := ColorTextDim
 	switch {
@@ -125,7 +172,7 @@ func (c *Context) IconButton(id ID, r rl.Rectangle, icon IconFunc, opts IconOpts
 	}
 	center := Center(iconBox)
 	if icon != nil {
-		icon(float64(center.X), float64(center.Y), IconSize*c.Scale, tint)
+		c.animatedIcon(icon, float64(center.X), float64(center.Y), IconSize*c.Scale, tint, !it.Disabled && (opts.Active || it.Hovered))
 	}
 
 	c.queueTooltip(id, r, it, opts.Tooltip, opts.Shortcut, opts.DisabledWhy)
@@ -164,21 +211,22 @@ func (c *Context) Eye(id ID, r rl.Rectangle, visible bool, opts IconOpts) bool {
 // Toggle draws a labelled on/off switch.
 func (c *Context) Toggle(id ID, r rl.Rectangle, label string, on bool, opts ButtonOpts) bool {
 	it := c.interact(id, r, opts.Disabled)
+	c.describeControl(id, "toggle", label)
+	target := 0.0
+	if on {
+		target = 1
+	}
+	amount := clamp01(c.easeAmount(id.Child("value"), target, 65, true))
 
 	knobBox, labelBox := SplitLeft(r, c.Px(30))
 	track := InsetXY(knobBox, c.Px(2), (knobBox.Height-c.Px(14))/2)
 
-	trackCol := ColorStroke
-	if on {
-		trackCol = ColorAccent
-	}
+	trackCol := blendColor(ColorStroke, ColorAccent, amount)
 	c.FillRounded(track, 7, stateColor(trackCol, it))
 
 	knobD := track.Height - c.Px(4)
 	knobX := track.X + c.Px(2)
-	if on {
-		knobX = track.X + track.Width - knobD - c.Px(2)
-	}
+	knobX += (track.Width - knobD - c.Px(4)) * float32(amount)
 	knob := Rect(knobX, track.Y+c.Px(2), knobD, knobD)
 	c.FillRounded(knob, float64(knobD), textColorFor(ColorText, it))
 
@@ -205,7 +253,17 @@ func (c *Context) Slider(id ID, r rl.Rectangle, value, min, max float64, opts Bu
 
 	t := (value - min) / (max - min)
 	t = clamp01(t)
+	if !it.Pressed {
+		t = c.easeAmount(id.Child("value"), t, 75, true)
+	} else {
+		if c.hoverTransitions == nil {
+			c.hoverTransitions = make(map[ID]hoverTransition)
+		}
+		c.hoverTransitions[id.Child("value")] = hoverTransition{value: t, frame: c.frameNumber}
+	}
 	filled := track
+	// Springs may overshoot a target inside the track, but never its bounds.
+	t = clamp01(t)
 	filled.Width = float32(t) * track.Width
 	c.FillRounded(filled, 2, stateColor(ColorAccent, it))
 
@@ -258,15 +316,16 @@ func (c *Context) ChipGroup(id ID, r rl.Rectangle, labels []string, selected int
 		}
 		cid := id.Child(label)
 		it := c.interact(cid, chip, disabled)
+		c.describeControl(cid, "choice", label)
 
 		fill := ColorCard
 		text := ColorTextDim
 		if i == selected {
-			fill, text = ColorAccent, ColorBG
+			fill, text = blendColor(ColorCard, ColorAccent, 0.20), ColorText
 		}
 		c.FillRounded(chip, CornerRadius, stateColor(fill, it))
-		if i != selected {
-			c.StrokeRounded(chip, CornerRadius, ColorStroke)
+		if i == selected {
+			c.StrokeRounded(chip, CornerRadius, Fade(ColorAccent, 0.42))
 		}
 		c.TextCentered(chip, label, FontSizeSmall, textColorFor(text, it))
 

@@ -51,12 +51,13 @@ func FoldBent(m *Mesh, moved map[int]bool, nextID func() FaceUID) int {
 			src = f.ID
 		}
 		paint := f.Paint
+		keepEdges := f.HasAuthoredEdges()
 		// The first piece replaces the original in place; the rest append.
 		// Every piece is a new face with a new identity: the original was one
 		// surface and none of the pieces is it, which is the same reasoning
 		// the boolean kernel applies to its fragments.
 		for i, loop := range pieces {
-			nf := Face{ID: nextID(), Loops: [][]int{loop}, SrcFace: src, Paint: paint}
+			nf := Face{ID: nextID(), Loops: [][]int{loop}, SrcFace: src, Paint: paint, KeepEdges: keepEdges}
 			if i == 0 {
 				m.Faces[fi] = nf
 			} else {

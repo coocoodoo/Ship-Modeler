@@ -1,4 +1,4 @@
-﻿package ui
+package ui
 
 import (
 	"encoding/json"
@@ -57,12 +57,13 @@ type ThemeAxis struct {
 
 // themeSnapshot is every mutable token, so the built-in theme can be restored.
 type themeSnapshot struct {
-	bg, panel, card, stroke, text, textDim   color.RGBA
-	warn, errorC, success                    color.RGBA
-	viewportTop, viewportBottom              color.RGBA
-	model, sketch, extrude, boolean, paint   color.RGBA
-	marker, axisX, axisY, axisZ              color.RGBA
-	accent, accentSoft                       color.RGBA
+	bg, panel, card, stroke, text, textDim     color.RGBA
+	warn, errorC, success                      color.RGBA
+	viewportTop, viewportBottom                color.RGBA
+	model, sketch, extrude, boolean, paint     color.RGBA
+	marker, axisX, axisY, axisZ                color.RGBA
+	accent, accentSoft                         color.RGBA
+	gridMinor, gridMajor, hover, bevel, shadow color.RGBA
 }
 
 func snapshotTheme() themeSnapshot {
@@ -75,6 +76,8 @@ func snapshotTheme() themeSnapshot {
 		boolean: AccentBoolean, paint: AccentPaint, marker: AccentMarker,
 		axisX: ColorAxisX, axisY: ColorAxisY, axisZ: ColorAxisZ,
 		accent: ColorAccent, accentSoft: ColorAccentSoft,
+		gridMinor: ColorGridMinor, gridMajor: ColorGridMajor, hover: ColorHover,
+		bevel: ColorBevel, shadow: ColorShadow,
 	}
 }
 
@@ -87,6 +90,8 @@ func (s themeSnapshot) restore() {
 	AccentBoolean, AccentPaint, AccentMarker = s.boolean, s.paint, s.marker
 	ColorAxisX, ColorAxisY, ColorAxisZ = s.axisX, s.axisY, s.axisZ
 	ColorAccent, ColorAccentSoft = s.accent, s.accentSoft
+	ColorGridMinor, ColorGridMajor, ColorHover = s.gridMinor, s.gridMajor, s.hover
+	ColorBevel, ColorShadow = s.bevel, s.shadow
 }
 
 // builtinTheme is the palette as compiled, taken before anything could touch
@@ -168,6 +173,7 @@ func LoadTheme(path string) (applied bool, err error) {
 	if err := json.Unmarshal(data, &t); err != nil {
 		return false, fmt.Errorf("theme: %w", err)
 	}
+	t = upgradeLegacyDefault(t)
 	if err := ApplyThemeFile(t); err != nil {
 		return false, err
 	}
@@ -222,4 +228,3 @@ func themeHex(c color.RGBA) string {
 	}
 	return fmt.Sprintf("#%02X%02X%02X%02X", c.R, c.G, c.B, c.A)
 }
-

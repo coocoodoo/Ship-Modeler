@@ -294,7 +294,7 @@ func (a *App) stepPaintBar(deltaMillis float64) {
 	if a.InPaint() {
 		want = 1
 	}
-	if a.Headless {
+	if a.Headless || a.UI.MotionFactor() == 0 {
 		a.paint.bar = want
 		return
 	}
@@ -302,7 +302,7 @@ func (a *App) stepPaintBar(deltaMillis float64) {
 	if want < a.paint.bar {
 		span = PaintBarShutMillis
 	}
-	step := deltaMillis / span
+	step := deltaMillis * a.UI.MotionFactor() / span
 	if a.paint.bar < want {
 		a.paint.bar = math.Min(a.paint.bar+step, want)
 	} else if a.paint.bar > want {

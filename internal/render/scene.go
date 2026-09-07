@@ -122,6 +122,8 @@ type Scene struct {
 	// front of the faces they belong to (SPEC-RENDER §6.1), so on a busy mesh
 	// they would swallow a brush stroke aimed at the face behind them.
 	PickFacesOnly bool
+	// PickOnly filters edge/vertex overlays while faces still provide occlusion.
+	PickOnly PickKind
 }
 
 // Viewport is the sub-rectangle of the window the 3D scene occupies, in device

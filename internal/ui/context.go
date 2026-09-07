@@ -2,6 +2,7 @@ package ui
 
 import (
 	"hash/fnv"
+	"modeler/internal/appearance"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -72,6 +73,7 @@ type Input struct {
 	Shift, Ctrl, Alt bool
 
 	DeltaMillis float64
+	FocusLost   bool
 }
 
 // KeyPressed reports whether a key went down this frame.
@@ -86,9 +88,25 @@ func (in *Input) KeyPressed(k int32) bool {
 
 // Context is the widget kit's per-frame state.
 type Context struct {
-	Fonts *Fonts
-	Scale float64
-	In    Input
+	Controls       []Control
+	TrackControls  bool
+	Motion         string // empty = normal; slow = half speed; off = reduced motion
+	Effects        appearance.Effects
+	visualClock    float64
+	menuStates     map[ID]menuState
+	selectOpen     ID
+	selectSuppress ID
+	selectSpecs    map[ID]selectSpec
+	selectResultID ID
+	selectResult   int
+	Screen         rl.Rectangle
+	lastMenuFrame  uint64
+	springs        map[ID][2]float64
+	appearance     *appearanceTransition
+	ripples        map[ID]clickRipple
+	Fonts          *Fonts
+	Scale          float64
+	In             Input
 
 	// hot is the widget under the cursor; active is the one being pressed or
 	// dragged. Only one of each exists at a time, which is what makes an
@@ -166,17 +184,86 @@ type Context struct {
 	wantKeyboard bool
 
 	// blocked is set while drawing beneath an open modal or popover.
-	blocked bool
+	blocked          bool
+	hoverTransitions map[ID]hoverTransition
+	frameNumber      uint64
+	clip             *rl.Rectangle
 }
 
 // NewContext creates a kit bound to a font set.
 func NewContext(fonts *Fonts, scale float64) *Context {
-	return &Context{Fonts: fonts, Scale: scale}
+	return &Context{Fonts: fonts, Scale: scale, Effects: appearance.Defaults()}
+}
+
+// SetScale discards coordinates and interactions from the old layout while
+// preserving queued toasts and modal state.
+func (c *Context) SetScale(fonts *Fonts, scale float64) {
+	c.Fonts, c.Scale = fonts, scale
+	c.ClearFocus()
+	c.hot, c.nextHot, c.active = NoID, NoID, NoID
+	c.drag = dragState{}
+	c.tip = tooltipState{}
+	c.clicks = clickTracker{}
+	c.cards, c.lastCards, c.claims = nil, nil, nil
+	c.wheelClaims, c.lastWheelClaims = nil, nil
+	c.CloseColorPicker()
+}
+
+// DrawBackground paints chrome beneath a foreground dialog without allowing
+// its controls or pointer claims to interfere with that dialog.
+func (c *Context) DrawBackground(draw func()) {
+	blocked, claims := c.blocked, c.claims
+	c.blocked = true
+	draw()
+	c.blocked, c.claims = blocked, claims
+}
+
+// Clip limits both drawing and hit testing to a scrolling panel's viewport.
+func (c *Context) Clip(r rl.Rectangle, draw func()) {
+	previous := c.clip
+	c.clip = &r
+	rl.BeginScissorMode(int32(r.X), int32(r.Y), int32(r.Width), int32(r.Height))
+	draw()
+	rl.EndScissorMode()
+	c.clip = previous
+	if previous != nil {
+		rl.BeginScissorMode(int32(previous.X), int32(previous.Y), int32(previous.Width), int32(previous.Height))
+	}
+}
+
+func (c *Context) ScrollWheel(r rl.Rectangle) float64 {
+	c.ClaimWheel(r)
+	if c.hovering(r) {
+		return c.In.Wheel
+	}
+	return 0
 }
 
 // Begin starts a frame.
 func (c *Context) Begin(in Input) {
+	c.Controls = c.Controls[:0]
+	c.frameNumber++
+	if c.frameNumber%120 == 0 {
+		for id, s := range c.menuStates {
+			if s.frame+120 < c.frameNumber {
+				delete(c.menuStates, id)
+			}
+		}
+		for id, state := range c.hoverTransitions {
+			if state.frame+120 < c.frameNumber {
+				delete(c.hoverTransitions, id)
+			}
+		}
+	}
 	c.In = in
+	if !in.Down[MouseLeft] && !in.Released[MouseLeft] {
+		c.selectSuppress = NoID
+	}
+	c.visualClock += max(0, min(250, in.DeltaMillis)) * c.MotionFactor()
+	if in.FocusLost {
+		c.selectOpen = NoID
+	}
+	c.stepRipples(in.DeltaMillis)
 	c.hot = c.nextHot
 	c.nextHot = NoID
 	c.wantMouse = false
@@ -193,6 +280,7 @@ func (c *Context) Begin(in Input) {
 	}
 	c.stepToasts(in.DeltaMillis)
 	c.stepTooltip(in.DeltaMillis)
+	c.prepareDropdown()
 }
 
 // End finishes a frame: it draws the deferred overlay layer and releases the
@@ -241,6 +329,9 @@ func (c *Context) hovering(r rl.Rectangle) bool {
 		return false
 	}
 	p := c.MousePos()
+	if c.clip != nil && !rl.CheckCollisionPointRec(p, *c.clip) {
+		return false
+	}
 	if !rl.CheckCollisionPointRec(p, r) {
 		return false
 	}
@@ -277,6 +368,7 @@ type Interaction struct {
 
 // interact runs the shared hover/press bookkeeping for a rectangle.
 func (c *Context) interact(id ID, r rl.Rectangle, disabled bool) Interaction {
+	c.recordControl(id, r, disabled)
 	if disabled {
 		return Interaction{Disabled: true, Hovered: c.hovering(r)}
 	}
@@ -337,6 +429,7 @@ func (c *Context) SetFocus(id ID, text string) {
 
 // ClearFocus drops keyboard focus.
 func (c *Context) ClearFocus() {
+	c.selectOpen = NoID
 	c.focus = NoID
 	c.edit = editState{}
 }

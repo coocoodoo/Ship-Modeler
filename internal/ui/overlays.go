@@ -11,7 +11,7 @@ import (
 // queued to the deferred layer rather than painted inline.
 
 // TooltipDelayMillis is how long the pointer must rest before a tip appears.
-const TooltipDelayMillis = 600
+const TooltipDelayMillis = 500
 
 type tooltipState struct {
 	id       ID
@@ -21,13 +21,17 @@ type tooltipState struct {
 	anchor   rl.Rectangle
 	// seen marks that the hovered widget re-registered this frame; a tip whose
 	// widget vanished is dropped rather than left hanging.
-	seen bool
+	seen  bool
+	grace float64
 }
 
 // queueTooltip records that a widget wants a tip while hovered. A disabled
 // control shows its reason instead, because every disabled thing must say how
 // to enable it (SPEC-UX §15).
 func (c *Context) queueTooltip(id ID, r rl.Rectangle, it Interaction, text, shortcut, disabledWhy string) {
+	if !c.Effects.Tooltips || c.tooltipInterrupted() {
+		return
+	}
 	if !it.Hovered {
 		return
 	}
@@ -41,22 +45,39 @@ func (c *Context) queueTooltip(id ID, r rl.Rectangle, it Interaction, text, shor
 		return
 	}
 	if c.tip.id != id {
+		warm := c.tip.waited >= TooltipDelayMillis && c.tip.grace > 0
 		c.tip = tooltipState{id: id}
+		if warm {
+			c.tip.waited = TooltipDelayMillis
+		}
 	}
 	c.tip.text, c.tip.shortcut, c.tip.anchor, c.tip.seen = text, shortcut, r, true
 }
 
 func (c *Context) stepTooltip(dtMillis float64) {
-	if !c.tip.seen {
+	if !c.Effects.Tooltips || c.tooltipInterrupted() {
 		c.tip = tooltipState{}
 		return
 	}
+	if !c.tip.seen {
+		c.tip.grace -= dtMillis
+		if c.tip.grace <= 0 {
+			c.tip = tooltipState{}
+		}
+		return
+	}
 	c.tip.waited += dtMillis
+	if (c.In.MouseDX != 0 || c.In.MouseDY != 0) && c.tip.waited < TooltipDelayMillis {
+		c.tip.waited = 0
+	}
+	if c.tip.waited >= TooltipDelayMillis {
+		c.tip.grace = 180
+	}
 	c.tip.seen = false
 }
 
 func (c *Context) drawTooltip() {
-	if c.tip.id == NoID || c.tip.waited < TooltipDelayMillis || c.tip.text == "" {
+	if !c.tip.seen || c.tip.id == NoID || c.tip.waited < TooltipDelayMillis || c.tip.text == "" {
 		return
 	}
 	pad := c.Px(Spacing / 2)
@@ -86,6 +107,14 @@ func (c *Context) drawTooltip() {
 		sb, _ := SplitRight(textBox, shortcutW)
 		c.Text(sb, c.tip.shortcut, FontSizeSmall, ColorTextDim)
 	}
+}
+
+func (c *Context) tooltipInterrupted() bool {
+	return c.In.FocusLost || c.In.Wheel != 0 || len(c.In.KeysPressed) > 0 || len(c.In.Chars) > 0 || c.In.Pressed[0] || c.In.Pressed[1] || c.In.Pressed[2] || c.In.Down[0] || c.In.Down[1] || c.In.Down[2]
+}
+
+func (c *Context) Tooltip(id ID, r rl.Rectangle, text string) {
+	c.queueTooltip(id, r, Interaction{Hovered: c.hovering(r)}, text, "", "")
 }
 
 // Toast is a transient message at the bottom of the viewport (SPEC-UX §4):
@@ -153,7 +182,20 @@ func (c *Context) stepToasts(dtMillis float64) {
 
 // DrawToasts paints the stack bottom-centre inside the given area.
 func (c *Context) DrawToasts(area rl.Rectangle) {
-	if len(c.toasts) == 0 {
+	c.drawToasts(area, false)
+}
+
+// DrawLatestToast leaves room for the footer of a foreground library dialog.
+func (c *Context) DrawLatestToast(area rl.Rectangle) {
+	c.drawToasts(area, true)
+}
+
+func (c *Context) drawToasts(area rl.Rectangle, latestOnly bool) {
+	toasts := c.toasts
+	if latestOnly && len(toasts) > 1 {
+		toasts = toasts[len(toasts)-1:]
+	}
+	if len(toasts) == 0 {
 		return
 	}
 	w := c.Px(toastWidth)
@@ -162,12 +204,16 @@ func (c *Context) DrawToasts(area rl.Rectangle) {
 	baseY := area.Y + area.Height - h - c.Px(Spacing*2)
 
 	boxAt := func(i int) rl.Rectangle {
-		idx := len(c.toasts) - 1 - i
+		idx := len(toasts) - 1 - i
 		return Rect(area.X+(area.Width-w)/2, baseY-float32(idx)*(h+gap), w, h)
 	}
 	alphaOf := func(t *Toast) float64 {
-		if t.remaining < toastFadeMs {
-			return t.remaining / toastFadeMs
+		if c.MotionFactor() == 0 {
+			return 1
+		}
+		fade := toastFadeMs / c.MotionFactor()
+		if t.remaining < fade {
+			return t.remaining / fade
 		}
 		return 1
 	}
@@ -175,12 +221,12 @@ func (c *Context) DrawToasts(area rl.Rectangle) {
 	// Every shadow before any body: a stack sits closer together than a
 	// shadow reaches, and a shadow painted over the neighbouring toast reads
 	// as a grey halo around it rather than as depth under it.
-	for i := range c.toasts {
-		c.Shadow(boxAt(i), CornerRadius, alphaOf(&c.toasts[i]))
+	for i := range toasts {
+		c.Shadow(boxAt(i), CornerRadius, alphaOf(&toasts[i]))
 	}
 
-	for i := len(c.toasts) - 1; i >= 0; i-- {
-		t := &c.toasts[i]
+	for i := len(toasts) - 1; i >= 0; i-- {
+		t := &toasts[i]
 		box := boxAt(i)
 		alpha := alphaOf(t)
 
@@ -245,6 +291,11 @@ func (c *Context) FloatingCard(id ID, r rl.Rectangle, title string, opts Floatin
 	// The pointer over a card belongs to the card, gaps included, and the
 	// viewport has to be able to find that out before the widgets run.
 	c.registerCard(r)
+	entrance := c.entrance(id, c.Effects.Entrances)
+	r.Y += c.Px(8) * float32(1-entrance)
+	if c.Effects.HoverLift && c.MotionFactor() > 0 {
+		r.Y -= c.Px(2) * float32(c.hoverAmount(id.Child("cardlift"), c.hovering(r)))
+	}
 	c.Card(r)
 	var out CardResult
 

@@ -52,6 +52,7 @@ type extrudeState struct {
 	previewKey string
 	// returnCamera restores the view if the tool is cancelled.
 	returnCamera render.Camera
+	targetRef    render.PickRef
 }
 
 // InExtrude reports whether the extrude tool is open.
@@ -566,6 +567,10 @@ func (a *App) updateExtrude(in InputFrame, vp render.Viewport) {
 	if t == nil {
 		return
 	}
+	if t.Extent != tools.ExtentDistance {
+		a.updateExtrudeTarget(in, vp)
+		return
+	}
 	length := a.arrowLength(vp)
 	ax, ay, bx, by, ok := scene.ArrowScreenEnds(a.Camera, vp, t.Origin, t.ArrowDirection(), length)
 	if !ok {
@@ -624,6 +629,9 @@ func (a *App) buildExtrudeGizmo(vp render.Viewport) *render.Overlay {
 	if t == nil {
 		return nil
 	}
+	if t.Extent != tools.ExtentDistance {
+		return a.extrudeTargetOverlay()
+	}
 	return scene.BuildArrowGizmo(scene.ArrowView{
 		Origin:      t.Origin,
 		Dir:         t.ArrowDirection(),
@@ -670,6 +678,9 @@ func (a *App) extrudeHint() string {
 	t := a.extrude.tool
 	if t == nil {
 		return ""
+	}
+	if t.Extent != tools.ExtentDistance {
+		return "Click a target " + t.Extent.TargetName() + " · Enter to extrude · Esc to cancel"
 	}
 	if t.Dragging() {
 		return fmt.Sprintf("Depth %s u · Ctrl for quarter units · Alt for free", t.DepthLabel())

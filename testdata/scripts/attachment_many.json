@@ -1,0 +1,425 @@
+[
+ {
+  "op": "marker.attachment",
+  "kind": "A",
+  "name": "Socket",
+  "dot": [
+   -1.5,
+   5,
+   -1
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "B",
+  "name": "Socket",
+  "dot": [
+   -0.9,
+   5,
+   -1
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "C",
+  "name": "Socket",
+  "dot": [
+   -0.30000000000000004,
+   5,
+   -1
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "D",
+  "name": "Socket",
+  "dot": [
+   0.2999999999999998,
+   5,
+   -1
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "E",
+  "name": "Socket",
+  "dot": [
+   0.8999999999999999,
+   5,
+   -1
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "F",
+  "name": "Socket",
+  "dot": [
+   1.5,
+   5,
+   -1
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "G",
+  "name": "Socket",
+  "dot": [
+   -1.5,
+   5,
+   -0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "H",
+  "name": "Socket",
+  "dot": [
+   -0.9,
+   5,
+   -0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "I",
+  "name": "Socket",
+  "dot": [
+   -0.30000000000000004,
+   5,
+   -0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "J",
+  "name": "Socket",
+  "dot": [
+   0.2999999999999998,
+   5,
+   -0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "K",
+  "name": "Socket",
+  "dot": [
+   0.8999999999999999,
+   5,
+   -0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "L",
+  "name": "Socket",
+  "dot": [
+   1.5,
+   5,
+   -0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "M",
+  "name": "Socket",
+  "dot": [
+   -1.5,
+   5,
+   0
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "N",
+  "name": "Socket",
+  "dot": [
+   -0.9,
+   5,
+   0
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "O",
+  "name": "Socket",
+  "dot": [
+   -0.30000000000000004,
+   5,
+   0
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "P",
+  "name": "Socket",
+  "dot": [
+   0.2999999999999998,
+   5,
+   0
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "Q",
+  "name": "Socket",
+  "dot": [
+   0.8999999999999999,
+   5,
+   0
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "R",
+  "name": "Socket",
+  "dot": [
+   1.5,
+   5,
+   0
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "S",
+  "name": "Socket",
+  "dot": [
+   -1.5,
+   5,
+   0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "T",
+  "name": "Socket",
+  "dot": [
+   -0.9,
+   5,
+   0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "U",
+  "name": "Socket",
+  "dot": [
+   -0.30000000000000004,
+   5,
+   0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "V",
+  "name": "Socket",
+  "dot": [
+   0.2999999999999998,
+   5,
+   0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "W",
+  "name": "Socket",
+  "dot": [
+   0.8999999999999999,
+   5,
+   0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "X",
+  "name": "Socket",
+  "dot": [
+   1.5,
+   5,
+   0.5
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "Y",
+  "name": "Socket",
+  "dot": [
+   -1.5,
+   5,
+   1
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "marker.attachment",
+  "kind": "Z",
+  "name": "Socket",
+  "dot": [
+   -0.9,
+   5,
+   1
+  ],
+  "normal": [
+   0,
+   1,
+   0
+  ]
+ },
+ {
+  "op": "shot",
+  "name": "attachment_first_page"
+ },
+ {
+  "op": "select",
+  "kind": "marker",
+  "face": 25
+ },
+ {"op":"click","at":[202,416]},
+ {"op":"click","at":[202,416]},
+ {"op":"click","at":[202,416]},
+ {"op":"click","at":[202,416]},
+ {"op":"click","at":[202,416]},
+ {"op":"click","at":[202,416]},
+ {
+  "op": "shot",
+  "name": "attachment_last_page"
+ },
+ {
+  "op": "click",
+  "at": [
+   27,
+   416
+  ]
+ },
+ {
+  "op": "shot",
+  "name": "attachment_previous_page"
+ },
+ {
+  "op": "dump"
+ }
+]

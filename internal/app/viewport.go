@@ -61,6 +61,11 @@ func (a *App) BuildScene() render.Scene {
 			// the dimming that exists to make the preview stand out.
 			d.GPU, d.Pickable, d.NoDim = g, false, true
 		}
+		if a.InChamfer() {
+			if g := a.chamfer.preview[b.ID]; g != nil {
+				d.GPU, d.Pickable = g, false
+			}
+		}
 		// Hovering a body's row in the tree pre-highlights it in the viewport
 		// (SPEC-UX §7).
 		if a.TreeHover == ref {
@@ -106,6 +111,8 @@ func (a *App) BuildScene() render.Scene {
 	// Exactly one gizmo is live at a time, and they are checked in the order a
 	// tool takes over from the selection underneath it.
 	switch {
+	case a.InChamfer():
+		s.Gizmo = a.buildChamferGizmo(vpr)
 	case a.InExtrude():
 		s.Gizmo = a.buildExtrudeGizmo(vpr)
 	case a.InEdgePaint():
@@ -517,6 +524,9 @@ func (a *App) handleCameraInput(in InputFrame, vp render.Viewport) {
 		return
 	}
 	if a.handlePixelPasteRightClick(&in, vp) {
+		return
+	}
+	if a.handleBodyRightClick(&in, vp) {
 		return
 	}
 	inViewport := vp.Contains(int(in.MouseX), int(in.MouseY))

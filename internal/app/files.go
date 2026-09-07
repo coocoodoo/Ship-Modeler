@@ -436,6 +436,11 @@ func (a *App) applyCameraState(s model.CameraState) {
 // leaveModes puts every transient tool away before the document underneath it
 // is replaced.
 func (a *App) leaveModes() {
+	a.markers.attachmentOpen, a.markers.armed = false, false
+	a.library.menu = bodyMenuState{}
+	a.dropLibraryPreview()
+	a.library.open, a.library.saveOpen, a.library.categoryMenu = false, false, false
+	a.library.sources = nil
 	a.CancelStroke()
 	a.ExitPaint()
 	if a.InExtrude() {

@@ -133,6 +133,21 @@ func (r *Renderer) DrawViewport(s *Scene, vp Viewport) {
 	r.drawSceneNoBackground(s, vp)
 }
 
+// DrawPreview draws an independent inset scene on the current framebuffer.
+// Clear only its rectangle so depth from the model behind a dialog cannot
+// occlude the preview. No framebuffer switch or per-frame readback is needed.
+func (r *Renderer) DrawPreview(s *Scene, vp Viewport) {
+	if vp.W <= 0 || vp.H <= 0 {
+		return
+	}
+	rl.DrawRenderBatchActive()
+	rl.EnableScissorTest()
+	rl.Scissor(int32(vp.X), int32(r.fbH-vp.Y-vp.H), int32(vp.W), int32(vp.H))
+	rl.ClearScreenBuffers()
+	rl.DisableScissorTest()
+	r.DrawViewport(s, vp)
+}
+
 // begin3D sets the GL viewport and matrices for a sub-rectangle of the window.
 // raylib's BeginMode3D always spans the whole framebuffer, so this configures
 // the viewport and projection directly instead.

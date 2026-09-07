@@ -82,6 +82,9 @@ func svgShapeFor(name string) *svgShape {
 // It reports false when the asset is missing so the caller can stroke the old
 // shape instead.
 func drawSVGIcon(name string, cx, cy, size float64, col rl.Color) bool {
+	if drawPatinaIcon(name, cx, cy, size, col) {
+		return true
+	}
 	s := svgShapeFor(name)
 	if s == nil || size < 2 {
 		return s != nil

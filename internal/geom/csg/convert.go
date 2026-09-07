@@ -22,7 +22,8 @@ type origin struct {
 	src mesh.FaceUID
 	// paint is shared, not copied. Fragments of one painted face are still
 	// showing the same picture (TESTING §3.4).
-	paint *mesh.FacePaint
+	paint     *mesh.FacePaint
+	keepEdges bool
 }
 
 // upload turns a body mesh into the triangle soup Manifold wants.
@@ -67,7 +68,7 @@ func upload(m *mesh.Mesh) (glMesh, map[uint32]origin, error) {
 		if src == mesh.NoFace {
 			src = f.ID
 		}
-		lineage[id] = origin{src: src, paint: f.Paint}
+		lineage[id] = origin{src: src, paint: f.Paint, keepEdges: f.HasAuthoredEdges()}
 
 		for _, t := range tris {
 			g.tris = append(g.tris, uint64(t.A), uint64(t.B), uint64(t.C))
@@ -113,10 +114,11 @@ func download(g glMesh, lineage map[uint32]origin, bodyID uint32, seq *uint32) (
 			for _, ti := range patch.tris {
 				t := tris[ti]
 				out.Faces = append(out.Faces, mesh.Face{
-					ID:      nextUID(bodyID, seq),
-					Loops:   [][]int{{t[0], t[1], t[2]}},
-					SrcFace: from.src,
-					Paint:   from.paint,
+					ID:        nextUID(bodyID, seq),
+					Loops:     [][]int{{t[0], t[1], t[2]}},
+					SrcFace:   from.src,
+					Paint:     from.paint,
+					KeepEdges: from.keepEdges,
 				})
 				loose++
 			}
@@ -124,10 +126,11 @@ func download(g glMesh, lineage map[uint32]origin, bodyID uint32, seq *uint32) (
 		}
 		for _, loops := range faces {
 			out.Faces = append(out.Faces, mesh.Face{
-				ID:      nextUID(bodyID, seq),
-				Loops:   loops,
-				SrcFace: from.src,
-				Paint:   from.paint,
+				ID:        nextUID(bodyID, seq),
+				Loops:     loops,
+				SrcFace:   from.src,
+				Paint:     from.paint,
+				KeepEdges: from.keepEdges,
 			})
 		}
 	}
@@ -409,9 +412,12 @@ func mergeable(a, b origin) bool {
 // inherit picks the lineage a merged face keeps: the painted side, if there is
 // one, so a picture is never dropped by a merge.
 func inherit(a, b origin) origin {
+	keepEdges := a.keepEdges || b.keepEdges
 	if a.paint == nil && b.paint != nil {
+		b.keepEdges = keepEdges
 		return b
 	}
+	a.keepEdges = keepEdges
 	return a
 }
 

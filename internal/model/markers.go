@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"strings"
 
 	"modeler/internal/geom"
 )
@@ -25,6 +26,8 @@ const (
 	MarkerTop
 	// MarkerThruster is one engine port: where an exhaust effect plays.
 	MarkerThruster
+	// MarkerAttachment is a named socket for a modular ship part.
+	MarkerAttachment
 )
 
 func (k MarkerKind) String() string {
@@ -33,6 +36,8 @@ func (k MarkerKind) String() string {
 		return "front"
 	case MarkerTop:
 		return "top"
+	case MarkerAttachment:
+		return "attachment"
 	default:
 		return "thruster"
 	}
@@ -45,6 +50,8 @@ func (k MarkerKind) Label() string {
 		return "Front"
 	case MarkerTop:
 		return "Top"
+	case MarkerAttachment:
+		return "Ship Part"
 	default:
 		return "Thruster"
 	}
@@ -65,6 +72,29 @@ type Marker struct {
 	Dir geom.Vec3 `json:"dir"`
 	// R is a thruster's bell radius in units; zero for the other kinds.
 	R float64 `json:"r,omitempty"`
+	// Slot is A-Z; AppendText is the optional text inside the label's brackets.
+	Slot       string `json:"slot,omitempty"`
+	AppendText string `json:"append,omitempty"`
+}
+
+func AttachmentName(slot, text string) string {
+	name := "Ship Part " + slot
+	if text = strings.TrimSpace(text); text != "" {
+		name += "[" + text + "]"
+	}
+	return name
+}
+
+func CleanAttachmentName(slot, text string) (string, string, error) {
+	slot = strings.ToUpper(strings.TrimSpace(slot))
+	text = strings.TrimSpace(text)
+	if len(slot) != 1 || slot[0] < 'A' || slot[0] > 'Z' {
+		return "", "", fmt.Errorf("choose a part letter from A to Z")
+	}
+	if len([]rune(text)) > 80 || strings.ContainsAny(text, "\r\n\t[]") {
+		return "", "", fmt.Errorf("append up to 80 characters without brackets or line breaks")
+	}
+	return slot, text, nil
 }
 
 // FrontMarker and TopMarker return the singleton markers, if placed.
@@ -105,6 +135,9 @@ type PlaceMarker struct {
 }
 
 func (c *PlaceMarker) Name() string {
+	if c.Marker.Kind == MarkerAttachment {
+		return "Add " + AttachmentName(c.Marker.Slot, c.Marker.AppendText)
+	}
 	if c.Marker.Kind == MarkerThruster {
 		return "Add thruster dot"
 	}
@@ -112,13 +145,20 @@ func (c *PlaceMarker) Name() string {
 }
 
 func (c *PlaceMarker) Do(doc *Document) error {
+	if c.Marker.Kind == MarkerAttachment {
+		slot, text, err := CleanAttachmentName(c.Marker.Slot, c.Marker.AppendText)
+		if err != nil {
+			return err
+		}
+		c.Marker.Slot, c.Marker.AppendText = slot, text
+	}
 	if c.Marker.Dir == (geom.Vec3{}) {
 		return fmt.Errorf("a marker needs the direction of the face it sits on")
 	}
 	if c.Marker.Kind == MarkerThruster && c.Marker.R <= 0 {
 		c.Marker.R = DefaultThrusterRadius
 	}
-	if c.Marker.Kind != MarkerThruster {
+	if c.Marker.Kind == MarkerFront || c.Marker.Kind == MarkerTop {
 		for i, m := range doc.Markers {
 			if m.Kind == c.Marker.Kind {
 				c.replaced, c.hadPrevious, c.at = m, true, i
@@ -187,6 +227,9 @@ func (d *Document) MarkerLabel(i int) string {
 		return "dot"
 	}
 	m := d.Markers[i]
+	if m.Kind == MarkerAttachment {
+		return AttachmentName(m.Slot, m.AppendText)
+	}
 	if m.Kind != MarkerThruster {
 		return m.Kind.Label() + " dot"
 	}
@@ -266,3 +309,26 @@ func (c *MoveMarkers) Undo(doc *Document) {
 func (c *MoveMarkers) Events() []Event {
 	return []Event{{Kind: EvMarkersChanged}}
 }
+
+// RenameAttachment changes socket metadata without moving the authored point.
+type RenameAttachment struct {
+	Index            int
+	Slot, AppendText string
+	prev             Marker
+}
+
+func (c *RenameAttachment) Name() string { return "Rename attachment point" }
+func (c *RenameAttachment) Do(doc *Document) error {
+	if c.Index < 0 || c.Index >= len(doc.Markers) || doc.Markers[c.Index].Kind != MarkerAttachment {
+		return fmt.Errorf("that attachment point is no longer there")
+	}
+	slot, text, err := CleanAttachmentName(c.Slot, c.AppendText)
+	if err != nil {
+		return err
+	}
+	c.prev = doc.Markers[c.Index]
+	doc.Markers[c.Index].Slot, doc.Markers[c.Index].AppendText = slot, text
+	return nil
+}
+func (c *RenameAttachment) Undo(doc *Document) { doc.Markers[c.Index] = c.prev }
+func (c *RenameAttachment) Events() []Event    { return []Event{{Kind: EvMarkersChanged}} }

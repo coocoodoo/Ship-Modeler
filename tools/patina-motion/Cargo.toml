@@ -1,0 +1,10 @@
+[package]
+name = "modeler-patina-motion"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+patina-core = { path = "../../../../Golang UI Lib/core" }
+tiny-skia = "0.12"
+
+[workspace]

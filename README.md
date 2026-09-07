@@ -21,7 +21,9 @@ To build one yourself:
    eight groups, each group's chevron opening its variants.
    Closed shapes fill in; loose ends show as red rings, because only a closed
    profile can be pulled into a solid. The **Grid** chips on the sketch card
-   set the grid and snap spacing, from a quarter unit to two. `Q` marks
+   set the grid and snap spacing, from a quarter unit to two. While drawing,
+   green dashed guides align your next point horizontally or vertically with
+   existing endpoints and corners. Hold `Alt` to draw freely. `Q` marks
    geometry as construction: guides that snap but close no region. With
    something selected, the card's **Modify** section fillets and chamfers
    corners, offsets a shape, mirrors about the sketch axes, and repeats a
@@ -29,6 +31,11 @@ To build one yourself:
 3. **Press `E`** and drag the arrow. The Extrude card sets the depth, a draft
    angle, and whether the result is a new body or is added to, cut out of, or
    intersected with what it reaches.
+   **End condition** offers Distance, Face, Vertex and Edge. Choose an up-to
+   mode, then click its target in the viewport. Face follows the selected
+   plane, including sloped faces; Vertex stops at that vertex's depth; Edge
+   stops at the depth of the point you click on the edge. The direction follows
+   the target. Enter confirms; Escape cancels.
 4. **Click a flat face** and press `S` to sketch on it, or drag its arrow to
    push and pull it directly.
 5. **Press `P`** to paint. Pick a resolution — **Res** is in texels per unit, so
@@ -40,6 +47,54 @@ To build one yourself:
 The hint bar at the bottom always says what to do next. If a control is greyed
 out, its tooltip says how to turn it on.
 
+## Working with solids
+
+To **chamfer solid edges**, click an edge and choose **Chamfer edges…** in
+the selection panel. Drag the distance field or click it to type a value.
+The arrow on the selected edge adjusts the distance in **0.25 u increments**;
+drag along the arrow to increase it, or back to decrease it. Its readout and
+the preview update as you drag. Releasing leaves the preview ready to apply.
+On outside corners the arrow points into the cut, so dragging inward makes
+the chamfer larger. Edges created by repeated chamfers remain selectable,
+including shallow bevels and chamfers saved by earlier builds.
+The preview shows an equal-distance bevel along both adjoining faces;
+click more original edges to add them, or click selected edges to remove them.
+Use **Apply** / `Enter` to commit, or **Cancel** / `Esc` to discard the preview.
+The whole operation is one undo step. Outside edges and inside corners of
+closed solids are supported, including faceted rims. Adjoining faces must be
+flat, and distances that do not fit are refused. Surviving face paint keeps
+its original mapping; new bevel faces can be painted normally.
+
+To **copy bodies**, select them in the tree or viewport and press **Ctrl+C**,
+then **Ctrl+V**. Copies keep their geometry, colour and paint, have independent
+pixels, and appear one unit farther along X with each paste. They remain
+selected so you can position them with the move gizmo. Each paste is one undo
+step. In Paint mode these shortcuts copy and paste the selected pixels instead.
+
+## Shared Parts Library
+
+Right-click a body in the viewport or tree and choose **Save to Library**.
+Name the part, type a new category or choose an existing one, then save.
+**Save selected** stores an assembly of several bodies as one part. Saving
+leaves the original in the model.
+
+The Library section's **Browse library** button opens your searchable parts
+collection. Click a part for an automatically rotating 3D preview of its
+geometry and paint; **Insert copy** adds an independent, undoable copy to the
+current model. Library assets keep their paint and geometry and remain
+available across projects and restarts on this computer. They are stored under
+`%APPDATA%\Modeler\parts` (or the configured settings directory). Library
+assets never enter exports; only copies inserted into the model become
+exportable geometry.
+
+To revise a saved part, select it in **Browse library → Edit part**. Edit its
+working copy, finish the active modelling tool, then choose **Save library
+changes** in the sidebar or the body's right-click menu. **Update** saves back
+to the same entry, including geometry, paint, name and category. To replace a
+saved part with a body you already have, select that body, browse to the
+library part, and choose **Update from selection**. Existing project copies
+stay independent.
+
 ## Keyboard
 
 | | |
@@ -47,6 +102,7 @@ out, its tooltip says how to turn it on.
 | **Navigate** | |
 | Right-drag / Middle-drag / Wheel | Orbit / Pan / Zoom to cursor |
 | `F` / `O` | Frame selection / Orthographic ⇄ perspective |
+| `Shift+F` | Look straight at the selected face or plane |
 | **Tools** | `S` sketch · `E` extrude · `B` boolean · `M` move · `P` paint |
 | **Sketch** | `V` select · `L` line · `R` rectangle · `C` circle · `A` arc |
 | | `P` polygon · `O` slot · `S` spline · `.` point · `Q` construction |
@@ -59,8 +115,16 @@ out, its tooltip says how to turn it on.
 | **Files** | `Ctrl+N` new · `Ctrl+O` open · `Ctrl+S` save · `Ctrl+Shift+S` save as |
 | | `Ctrl+E` export · `Ctrl+I` import an STL or OBJ mesh |
 | **Edit** | `Ctrl+Z` undo · `Ctrl+Y` redo · `Del` delete · `H` hide |
+| | `Ctrl+C` / `Ctrl+V` copy and paste bodies (pixels, in Paint) |
 | **Held** | `Alt` no snapping, or eyedropper in paint · `Ctrl` fine snap · `Shift` add to selection, constrain a shape |
 | `Esc` | Back one level · `?` the shortcut sheet |
+
+Menus and dropdowns support **Up/Down**, **Home/End**, **Enter/Space** and
+**Escape**, stay inside the window, and close on focus loss. Tooltips appear
+after half a second, transfer immediately between adjacent controls, and hide
+when you click, type or scroll.
+
+## The viewport and the interface
 
 The viewport uses **live screen-space ambient occlusion**: inside corners,
 pockets and contact between separate parts receive soft shadows as you edit
@@ -69,15 +133,43 @@ Enabling AO from flat view also restores lighting. The effect uses visible
 scene depth, so surfaces hidden from the camera cannot contribute shadows.
 It does not alter paint or exported geometry; rendered PNGs include the shading.
 
-The interface uses consistent outline icons, native Windows typography with
-embedded fallbacks, and restrained active-tool highlights. The chrome's colour
-follows what you are doing: gold while sketching, teal
+The chrome's colour follows what you are doing: gold while sketching, teal
 while extruding, violet for booleans, pink in paint, lime while placing
 markers, blue otherwise. The hint bar names the mode in a chip of the same
-colour. Every colour is yours to change in `theme.json` beside the settings
-file - it is written out with the defaults on first launch, so open it and
-edit any `#RRGGBB`. The viewport itself never tints, so painted colours stay
-true.
+colour. The viewport itself never tints, so painted colours stay true.
+
+**Settings**, beside **AO** in the bottom-left corner, holds the appearance:
+
+- **Dark / Light**, then one of **20 colour palettes** with a preview of each.
+  Theme changes cross-fade over 280 ms and the choice is saved across
+  restarts. The viewport keeps a neutral light or dark background so model and
+  paint colours remain true.
+- **Interface motion**: Normal, Slow (half speed) and Reduced. Reduced applies
+  visual changes instantly and stops part-preview rotation. Button hit areas
+  stay fixed during press feedback.
+- **Effects**, with a live button and animated SVG preview. Toggle glow,
+  colour cycling, ripples, gradients, hover lift, icon spin/pulse, SVG/path
+  animation, card/menu entrances, tooltips, theme fades and part-preview
+  rotation individually. Choose **Bounce**, **Rubber band** or **Gelatin**
+  press feedback, and **Smooth easing**, **Spring** or **Bouncy spring**
+  motion. Preferences save automatically; Reduced motion freezes animation
+  while keeping your choices.
+- **UI size**: Auto (your display scale), 100%, 125%, 150% and 200%. Text,
+  icons and controls resize immediately and the choice is remembered. Scroll
+  the left sidebar or Settings to reach controls at larger sizes.
+
+The palettes, gradient surfaces, rounded controls, click ripples, hover easing
+and line icons are adapted from **Patina**; see
+[Patina integration](third_party/patina/README.md) for attribution and for
+rebuilding the embedded assets. Icons are a consistent outline set, and text
+uses native Windows typography with embedded fallbacks.
+
+Every colour is still yours to change in `theme.json` beside the settings
+file — it is written out with the defaults on first launch, so open it and
+edit any `#RRGGBB`. An untouched default `theme.json` from an earlier release
+adopts the new appearance automatically; a custom one keeps its colours.
+Choosing a built-in appearance in Settings overrides custom theme colours
+without changing the custom theme file.
 
 ## Painting, and why the exports look right
 
@@ -85,6 +177,16 @@ Face paint is anchored to a frame that belongs to the face, not to the
 triangles under it, so pixels stay where you put them when the geometry
 underneath changes. Cut a window through a painted hull and the paint on both
 sides of the cut is still exactly where it was.
+
+The **Alpha** slider, between the palette and the recents, sets how much of
+the colour a stroke lays down, from 1 to 100%. It belongs to the brush, not to
+the colour: choosing a swatch never changes it. Below full, paint composites
+onto what is already there, so a glaze over the hull or over other paint lets
+it show through; a gradient takes the alpha at both ends. The two armed colour
+chips draw over a checkerboard so you can see what will land, and the cursor
+preview fades with the brush. The eyedropper reads a texel's alpha back into
+the brush. Exports flatten the paint over the body colour, so a translucent
+stroke looks the same in the file as it did in the viewport.
 
 To **copy pixels between faces**, press `U` in Paint and drag a box around the
 paint you want; hold `Shift` for a square. Press `Ctrl+C`, then `Ctrl+V`, hover
@@ -99,11 +201,11 @@ Right-click during placement to choose which of the paste's **four corners**
 follows the cursor, or choose **0° / 90° / 180° / 270°** in the mini menu.
 **Cancel**, clicking outside, or `Esc` closes the menu without placing pixels
 or changing the current paste. Right-drag still moves the camera.
-You can place the copied
-pattern repeatedly; `Esc` stops placement and `Ctrl+Z` undoes each paste.
-Pixels keep their colors and alpha, one copied pixel per destination pixel.
-Empty pixels leave existing paint underneath, and the destination face clips
-the result at its edges. The clipboard lasts for the current app session.
+You can place the copied pattern repeatedly; `Esc` stops placement and
+`Ctrl+Z` undoes each paste. Pixels keep their colours and alpha, one copied
+pixel per destination pixel. Empty pixels leave existing paint underneath, and
+the destination face clips the result at its edges. The clipboard lasts for
+the current app session.
 
 The **Edge tool** (`K`) paints a band along edges you pick — panel seams,
 plating lines, an outlined hull. **All corners** takes every sharp edge of a
@@ -112,10 +214,10 @@ that comes to in units beside it — at Res 8 a one-pixel line is 0.125 u, and i
 is that same 0.125 u on every face it touches. If one pixel is still thicker
 than you want, raise the Res — with paint on the model, choosing a Res chip
 resamples every painted face to the new density in one undoable step, so the
-model always has exactly one pixel size. The band is laid inside each face and meets its
-other half at the corner, so it reads as one line rather than two that nearly
-line up, and it is baked into the faces own pictures: it saves, exports and can
-be painted over like anything else you drew.
+model always has exactly one pixel size. The band is laid inside each face and
+meets its other half at the corner, so it reads as one line rather than two
+that nearly line up, and it is baked into the faces' own pictures: it saves,
+exports and can be painted over like anything else you drew.
 
 The **Tile tool** (`T`) stamps pixel-art tiles from an imported sheet. Import
 a PNG, pick the grid that separates its tiles — 8, 16, 32, 64, or Custom with
@@ -127,9 +229,16 @@ own resolution, transparent tile pixels leave the surface alone, and a whole
 trail is a single undo step. The sheet and its grid are remembered between
 sessions, like the palette.
 
+**Palettes…** opens a library of about 4,400 Lospec palettes plus any `.hex`
+files in `%APPDATA%\Modeler\palettes\`, each row showing the palette's
+colours. Search matches every word in any order; the chosen palette goes on
+the custom page and is remembered between sessions.
+
 The **dither modes** (2×2, 4×4, 8×8 Bayer) are how a gradient or a soft brush
 gets a middle without leaving the palette: the shading is spent on how many
-whole texels are painted, not on inventing colours between two of them.
+whole texels are painted, not on inventing colours between two of them. A
+dither never thins out a translucent stroke — it decides which texels a soft
+edge covers, and the brush's alpha lands on all of them.
 
 Exports carry the same promise as far as the format allows:
 
@@ -156,6 +265,21 @@ that is the exhaust direction. From those the file derives an orthonormal
 forward/up/right basis, so an engine loads a `.pxm` already knowing which way
 the ship flies, with no per-hull correction tables.
 
+**Modular attachments:** In **Markers**, choose **Add ship part…**, pick a
+letter from **A–Z**, and enter optional appended text, for example
+`Ship Part A[Left wing]`. Click **Place**, then a face to set the attachment
+position and outward direction. Select a marker to move it with the gizmo;
+double-click its sidebar row to edit the letter or text. Placement, movement,
+renaming and deletion support undo/redo. Marker pages keep large sets accessible.
+Markers with matching bracketed text share a colour across letters and projects;
+the dots, direction ticks, labels and sidebar rows use that pair colour. Matching
+ignores capitalisation and surrounding spaces. Renaming updates the colour.
+
+Attachment points are saved in `.pxm`/`.ship` projects and listed in the
+`game/markers.json` payload's `attachments` array with `name`, `slot`, `append`,
+`at`, and normalised `dir`. GLB/glTF exports include named empty nodes at those
+positions, with local +Z facing outward and the same metadata in node `extras`.
+
 Dropping a `.pxm` (or `.ship`) on the window opens it. Unsaved work
 is autosaved every two minutes and again if the program ever crashes; the next
 launch offers it back — and anything that would replace unsaved work, from the
@@ -174,8 +298,27 @@ winding is repaired, and the card asks what one file unit is worth — mesh file
 carry no units — showing the result in units before you commit. STEP files go
 through a converter first (FreeCAD exports STL happily).
 
-Settings, autosaves and crash logs live in `%APPDATA%\Modeler`. Set
-`MODELER_CONFIG_DIR` to put them somewhere else.
+Settings, autosaves, crash logs, the parts library and palettes live in
+`%APPDATA%\Modeler`. Set `MODELER_CONFIG_DIR` to put them somewhere else.
+
+## AI connection
+
+An assistant running on the same machine can inspect and work in a running
+Modeler window: modelling, painting, screenshots, UI controls and library
+operations. It is **off by default**. Turn it on with **Settings → AI
+connection: On** in the window you want to work in, and off again with the same
+button; `modeler.exe -ai` enables it for one session from the start.
+
+The connection binds only to 127.0.0.1 on an available port, with a random
+token created for that process; browser-origin requests are rejected. Discovery
+records live in `%APPDATA%\Modeler\ai\session-<pid>.json`, or beneath
+`MODELER_CONFIG_DIR`. Do not print or share their tokens. Modeler itself needs
+no cloud account or API key.
+
+`tools/modeler.ps1` connects, reads state, captures the view, lists the
+operation catalog, sends command batches, checks jobs and disconnects. The
+protocol and the modelling workflow are in [AI control](docs/AI_CONTROL.md);
+[AGENTS.md](AGENTS.md) is the short brief an assistant reads first.
 
 ## Building from source
 
@@ -196,11 +339,16 @@ machine without MinGW:
 go build -ldflags "-s -w -H windowsgui -extldflags=-static" -o modeler.exe ./cmd/modeler
 ```
 
+`tools/modeler.ps1 -Action Build` runs that build and writes both
+`modeler.exe` and `modeler-release.exe`, reporting their hashes so you can see
+they match.
+
 The program can also drive itself, which is how it is tested: `modeler.exe
 -headless -script <ops.json> -out <dir>` runs a script of operations against a
 hidden window and writes PNGs. `assets/sample_ship.json` is one such script —
 it is the ship on the welcome card, the end-to-end test, and the image at the
-top of this file.
+top of this file. `-ai -hidden` starts a hidden live window with the AI
+connection enabled, for connection tests.
 
 ## Credits
 
@@ -212,10 +360,16 @@ Modeler stands on:
 | [Manifold](https://github.com/elalish/manifold) v3.5.2 | the boolean kernel, the same one OpenSCAD uses — Apache-2.0 |
 | [Clipper2](https://github.com/AngusJohnson/Clipper2), vendored inside Manifold | BSL-1.0 |
 | [zenity](https://github.com/ncruces/zenity) | native file dialogs — MIT |
-| [Go Regular](https://go.dev/blog/go-fonts) via `golang.org/x/image` | the UI typeface — BSD-3-Clause |
+| Patina | the interface's palettes, controls, motion and icon renderer, adapted — MIT |
+| [Go Regular and Go Medium](https://go.dev/blog/go-fonts) via `golang.org/x/image` | the embedded UI typefaces — BSD-3-Clause |
 
-Licence texts for the vendored kernel are in `third_party/manifold/`.
+On Windows the interface uses Segoe UI from the system's own font folder at
+runtime; the font files are read from the machine and never redistributed.
+The Go faces are the fallback everywhere else.
+
+Licence texts for the vendored kernel are in `third_party/manifold/`, and
+Patina's in `third_party/patina/`.
 
 The 32-colour palette is original to this program: four ramps of eight, tuned
 for hull plating rather than for covering the colour wheel. Lospec `.hex`
-palettes can be imported over it.
+palettes can be imported over it, or chosen from the bundled library.

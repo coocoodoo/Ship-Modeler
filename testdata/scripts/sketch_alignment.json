@@ -1,0 +1,22 @@
+[
+  {"op":"body.visible","body":"Hull","visible":false},
+  {"op":"body.visible","body":"Engine pod","visible":false},
+  {"op":"body.visible","body":"Wing pod","visible":false},
+  {"op":"sketch.begin","plane":"Front"},
+  {"op":"settle"},
+  {"op":"sketch.line","from":[-5,-3],"to":[-5,1]},
+  {"op":"sketch.line","from":[-5,1],"to":[-2,1]},
+  {"op":"sketch.line","from":[-2,1],"to":[-2,4]},
+  {"op":"sketch.line","from":[-2,4],"to":[4,4]},
+  {"op":"click","at":[667,423]},
+  {"op":"hover","at":[838,386]},
+  {"op":"shot","name":"vertical_guide"},
+  {"op":"hover","at":[928,295]},
+  {"op":"shot","name":"horizontal_guide"},
+  {"op":"hover","at":[838,386],"alt":true},
+  {"op":"shot","name":"alt_free"},
+  {"op":"click","at":[838,386]},
+  {"op":"hover","at":[100,100]},
+  {"op":"shot","name":"placed"},
+  {"op":"dump"}
+]

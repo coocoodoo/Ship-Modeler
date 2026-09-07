@@ -44,7 +44,17 @@ type GameMarkers struct {
 	Top  *[3]float64 `json:"top,omitempty"`
 
 	// Thrusters are the engine ports, in the order they were placed.
-	Thrusters []GameThruster `json:"thrusters,omitempty"`
+	Thrusters   []GameThruster   `json:"thrusters,omitempty"`
+	Attachments []GameAttachment `json:"attachments,omitempty"`
+}
+
+// GameAttachment is a modular socket in the same coordinates as the mesh.
+type GameAttachment struct {
+	Name       string     `json:"name"`
+	Slot       string     `json:"slot"`
+	AppendText string     `json:"append,omitempty"`
+	At         [3]float64 `json:"at"`
+	Dir        [3]float64 `json:"dir"`
 }
 
 // GameThruster is one engine port: where the effect plays, which way the
@@ -114,6 +124,19 @@ func BuildGameMarkers(doc *model.Document) GameMarkers {
 		}
 		out.Thrusters = append(out.Thrusters, GameThruster{
 			At: vec3Arr(t.At), Dir: vec3Arr(dir), R: r,
+		})
+	}
+	for _, m := range doc.Markers {
+		if m.Kind != model.MarkerAttachment {
+			continue
+		}
+		dir, ok := m.Dir.NormalizeOK()
+		if !ok {
+			dir = geom.AxisZ
+		}
+		out.Attachments = append(out.Attachments, GameAttachment{
+			Name: model.AttachmentName(m.Slot, m.AppendText), Slot: m.Slot,
+			AppendText: m.AppendText, At: vec3Arr(m.At), Dir: vec3Arr(dir),
 		})
 	}
 	return out

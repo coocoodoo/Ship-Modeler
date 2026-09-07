@@ -383,6 +383,14 @@ func (a *App) canMove() (bool, string) {
 
 // handleTransformKeys implements the shortcuts that act on a selection.
 func (a *App) handleTransformKeys(in InputFrame) {
+	if in.Ctrl && in.KeyPressed(rl.KeyC) {
+		a.CopyBodies()
+		return
+	}
+	if in.Ctrl && in.KeyPressed(rl.KeyV) {
+		a.PasteBodies()
+		return
+	}
 	if in.Ctrl && in.KeyPressed(rl.KeyD) {
 		a.duplicateSelection()
 		return
@@ -483,6 +491,10 @@ func (a *App) buildTransformCard(viewport rl.Rectangle) {
 	}
 	w := a.px(232)
 	h := a.px(206)
+	canChamfer := a.Sel.Kind() == model.SelEdge
+	if canChamfer {
+		h += a.px(36)
+	}
 	box := ui.Rect(
 		viewport.X+viewport.Width-w-a.px(ui.Spacing*2),
 		viewport.Y+a.px(ui.ViewCubeSize+ui.ViewCubeMargin*2+34),
@@ -562,6 +574,12 @@ func (a *App) buildTransformCard(viewport rl.Rectangle) {
 			Tooltip: "What dragging a box on empty space collects",
 		}); changed {
 		a.box.Filter = filters[pick]
+	}
+	if canChamfer {
+		row(a.px(8))
+		if a.UI.Button(ui.MakeID("transform.chamfer"), row(a.px(28)), "Chamfer edges…", ui.ButtonOpts{Disabled: a.transform.live, Tooltip: "Bevel the selected solid edges"}) {
+			a.BeginEdgeChamfer()
+		}
 	}
 }
 

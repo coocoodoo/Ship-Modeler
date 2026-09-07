@@ -25,6 +25,7 @@ const (
 	ModeExtrude
 	ModeBoolean
 	ModePaint
+	ModeChamfer
 )
 
 func (m Mode) String() string {
@@ -37,6 +38,8 @@ func (m Mode) String() string {
 		return "Boolean"
 	case ModePaint:
 		return "Paint"
+	case ModeChamfer:
+		return "Chamfer"
 	default:
 		return "Idle"
 	}
@@ -44,6 +47,8 @@ func (m Mode) String() string {
 
 // App is the running application: window, renderer, document and UI.
 type App struct {
+	ai       *aiConnection
+	aiToggle bool
 	Renderer *render.Renderer
 	Fonts    *ui.Fonts
 	UI       *ui.Context
@@ -74,16 +79,19 @@ type App struct {
 	// body changed.
 	gpu map[uint32]*render.BodyGPU
 
-	tree      treeState
-	sketch    sketchState
-	extrude   extrudeState
-	boolean   booleanState
-	pushPull  pushPullState
-	transform transformState
-	box       boxSelectState
-	paint     paintState
-	files     fileState
-	markers   markerState
+	tree          treeState
+	sketch        sketchState
+	extrude       extrudeState
+	boolean       booleanState
+	pushPull      pushPullState
+	transform     transformState
+	box           boxSelectState
+	paint         paintState
+	files         fileState
+	markers       markerState
+	chamfer       chamferState
+	bodyClipboard bodyClipboard
+	library       partLibraryState
 
 	// hoverSketch is the visible sketch under the pointer, which the ID buffer
 	// cannot report because an overlay is not geometry.
@@ -97,7 +105,12 @@ type App struct {
 	pickCooldown float64
 
 	// showShortcuts toggles the `?` overlay.
-	showShortcuts bool
+	showShortcuts   bool
+	showSettings    bool
+	settingsScroll  float64
+	settingsEffects bool
+	effectsPreview  float64
+	pendingUISize   bool
 
 	// lastMouse remembers the cursor so the draw pass can re-run the widget
 	// code with the same hover states the update pass saw.
@@ -123,11 +136,21 @@ func New(headless bool) *App {
 	// state: golden shots have to depend on the document alone.
 	settings, settingsErr := io.DefaultSettings(), error(nil)
 	themeWarn := ""
+	ui.ResetTheme()
 	if !headless {
 		settings, settingsErr = io.LoadSettings()
 		// The theme file lives beside the settings. Headless runs keep the
 		// built-in palette so golden shots depend on nothing outside the repo.
-		themeWarn = loadThemeFile()
+		themeWarn = loadAppearance(settings.Theme)
+		if p, ok := ui.FindPalette(settings.AppearancePalette); ok {
+			ui.ApplyPalette(p.Name)
+			settings.Theme = "light"
+			if p.Dark {
+				settings.Theme = "dark"
+			}
+		} else {
+			settings.AppearancePalette = ""
+		}
 	}
 
 	uiScale := settings.UIScaleOverride
@@ -149,6 +172,10 @@ func New(headless bool) *App {
 		Headless: headless,
 	}
 	a.tree.init(settings)
+	a.UI.Motion = settings.UIMotion
+	if settings.UIEffects != nil {
+		a.UI.Effects = *settings.UIEffects
+	}
 	// No dot is under the pointer until one is, and index 0 is a real dot.
 	a.markers.hover = -1
 	a.initPaint()
@@ -159,6 +186,7 @@ func New(headless bool) *App {
 	}
 	a.restorePaint()
 	a.initFiles()
+	a.initPartLibrary()
 	a.Bus.Events.Listen(a.onDocumentEvent)
 
 	if settingsErr != nil && !headless {
@@ -175,6 +203,9 @@ func New(headless bool) *App {
 
 // Close releases GPU resources and persists the settings.
 func (a *App) Close() {
+	a.stopAI()
+	a.dropLibraryPreview()
+	a.dropChamferPreview()
 	a.storeTileSettings()
 	a.saveSettings()
 	a.dropTilePickerTexture()
@@ -211,6 +242,10 @@ func (a *App) saveSettings() {
 
 // onDocumentEvent keeps the derived GPU caches in step with the document.
 func (a *App) onDocumentEvent(ev model.Event) {
+	a.onExtrudeTargetEvent(ev)
+	if a.InChamfer() {
+		a.CancelEdgeChamfer()
+	}
 	switch ev.Kind {
 	case model.EvBodyChanged, model.EvBodyAdded, model.EvBodyRemoved:
 		a.dropGPU(ev.BodyID)
@@ -293,6 +328,7 @@ func (a *App) Viewport(fbW, fbH int) render.Viewport {
 // has waited — so running it twice would corrupt that, and running it outside
 // the drawing block would queue geometry into the wrong framebuffer.
 func (a *App) Frame(in InputFrame) {
+	a.applyPendingUISize()
 	a.update(in)
 	a.draw(in)
 	// After both, because what the pointer will do depends on what the widgets
@@ -326,11 +362,27 @@ func (a *App) update(in InputFrame) {
 	a.Cube.Flat = a.Settings.FlatShading
 	a.Triad.Layout(vp, a.Scale)
 	a.Cube.Update(in.MouseX, in.MouseY)
+	if a.showSettings {
+		return
+	}
+	a.chamfer.gizmo.hovered, a.chamfer.gizmo.captured = false, false
+	if a.InChamfer() && a.chamfer.dirty {
+		a.chamfer.wait -= in.DeltaMillis
+		if a.chamfer.wait <= 0 {
+			a.rebuildChamferPreview()
+		}
+	}
 
-	if !a.chromeOwnsPointer(in) {
+	if a.InChamfer() && a.chamfer.gizmo.dragging {
+		// A captured drag must finish even if released over a panel or outside
+		// the viewport. Its release cannot activate a control beneath it.
+		a.updateChamferGizmo(in, vp)
+	} else if !a.chromeOwnsPointer(in) {
 		a.handleCubeInput(in, vp)
 		a.handleCameraInput(in, vp)
-		if a.InExtrude() {
+		if a.InChamfer() {
+			a.updateChamfer(in, vp)
+		} else if a.InExtrude() {
 			a.updateExtrude(in, vp)
 		} else if a.InBoolean() {
 			a.updateBoolean(in, vp)
@@ -400,7 +452,7 @@ func (a *App) update(in InputFrame) {
 	// that left the modal to read the same Escape as its own answer, closing
 	// the program without saving. The shortcut sheet owns it the same way: a
 	// sheet explaining the S key must not be the thing the S key acts through.
-	if !a.pixelPasteMenuOpen() && !a.UI.WantKeyboard() && !a.UI.ModalOpen() {
+	if !a.markers.attachmentOpen && !a.libraryOwnsInput() && !a.pixelPasteMenuOpen() && !a.UI.WantKeyboard() && !a.UI.ModalOpen() {
 		if a.showShortcuts {
 			if in.KeyPressed(rl.KeyEscape) || (in.KeyPressed(rl.KeySlash) && in.Shift) {
 				a.showShortcuts = false
@@ -408,6 +460,9 @@ func (a *App) update(in InputFrame) {
 			return
 		}
 		switch {
+		case a.InChamfer():
+			a.handleGlobalKeys(in, vp)
+			a.handleChamferKeys(in)
 		case a.InExtrude():
 			a.handleGlobalKeys(in, vp)
 			a.handleExtrudeKeys(in)
@@ -430,6 +485,12 @@ func (a *App) update(in InputFrame) {
 // chromeOwnsPointer reports whether the toolbar, tree, an overlay or a live
 // widget drag has the pointer, in which case the viewport ignores it.
 func (a *App) chromeOwnsPointer(in InputFrame) bool {
+	if a.showSettings {
+		return true
+	}
+	if a.markers.attachmentOpen || a.libraryOwnsInput() {
+		return true
+	}
 	if a.pixelPasteMenuOpen() {
 		return true
 	}
@@ -468,6 +529,12 @@ func (a *App) chromeOwnsPointer(in InputFrame) bool {
 // (SPEC-UX §1); it is only the left button that belongs to the card. Over the
 // toolbar or the tree — real chrome — nothing does.
 func (a *App) cardOnlyOwnsPointer(in InputFrame) bool {
+	if a.showSettings {
+		return false
+	}
+	if a.markers.attachmentOpen || a.libraryOwnsInput() {
+		return false
+	}
 	if a.pixelPasteMenuOpen() {
 		return false
 	}
@@ -486,6 +553,7 @@ func (a *App) cardOnlyOwnsPointer(in InputFrame) bool {
 
 // draw paints the 3D view and then the chrome over it.
 func (a *App) draw(in InputFrame) {
+	a.UI.AdvanceAppearance(in.DeltaMillis)
 	// The accent is the mode's, and everything below — the renderer's
 	// selection tint, the widgets, the cards — reads it (SPEC-UX §3.1).
 	ui.SetAccent(a.modeAccent())
@@ -502,13 +570,36 @@ func (a *App) draw(in InputFrame) {
 	a.Cube.Draw(a.Fonts, a.Scale)
 	a.Triad.Draw(a.Camera, a.Fonts, a.Scale)
 
+	a.UI.Screen = l.Screen
 	a.UI.Begin(in.ToUI())
-	a.buildPixelPasteMenu()
-	a.buildShell(l)
-	a.UI.DrawToasts(l.Viewport)
-	if a.showShortcuts {
-		a.UI.DrawShortcutOverlay(l.Screen, shortcutSheet())
+	chrome := func() {
+		a.drawAttachmentLabels(vp)
+		if a.InChamfer() {
+			a.drawChamferGizmoLabel(vp)
+			if a.chamfer.gizmo.captured {
+				a.UI.ClaimPointer(l.Screen)
+			}
+		}
+		a.buildPixelPasteMenu()
+		a.buildBodyMenu()
+		a.buildAttachmentDialog()
+		a.buildLibraryDialogs()
+		a.buildShell(l)
+		if a.libraryOwnsInput() {
+			a.UI.DrawLatestToast(l.Viewport)
+		} else {
+			a.UI.DrawToasts(l.Viewport)
+		}
+		if a.showShortcuts {
+			a.UI.DrawShortcutOverlay(l.Screen, shortcutSheet())
+		}
 	}
+	if a.showSettings {
+		a.UI.DrawBackground(chrome)
+	} else {
+		chrome()
+	}
+	a.buildSettingsDialog()
 	a.routeModalAnswer(a.UI.DrawModal(l.Screen))
 	a.UI.End()
 }
@@ -551,6 +642,9 @@ func (a *App) routeModalAnswer(res ui.ModalResult) {
 // HintText is what the hint bar says right now. It never returns an empty
 // string: silence is never the answer (SPEC-UX §1).
 func (a *App) HintText() string {
+	if a.InChamfer() {
+		return "Chamfer · drag arrow: 0.25 u steps · click edges to add/remove · Enter applies · Esc cancels"
+	}
 	if a.hintOverride != "" {
 		return a.hintOverride
 	}
@@ -689,7 +783,7 @@ func shortcutSheet() []ui.Shortcut {
 		{Keys: "X", Description: "Swap the two colours"},
 		{Keys: "W", Description: "Magic wand: select by colour, then paint inside"},
 		{Keys: "U", Description: "Select pixels: drag a rectangle; Shift makes a square"},
-		{Keys: "Ctrl+C / Ctrl+V", Description: "Copy selected pixels / place on another face"},
+		{Keys: "Ctrl+C / Ctrl+V", Description: "Copy/paste bodies, or selected pixels in Paint"},
 		{Keys: "K", Description: "Edge line: pick edges, bake a band"},
 		{Section: "Files"},
 		{Keys: "Ctrl+N", Description: "New ship"},

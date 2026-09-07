@@ -32,6 +32,7 @@ type InputFrame struct {
 
 	WindowW, WindowH int
 	DeltaMillis      float64
+	FocusLost        bool
 }
 
 // ToUI converts a frame into the widget kit's input form. The kit deliberately
@@ -49,6 +50,7 @@ func (f *InputFrame) ToUI() ui.Input {
 		KeysDown:    f.KeysDown,
 		Shift:       f.Shift, Ctrl: f.Ctrl, Alt: f.Alt,
 		DeltaMillis: f.DeltaMillis,
+		FocusLost:   f.FocusLost,
 	}
 }
 
@@ -89,6 +91,7 @@ var watchedKeys = []int32{
 	rl.KeyLeftAlt, rl.KeyRightAlt,
 	rl.KeyZ, rl.KeyY, rl.KeyD, rl.KeyN, rl.KeyA, rl.KeyG, rl.KeyI,
 	rl.KeyBackspace, rl.KeyLeft, rl.KeyRight, rl.KeyHome, rl.KeyEnd,
+	rl.KeyUp, rl.KeyDown, rl.KeySpace,
 	rl.KeySlash,
 }
 

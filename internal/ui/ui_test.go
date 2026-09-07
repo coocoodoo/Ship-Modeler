@@ -413,7 +413,7 @@ func TestToastLifecycle(t *testing.T) {
 }
 
 func TestTooltipWaitsForTheDelay(t *testing.T) {
-	c := &Context{Scale: 1}
+	c := NewContext(nil, 1)
 	id := MakeID("btn")
 	r := Rect(0, 0, 100, 30)
 	hovered := Interaction{Hovered: true}
@@ -432,15 +432,15 @@ func TestTooltipWaitsForTheDelay(t *testing.T) {
 		t.Fatalf("after 1.1 s the tooltip has waited only %v ms", c.tip.waited)
 	}
 
-	// Moving to another widget restarts the wait.
+	// Adjacent widgets reuse the visible tooltip's warm state.
 	other := MakeID("other")
 	c.queueTooltip(other, r, hovered, "Boolean", "B", "")
-	if c.tip.waited != 0 {
-		t.Errorf("moving to a new widget kept %v ms of waiting", c.tip.waited)
+	if c.tip.waited != TooltipDelayMillis {
+		t.Errorf("adjacent tooltip restarted its delay: %v", c.tip.waited)
 	}
 	// Losing the hover drops the tip entirely.
 	c.stepTooltip(16)
-	c.stepTooltip(16)
+	c.stepTooltip(200)
 	if c.tip.id != NoID {
 		t.Error("the tooltip survived losing its hover")
 	}
@@ -449,7 +449,7 @@ func TestTooltipWaitsForTheDelay(t *testing.T) {
 // TestDisabledTooltipExplainsItself covers the SPEC-UX §15 rule that every
 // disabled control says how to enable it.
 func TestDisabledTooltipExplainsItself(t *testing.T) {
-	c := &Context{Scale: 1}
+	c := NewContext(nil, 1)
 	id := MakeID("btn")
 	r := Rect(0, 0, 100, 30)
 

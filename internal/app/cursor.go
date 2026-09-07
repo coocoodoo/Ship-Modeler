@@ -33,6 +33,9 @@ func (a *App) updateCursor(in InputFrame) {
 }
 
 func (a *App) wantedCursor(in InputFrame) int32 {
+	if a.InChamfer() && a.chamfer.gizmo.dragging {
+		return rl.MouseCursorResizeAll
+	}
 	// The chrome is ordinary pointing, whatever the viewport is doing.
 	if a.chromeOwnsPointer(in) {
 		return rl.MouseCursorDefault
@@ -46,6 +49,11 @@ func (a *App) wantedCursor(in InputFrame) int32 {
 	}
 
 	switch {
+	case a.InChamfer():
+		if a.chamfer.gizmo.hovered {
+			return rl.MouseCursorResizeAll
+		}
+		return rl.MouseCursorPointingHand
 	case a.InPaint():
 		if a.paint.awaitingLock {
 			return rl.MouseCursorPointingHand

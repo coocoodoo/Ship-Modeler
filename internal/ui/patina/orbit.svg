@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 64">
+ <defs><path id="orbit" d="M 156 32 A 60 22 0 1 1 36 32 A 60 22 0 1 1 156 32 Z"/></defs>
+ <ellipse cx="96" cy="32" rx="60" ry="22" fill="none" stroke="#88C0D0" stroke-opacity=".35"/>
+ <circle cx="96" cy="32" r="12" fill="#38BDF8"/>
+ <path d="M 87 30 Q 96 23 105 30 M 85 36 Q 96 30 107 36" fill="none" stroke="#E6F0F7" opacity=".55"/>
+ <g><path d="M 7 0 L -5 -4 L -3 0 L -5 4 Z" fill="#FBBF24"/>
+  <animateMotion dur="4s" repeatCount="indefinite" rotate="auto"><mpath href="#orbit"/></animateMotion>
+ </g>
+</svg>

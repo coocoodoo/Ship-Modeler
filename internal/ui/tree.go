@@ -40,6 +40,10 @@ type TreeRowSpec struct {
 	// colour, a sketch in the sketch accent — so the tree reads by hue before
 	// it is read by name (SPEC-UX §3.1).
 	IconColor color.RGBA
+	// Semantic colors (such as matching attachment pairs) stay visible while
+	// the selection background and stripe still identify the selected row.
+	KeepIconColor bool
+	LabelColor    color.RGBA
 }
 
 // TreeRowResult reports what the user did to a row this frame.
@@ -65,6 +69,7 @@ const doubleClickMillis = 350
 func (c *Context) TreeRow(id ID, r rl.Rectangle, spec TreeRowSpec) TreeRowResult {
 	var out TreeRowResult
 	rowIt := c.interact(id, r, false)
+	c.describeControl(id, "tree row", spec.Label)
 	out.Hovered = rowIt.Hovered
 
 	// Background: selection wins over hover.
@@ -79,6 +84,9 @@ func (c *Context) TreeRow(id ID, r rl.Rectangle, spec TreeRowSpec) TreeRowResult
 	}
 
 	text := ColorText
+	if spec.LabelColor.A > 0 {
+		text = spec.LabelColor
+	}
 	if spec.Dim {
 		text = ColorTextDim
 	}
@@ -134,7 +142,7 @@ func (c *Context) TreeRow(id ID, r rl.Rectangle, spec TreeRowSpec) TreeRowResult
 		if spec.IconColor.A > 0 {
 			tint = spec.IconColor
 		}
-		if spec.Selected {
+		if spec.Selected && !spec.KeepIconColor {
 			tint = ColorAccent
 		}
 		if spec.Dim {

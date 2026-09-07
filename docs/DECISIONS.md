@@ -2346,3 +2346,30 @@ because the choice is about the thing under the cursor and belongs next to it.
 It clamps to the window, blocks the controls beneath it and freezes the
 preview while open. Right-drag still orbits: a menu on right-click that ate
 the camera gesture would cost more than it gave.
+
+**2026-09-07 · Patina palette and motion update.** Adapt the supplied library's
+20 palette definitions, 280 ms theme fade, gradient surfaces, ripple feedback
+and eased values within Modeler's existing raylib UI. A compact PaletteTile
+widget previews the surfaces and accent of each named palette. Keep CAD mode
+accents and neutral viewport backgrounds; appearance choices do not recolor
+document bodies or paint. Save palette and motion preferences, and keep the
+Settings footer fixed while large UI sizes scroll. Reduced motion applies
+changes immediately and stops decorative part-preview rotation. Hit areas stay
+fixed during press feedback. Avoid a second native window/event loop or a
+runtime dependency on the actively developed external library.
+
+**2026-09-07 · Optional expressive effects and shared menu behavior.** The user
+explicitly requested animation/glow and individual switches for the supplied
+library's additions. Store the effect preferences outside documents, with a
+scrollable Effects page, live preview, selectable press/motion styles, and a
+Reduced motion override. Whole-widget matrix transformations preserve captions
+and icons together; button hit regions keep their original geometry. Bake the
+decorative SVG loops using Patina's real SMIL interpreter and embed atlases, so
+Modeler still needs no second native window or library DLL at runtime.
+
+Generalize the existing menu widget with checked/disabled/separator rows,
+keyboard traversal, clamping and focus-loss dismissal. Add a Select dropdown
+with a trailing chevron and an early popup pass: upward-opening menus must
+claim input before any underlying settings control can answer a click. Tooltips
+share a short warm interval between adjacent controls and suppress themselves
+on input. Springs retain velocity and integrate in bounded substeps.

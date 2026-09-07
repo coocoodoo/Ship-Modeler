@@ -49,8 +49,11 @@ type gltfScene struct {
 }
 
 type gltfNode struct {
-	Mesh int    `json:"mesh"`
-	Name string `json:"name,omitempty"`
+	Mesh        *int            `json:"mesh,omitempty"`
+	Name        string          `json:"name,omitempty"`
+	Translation *[3]float64     `json:"translation,omitempty"`
+	Rotation    *[4]float64     `json:"rotation,omitempty"`
+	Extras      *GameAttachment `json:"extras,omitempty"`
 }
 
 type gltfAttributes struct {
@@ -253,6 +256,13 @@ func buildGLTF(doc *model.Document, binary bool, stem string) ([]byte, []byte, m
 		b.doc.Nodes = append(b.doc.Nodes, node)
 	}
 
+	for _, attachment := range BuildGameMarkers(doc).Attachments {
+		point := attachment
+		rotation := attachmentRotation(point.Dir)
+		b.doc.Nodes = append(b.doc.Nodes, gltfNode{
+			Name: point.Name, Translation: &point.At, Rotation: &rotation, Extras: &point,
+		})
+	}
 	nodes := make([]int, len(b.doc.Nodes))
 	for i := range nodes {
 		nodes[i] = i
@@ -368,7 +378,25 @@ func buildGLTFBody(b *gltfBuilder, body *model.Body, embed bool,
 		prims = append(prims, prim)
 	}
 	b.doc.Meshes = append(b.doc.Meshes, gltfMesh{Name: body.Name, Primitives: prims})
-	return gltfNode{Mesh: len(b.doc.Meshes) - 1, Name: body.Name}, nil
+	meshIndex := len(b.doc.Meshes) - 1
+	return gltfNode{Mesh: &meshIndex, Name: body.Name}, nil
+}
+
+// Attachment nodes face outward along local +Z. The normal supplies the
+// shortest rotation from +Z; authored metadata also exposes that normal.
+func attachmentRotation(dir [3]float64) [4]float64 {
+	if dir[2] < -1+1e-12 {
+		return [4]float64{1, 0, 0, 0}
+	}
+	q := [4]float64{-dir[1], dir[0], 0, 1 + dir[2]}
+	n := math.Sqrt(q[0]*q[0] + q[1]*q[1] + q[3]*q[3])
+	if n == 0 {
+		return [4]float64{0, 0, 0, 1}
+	}
+	for i := range q {
+		q[i] /= n
+	}
+	return q
 }
 
 // buildGLTFPrimitive writes one material's triangles.

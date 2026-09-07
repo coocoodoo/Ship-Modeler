@@ -23,8 +23,9 @@ import (
 // treeState is the left panel's own state: which sections are open, whether the
 // panel is collapsed, and which row is being renamed inline.
 type treeState struct {
-	width     float64
-	collapsed bool
+	width                 float64
+	collapsed             bool
+	scroll, contentHeight float64
 
 	planesOpen   bool
 	sketchesOpen bool
@@ -63,6 +64,8 @@ func (a *App) buildShell(l Layout) {
 	}
 	a.buildTreeHandle(l.Handle)
 	switch {
+	case a.InChamfer():
+		a.buildChamferCard(l.Viewport)
 	case a.InExtrude():
 		a.buildExtrudeCard(l.Viewport)
 	case a.InBoolean():
@@ -95,6 +98,15 @@ func (a *App) buildShell(l Layout) {
 		a.drawBoxRect()
 	}
 	aoBox, hintBox := ui.SplitLeft(l.HintBar, a.px(104))
+	settingsBox, hintBox := ui.SplitLeft(hintBox, a.px(104))
+	a.UI.Panel(settingsBox)
+	a.UI.HairlineH(settingsBox.X, settingsBox.Y, settingsBox.Width, ui.ColorStroke)
+	if a.UI.IconButton(ui.MakeID("app.settings"), ui.InsetXY(settingsBox, a.px(6), a.px(3)), ui.DrawSettingsIcon, ui.IconOpts{
+		Label: "Settings", Tooltip: "Settings — palettes, UI size and motion", Active: a.showSettings,
+	}) {
+		a.showSettings = true
+		a.UI.ClearFocus()
+	}
 	a.UI.HintBar(hintBox, a.modeName(), a.HintText(), Version)
 	a.UI.Panel(aoBox)
 	a.UI.HairlineH(aoBox.X, aoBox.Y, aoBox.Width, ui.ColorStroke)
@@ -192,8 +204,18 @@ func (a *App) buildToolbar(r rl.Rectangle) {
 	btnH := inner.Height
 	rest := inner
 
-	for _, tool := range toolbarTools() {
+	tools := toolbarTools()
+	needed := a.px(16 + 7*(ui.ToolbarHeight-10) + 5*4)
+	for _, tool := range tools {
+		needed += a.px(ui.IconSize+ui.Spacing*2+2) + a.UI.TextWidth(tool.label, ui.FontSizeUI)
+	}
+	labelled := needed <= inner.Width
+	for _, tool := range tools {
 		w := a.px(ui.IconSize+ui.Spacing) + a.UI.TextWidth(tool.label, ui.FontSizeUI) + a.px(ui.Spacing)
+		label := tool.label
+		if !labelled {
+			w, label = a.px(ui.ToolbarHeight-10), ""
+		}
 		var box rl.Rectangle
 		box, rest = ui.SplitLeft(rest, w)
 		box.Height = btnH
@@ -206,7 +228,8 @@ func (a *App) buildToolbar(r rl.Rectangle) {
 			enabled, why = tool.ready(a)
 		}
 		clicked := a.UI.IconButton(ui.MakeID("tool."+tool.label), box, tool.icon, ui.IconOpts{
-			Label:       tool.label,
+			Label:       label,
+			Tooltip:     tool.label,
 			Active:      tool.active(a),
 			Disabled:    !enabled,
 			Shortcut:    tool.shortcut,
@@ -216,6 +239,9 @@ func (a *App) buildToolbar(r rl.Rectangle) {
 			Accent: modeColor(tool.mode),
 		})
 		if clicked && enabled {
+			if a.InChamfer() {
+				a.CancelEdgeChamfer()
+			}
 			tool.start(a)
 		}
 		var gap rl.Rectangle
@@ -328,63 +354,75 @@ func (a *App) buildTree(r rl.Rectangle) {
 	// Leave room for the collapse handle and the footer stats line.
 	content := ui.Rect(r.X, r.Y+a.px(4), r.Width-a.px(TreeHandleWidth), r.Height-a.px(4))
 	footer, content := ui.SplitBottom(content, a.px(22))
-
-	rest := content
-	section := func(key, label string, count int, open *bool) bool {
-		var head rl.Rectangle
-		head, rest = ui.SplitTop(rest, rowH)
-		if a.UI.TreeSection(ui.MakeID("tree.section."+key), head, label, count, *open) {
-			*open = !*open
-		}
-		return *open
-	}
-
-	if section("planes", "Planes", geom.PlaneCount, &a.tree.planesOpen) {
-		for i := 0; i < geom.PlaneCount; i++ {
-			var row rl.Rectangle
-			row, rest = ui.SplitTop(rest, rowH)
-			a.planeRow(row, geom.PlaneKind(i))
-		}
-	}
-	if section("sketches", "Sketches", len(doc.Sketches), &a.tree.sketchesOpen) {
-		if len(doc.Sketches) == 0 {
-			var row rl.Rectangle
-			row, rest = ui.SplitTop(rest, rowH)
-			a.emptyRow(row, "No sketches yet")
-		}
-		for _, s := range doc.Sketches {
-			var row rl.Rectangle
-			row, rest = ui.SplitTop(rest, rowH)
-			a.sketchRow(row, s)
-		}
-	}
-	if section("bodies", "Bodies", len(doc.Bodies), &a.tree.bodiesOpen) {
-		if len(doc.Bodies) == 0 {
-			var row rl.Rectangle
-			row, rest = ui.SplitTop(rest, rowH)
-			a.emptyRow(row, "No bodies yet")
-		}
-		for _, b := range doc.Bodies {
-			var row rl.Rectangle
-			row, rest = ui.SplitTop(rest, rowH)
-			a.bodyRow(row, b)
-		}
-	}
-	// The orientation dots a game engine reads out of the .pxm (V-131). Only
-	// offered once there is a model to put them on: a front dot on an empty
-	// document points at nothing.
-	if len(doc.Bodies) > 0 {
-		open := section("markers", "Markers", len(doc.Markers), &a.tree.markersOpen)
-		a.buildMarkerRows(func() rl.Rectangle {
-			var row rl.Rectangle
-			row, rest = ui.SplitTop(rest, rowH)
-			return row
-		}, open)
-	}
-
 	a.UI.HairlineH(footer.X, footer.Y, footer.Width, ui.ColorStroke)
 	a.UI.Text(ui.InsetXY(footer, a.px(ui.Spacing), 0), doc.Stats().String(),
 		ui.FontSizeSmall, ui.Fade(ui.ColorTextDim, 0.8))
+
+	maxScroll := max(0, a.tree.contentHeight-float64(content.Height)/a.Scale)
+	a.tree.scroll = max(0, min(maxScroll, a.tree.scroll-a.UI.ScrollWheel(content)*ui.TreeRowHeight*3))
+	rest := ui.Rect(content.X, content.Y-a.px(a.tree.scroll), content.Width, a.px(1000000))
+	startY := rest.Y
+	a.UI.Clip(content, func() {
+		section := func(key, label string, count int, open *bool) bool {
+			var head rl.Rectangle
+			head, rest = ui.SplitTop(rest, rowH)
+			if a.UI.TreeSection(ui.MakeID("tree.section."+key), head, label, count, *open) {
+				*open = !*open
+			}
+			return *open
+		}
+
+		if section("planes", "Planes", geom.PlaneCount, &a.tree.planesOpen) {
+			for i := 0; i < geom.PlaneCount; i++ {
+				var row rl.Rectangle
+				row, rest = ui.SplitTop(rest, rowH)
+				a.planeRow(row, geom.PlaneKind(i))
+			}
+		}
+		if section("sketches", "Sketches", len(doc.Sketches), &a.tree.sketchesOpen) {
+			if len(doc.Sketches) == 0 {
+				var row rl.Rectangle
+				row, rest = ui.SplitTop(rest, rowH)
+				a.emptyRow(row, "No sketches yet")
+			}
+			for _, s := range doc.Sketches {
+				var row rl.Rectangle
+				row, rest = ui.SplitTop(rest, rowH)
+				a.sketchRow(row, s)
+			}
+		}
+		if section("bodies", "Bodies", len(doc.Bodies), &a.tree.bodiesOpen) {
+			if len(doc.Bodies) == 0 {
+				var row rl.Rectangle
+				row, rest = ui.SplitTop(rest, rowH)
+				a.emptyRow(row, "No bodies yet")
+			}
+			for _, b := range doc.Bodies {
+				var row rl.Rectangle
+				row, rest = ui.SplitTop(rest, rowH)
+				a.bodyRow(row, b)
+			}
+		}
+		// The orientation dots a game engine reads out of the .pxm (V-131). Only
+		// offered once there is a model to put them on: a front dot on an empty
+		// document points at nothing.
+		if len(doc.Bodies) > 0 {
+			open := section("markers", "Markers", len(doc.Markers), &a.tree.markersOpen)
+			a.buildMarkerRows(func() rl.Rectangle {
+				var row rl.Rectangle
+				row, rest = ui.SplitTop(rest, rowH)
+				return row
+			}, open)
+		}
+
+		rest = a.buildLibrarySection(rest, rowH)
+		a.tree.contentHeight = float64(rest.Y-startY) / a.Scale
+	})
+	if maxScroll > 0 {
+		thumbH := content.Height * content.Height / a.px(a.tree.contentHeight)
+		y := content.Y + float32(a.tree.scroll/maxScroll)*(content.Height-thumbH)
+		a.UI.FillRounded(ui.Rect(content.X+content.Width-a.px(3), y, a.px(3), thumbH), 2, ui.ColorStroke)
+	}
 }
 
 // emptyRow is the placeholder an empty section shows instead of a blank stare
@@ -484,6 +522,10 @@ func (a *App) bodyRow(r rl.Rectangle, b *model.Body) {
 	})
 	if res.Hovered {
 		a.tree.hovered = ref
+		if a.Mode == ModeIdle && a.UI.In.Pressed[ui.MouseRight] && !a.markers.attachmentOpen && !a.libraryOwnsInput() {
+			a.Sel.Set(ref)
+			a.library.menu = bodyMenuState{open: true, body: b.ID, x: a.UI.In.MouseX, y: a.UI.In.MouseY}
+		}
 	}
 	switch {
 	case res.ToggledVisible:
@@ -968,14 +1010,15 @@ func (a *App) buildExtrudeCard(viewport rl.Rectangle) {
 	if v, res := a.UI.DragNumber(ui.MakeID("extrude.depth"), fieldBox, shown, ui.NumberOpts{
 		Unit: "u", Step: 1, FineStep: 0.25, Decimals: 2,
 		Min: -tools.MaxDepthUnits, Max: tools.MaxDepthUnits,
-		Disabled:    t.ThroughAll,
+		Disabled:    t.ThroughAll || t.Extent != tools.ExtentDistance,
 		Tooltip:     "Drag to scrub, click to type",
-		DisabledWhy: "Through all sets the depth from the scene",
+		DisabledWhy: "The end condition sets the depth from the scene",
 	}); res.Changed {
 		t.SetDepth(v)
 		a.rebuildExtrudePreview()
 	}
 	if a.UI.IconButton(ui.MakeID("extrude.flip"), flipBox, ui.DrawFlipIcon, ui.IconOpts{
+		Disabled: t.Extent != tools.ExtentDistance, DisabledWhy: "Pick a target on the other side to reverse",
 		Tooltip: "Flip the direction",
 	}) {
 		t.Flip()
@@ -991,12 +1034,16 @@ func (a *App) buildExtrudeCard(viewport rl.Rectangle) {
 	dirLabels := []string{"Normal", "Reverse", "Symmetric"}
 	sel := 0
 	for i, d := range dirs {
-		if d == t.Dir {
+		shownDir := t.Dir
+		if t.Extent != tools.ExtentDistance {
+			shownDir = t.EffectiveDir()
+		}
+		if d == shownDir {
 			sel = i
 		}
 	}
 	if pick, changed := a.UI.ChipGroup(ui.MakeID("extrude.dir"), row(a.px(24)),
-		dirLabels, sel, ui.ChipGroupOpts{}); changed {
+		dirLabels, sel, ui.ChipGroupOpts{PerChipDisabled: []bool{t.Extent != tools.ExtentDistance, t.Extent != tools.ExtentDistance, t.Extent != tools.ExtentDistance}, PerChipWhy: []string{"Direction follows the target", "Direction follows the target", "Up-to targets use one direction"}}); changed {
 		t.Dir = dirs[pick]
 		a.rebuildExtrudePreview()
 	}
@@ -1072,6 +1119,7 @@ func (a *App) buildExtrudeCard(viewport rl.Rectangle) {
 	}
 	if a.UI.Toggle(ui.MakeID("extrude.through"), throughRow, "Through all",
 		t.ThroughAll, ui.ButtonOpts{
+			Disabled: t.Extent != tools.ExtentDistance, DisabledWhy: "Choose Distance to use Through all",
 			Tooltip: "Run past everything in the scene instead of a set depth",
 		}) {
 		t.SetThroughAll(!t.ThroughAll)
@@ -1087,5 +1135,8 @@ func (a *App) buildExtrudeCard(viewport rl.Rectangle) {
 	}
 	if card.Cancelled {
 		a.CancelExtrude()
+	}
+	if a.InExtrude() {
+		a.buildExtrudeExtentCard(ui.Rect(box.X, box.Y+box.Height+a.px(8), box.Width, a.px(106)))
 	}
 }

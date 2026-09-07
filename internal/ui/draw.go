@@ -250,7 +250,7 @@ func (c *Context) Bevel(r rl.Rectangle, radius float64) {
 // a border.
 func (c *Context) Card(r rl.Rectangle) {
 	c.Shadow(r, CardRadius, 1)
-	c.FillRounded(r, CardRadius, ColorCard)
+	c.FillGradientRounded(r, CardRadius, blendColor(ColorPanel, ColorCard, .45), ColorPanel)
 	c.StrokeRounded(r, CardRadius, ColorStroke)
 	c.Bevel(r, CardRadius)
 }

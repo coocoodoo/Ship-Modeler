@@ -83,6 +83,7 @@ type Face struct {
 	Loops     [][]int
 	SrcFace   FaceUID // lineage through booleans, for paint and selection
 	NonPlanar bool    // set by direct edits (SPEC-GEOMETRY §7.2)
+	KeepEdges bool    // authored bevel boundaries stay visible and pickable
 	Paint     *FacePaint
 
 	// plane cache; valid only when planeOK is set. Invalidated by any vertex

@@ -28,15 +28,17 @@ func main() {
 	out := flag.String("out", "shots", "directory to write shot PNGs into")
 	size := flag.String("size", "1280x720", "render size for headless shots, WxH")
 	bench := flag.Int("bench", 0, "after the script, render N frames and report frame cost")
+	ai := flag.Bool("ai", false, "enable the local AI connection for this session")
+	hidden := flag.Bool("hidden", false, "hide the live window (requires -ai; for connection tests)")
 	flag.Parse()
 
-	if err := run(*headless || *script != "", *script, *out, *size, *bench); err != nil {
+	if err := run(*headless || *script != "", *script, *out, *size, *bench, *ai, *hidden); err != nil {
 		fmt.Fprintln(os.Stderr, "modeler:", err)
 		os.Exit(1)
 	}
 }
 
-func run(headless bool, script, out, size string, bench int) (err error) {
+func run(headless bool, script, out, size string, bench int, ai, hidden bool) (err error) {
 	// A crash must never take the user's work with it silently: recover, report
 	// and exit non-zero. M8 adds the crash-save and the log file (SPEC-DATA §6).
 	defer func() {
@@ -56,8 +58,11 @@ func run(headless bool, script, out, size string, bench int) (err error) {
 		return app.RunHeadless(script, out, sz, bench)
 	}
 
-	app.OpenWindow(app.DefaultWindowW, app.DefaultWindowH, true, false)
+	if hidden && !ai {
+		return fmt.Errorf("-hidden requires -ai")
+	}
+	app.OpenWindow(app.DefaultWindowW, app.DefaultWindowH, true, hidden)
 	defer rl.CloseWindow()
-	app.Run()
+	app.RunWithAI(ai)
 	return nil
 }

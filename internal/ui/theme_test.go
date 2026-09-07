@@ -52,8 +52,8 @@ func TestModeAccentsAreDistinctAndClearOfTheSemanticColours(t *testing.T) {
 
 func TestParseHexColor(t *testing.T) {
 	cases := map[string]color.RGBA{
-		"#53A4FF":   {R: 0x53, G: 0xA4, B: 0xFF, A: 0xFF},
-		"53a4ff":    {R: 0x53, G: 0xA4, B: 0xFF, A: 0xFF},
+		"#53A4FF":    {R: 0x53, G: 0xA4, B: 0xFF, A: 0xFF},
+		"53a4ff":     {R: 0x53, G: 0xA4, B: 0xFF, A: 0xFF},
 		" #FF000080": {R: 0xFF, G: 0, B: 0, A: 0x80},
 	}
 	for in, want := range cases {

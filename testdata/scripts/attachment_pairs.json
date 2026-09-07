@@ -1,0 +1,9 @@
+[
+ {"op":"marker.attachment","kind":"A","name":"Wing","dot":[-4,1,3],"normal":[0,0,1]},
+ {"op":"marker.attachment","kind":"B","name":"Wing","dot":[-1,1,3],"normal":[0,0,1]},
+ {"op":"marker.attachment","kind":"C","name":"Engine","dot":[2,1,3],"normal":[0,0,1]},
+ {"op":"marker.attachment","kind":"D","name":"Engine","dot":[5,1,3],"normal":[0,0,1]},
+ {"op":"shot","name":"pairs"},
+ {"op":"select","kind":"marker","face":0},
+ {"op":"shot","name":"pair_selected"}
+]

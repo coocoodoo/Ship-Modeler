@@ -78,6 +78,9 @@ type FieldResult struct {
 
 // TextFieldOpts configures a text field.
 type TextFieldOpts struct {
+	LeadingIcon IconFunc
+	// Live reports the editing buffer on every keystroke, for previews.
+	Live        bool
 	Disabled    bool
 	Placeholder string
 	// SelectAllOnFocus starts an edit with the whole value selected, which is
@@ -90,6 +93,11 @@ type TextFieldOpts struct {
 // cancel edges; the caller only writes to the document on Committed.
 func (c *Context) TextField(id ID, r rl.Rectangle, text string, opts TextFieldOpts) FieldResult {
 	it := c.interact(id, r, opts.Disabled)
+	controlText := text
+	if c.focus == id {
+		controlText = c.edit.String()
+	}
+	c.describeControl(id, "text", controlText+" "+opts.Placeholder)
 	res := FieldResult{Text: text}
 
 	if it.Clicked && c.focus != id {
@@ -108,11 +116,18 @@ func (c *Context) TextField(id ID, r rl.Rectangle, text string, opts TextFieldOp
 	border := ColorStroke
 	if editing {
 		border = ColorAccent
+		c.StrokeRounded(Inset(r, -c.Px(2)), CornerRadius+2, Fade(ColorAccent, 0.35))
 	}
 	c.FillRounded(r, CornerRadius, stateColor(fill, it))
 	c.StrokeRounded(r, CornerRadius, border)
 
 	inner := InsetXY(r, c.Px(Spacing/2), 0)
+	if opts.LeadingIcon != nil {
+		icon, rest := SplitLeft(inner, c.Px(24))
+		ctr := Center(icon)
+		opts.LeadingIcon(float64(ctr.X), float64(ctr.Y), 16*c.Scale, ColorTextDim)
+		inner = rest
+	}
 
 	if editing {
 		c.edit.blink += c.In.DeltaMillis
@@ -124,6 +139,9 @@ func (c *Context) TextField(id ID, r rl.Rectangle, text string, opts TextFieldOp
 			res.Text = c.textOrOriginal(text)
 		}
 		c.drawEditable(inner)
+		if opts.Live && c.focus == id {
+			res.Text = c.edit.String()
+		}
 	} else {
 		display, col := text, ColorText
 		if display == "" {
@@ -218,7 +236,7 @@ func (c *Context) drawEditable(inner rl.Rectangle) {
 
 	// The caret blinks at roughly 1 Hz and is always solid right after a
 	// keystroke, so typing never looks like it was dropped.
-	if math.Mod(e.blink, 1000) < 600 || len(c.In.Chars) > 0 {
+	if c.MotionFactor() == 0 || math.Mod(e.blink*c.MotionFactor(), 1000) < 600 || len(c.In.Chars) > 0 {
 		cx := inner.X + c.TextWidth(string(e.text[:e.caret]), FontSizeUI)
 		FillRect(Rect(cx, y, c.hairline(), th), ColorAccent)
 	}
@@ -287,6 +305,7 @@ func (c *Context) DragNumber(id ID, r rl.Rectangle, value float64, opts NumberOp
 	if it.Pressed && c.drag.active != id && c.In.Pressed[MouseLeft] {
 		c.drag = dragState{active: id, startValue: value, startX: c.In.MouseX}
 	}
+	c.describeControl(id, "number", formatNumber(value, opts.Decimals))
 	res := FieldResult{Text: formatNumber(value, opts.Decimals)}
 	if c.drag.active == id {
 		dx := c.In.MouseX - c.drag.startX
@@ -333,6 +352,7 @@ type numberEditResult struct {
 // numberEditor runs the typing half of a drag-number field.
 func (c *Context) numberEditor(id ID, r rl.Rectangle, value float64, opts NumberOpts) numberEditResult {
 	it := c.interact(id, r, opts.Disabled)
+	c.describeControl(id, "number", c.edit.String())
 	c.edit.blink += c.In.DeltaMillis
 
 	out := numberEditResult{value: value, result: FieldResult{Editing: true}}

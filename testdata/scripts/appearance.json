@@ -1,0 +1,17 @@
+[
+ {"op":"click","at":[150,707]}, {"op":"settle"},
+ {"op":"shot","name":"settings_dark"},
+ {"op":"click","at":[780,200]}, {"op":"settle"},
+ {"op":"shot","name":"settings_light"},
+ {"op":"click","at":[870,600]}, {"op":"settle"},
+ {"op":"shot","name":"viewport_light"},
+ {"op":"click","at":[150,707]},
+ {"op":"click","at":[500,200]}, {"op":"settle"},
+ {"op":"shot","name":"settings_dark_again"},
+ {"op":"click","at":[870,600]},
+ {"op":"sketch.begin","plane":"Front"}, {"op":"settle"},
+ {"op":"click","at":[150,707]},
+ {"op":"click","at":[780,200]}, {"op":"settle"},
+ {"op":"click","at":[870,600]}, {"op":"settle"},
+ {"op":"shot","name":"sketch_light"}
+]

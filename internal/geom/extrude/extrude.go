@@ -49,6 +49,9 @@ type Params struct {
 	// Draft tapers the far cap, in degrees. Positive shrinks it.
 	Draft float64
 	Dir   Direction
+	// EndPlane terminates the generators at a plane instead of a flat depth.
+	EndPlane            bool
+	EndPoint, EndNormal geom.Vec3
 }
 
 // Result is a built solid.
@@ -98,7 +101,13 @@ func Build(regions []sketch2d.Region, p Params, bodyID uint32) (Result, error) {
 	out.AchievedDraft, out.Clamped = achieved, clamped
 
 	for ri := range regions {
+		start := len(out.Mesh.Verts)
 		buildShell(out.Mesh, rings[ri], p.Frame, bodyID, &seq)
+		if p.EndPlane {
+			if err := terminateShell(out.Mesh, start, rings[ri], p); err != nil {
+				return Result{}, err
+			}
+		}
 	}
 
 	mesh.Weld(out.Mesh)

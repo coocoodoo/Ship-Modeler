@@ -59,6 +59,7 @@ type ScriptRunner struct {
 	App    *App
 	OutDir string
 	Size   ShotSize
+	Live   bool
 
 	rt      rl.RenderTexture2D
 	rtReady bool
@@ -114,6 +115,21 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 	vp := a.Viewport(r.Size.W, r.Size.H)
 
 	switch op.Op {
+	case "chamfer.begin":
+		if !a.BeginEdgeChamfer() {
+			return op.Errorf("select solid edges first")
+		}
+	case "chamfer.distance":
+		if !a.InChamfer() {
+			return op.Errorf("open the chamfer tool first")
+		}
+		a.setChamferDistance(op.R)
+	case "chamfer.commit":
+		if !a.CommitEdgeChamfer() {
+			return op.Errorf("chamfer refused: %s", a.chamfer.err)
+		}
+	case "chamfer.cancel":
+		a.CancelEdgeChamfer()
 	case "camera.view":
 		v, ok := render.ParseStandardView(op.View)
 		if !ok {
@@ -307,13 +323,15 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			return err
 		}
 
-	case "marker.front", "marker.top", "marker.thruster":
+	case "marker.front", "marker.top", "marker.thruster", "marker.attachment":
 		kind := model.MarkerFront
 		switch op.Op {
 		case "marker.top":
 			kind = model.MarkerTop
 		case "marker.thruster":
 			kind = model.MarkerThruster
+		case "marker.attachment":
+			kind = model.MarkerAttachment
 		}
 		if op.Dot == nil {
 			return op.Errorf("%s needs dot [x,y,z]", op.Op)
@@ -326,6 +344,7 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 			Kind: kind,
 			At:   geom.Vec3{X: op.Dot[0], Y: op.Dot[1], Z: op.Dot[2]},
 			Dir:  dir,
+			Slot: op.Kind, AppendText: op.Name,
 		}}); err != nil {
 			return op.Errorf("place the marker: %v", err)
 		}
@@ -640,6 +659,119 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		if !a.CommitExtrude() {
 			return op.Errorf("the extrude was refused")
 		}
+	case "body.copy", "body.paste":
+		in := r.frame()
+		in.Ctrl = true
+		key := int32(rl.KeyC)
+		if op.Op == "body.paste" {
+			key = rl.KeyV
+		}
+		in.KeysPressed = []int32{key}
+		r.runFrame(in)
+	case "library.testdir":
+		a.library.dir = filepath.Join(r.OutDir, "parts")
+		a.refreshPartLibrary()
+	case "library.browse":
+		a.refreshPartLibrary()
+		a.library.open = true
+		a.library.page = 0
+		a.UI.ClearFocus()
+	case "library.insert":
+		a.refreshPartLibrary()
+		if !a.insertLibraryPart(op.Target) {
+			return op.Errorf("%s", a.library.err)
+		}
+	case "library.edit":
+		a.refreshPartLibrary()
+		if !a.editLibraryPart(op.Target) {
+			return op.Errorf("could not edit library part")
+		}
+	case "library.save", "library.update":
+		a.beginSaveToLibrary(a.selectedLibrarySources())
+		if !a.library.saveOpen {
+			return op.Errorf("select bodies and finish the active tool first")
+		}
+		if op.Op == "library.update" {
+			found := false
+			for _, p := range a.library.parts {
+				if p.ID == op.Target {
+					a.library.updatePart = p
+					a.library.name = p.Name
+					a.library.category = p.Category
+					found = true
+					break
+				}
+			}
+			if !found {
+				return op.Errorf("library part not found")
+			}
+		}
+		if op.Name != "" {
+			a.library.name = op.Name
+		}
+		if op.Kind != "" {
+			a.library.category = op.Kind
+		}
+		if !a.saveLibraryPart() {
+			return op.Errorf("%s", a.library.err)
+		}
+	case "ui.key":
+		key, ok := automationKey(op.Name)
+		if !ok {
+			return op.Errorf("unknown key %q", op.Name)
+		}
+		in := r.frame()
+		in.Ctrl, in.Shift, in.Alt = op.Ctrl, op.Shift, op.Alt
+		in.KeysPressed = []int32{key}
+		r.runFrame(in)
+	case "ui.text":
+		in := r.frame()
+		in.Chars = []rune(op.Name)
+		r.runFrame(in)
+	case "ui.type":
+		in := r.frame()
+		in.Ctrl = true
+		in.KeysPressed = []int32{rl.KeyA}
+		r.runFrame(in)
+		in = r.frame()
+		in.Chars = []rune(op.Name)
+		r.runFrame(in)
+	case "extrude.pick":
+		if !a.InExtrude() {
+			return op.Errorf("open extrusion first")
+		}
+		b := a.Doc().BodyByName(op.Body)
+		if b == nil || b.Mesh == nil {
+			return op.Errorf("target body missing")
+		}
+		ref := render.PickRef{BodyID: b.ID, Edge: op.Edge, Vert: op.Vert}
+		switch op.Kind {
+		case "face":
+			ref.Kind = render.PickFace
+			if op.Face < 0 || op.Face >= len(b.Mesh.Faces) {
+				return op.Errorf("invalid face")
+			}
+			ref.FaceUID = b.Mesh.Faces[op.Face].ID
+		case "vertex":
+			ref.Kind = render.PickVert
+		case "edge":
+			ref.Kind = render.PickEdge
+		default:
+			return op.Errorf("invalid target kind")
+		}
+		point, _, ok := extrudeTargetGeometry(b, ref)
+		if !ok {
+			return op.Errorf("invalid target")
+		}
+		vp := a.Viewport(r.Size.W, r.Size.H)
+		pixel, ok := a.Camera.WorldToViewport(point, float64(vp.W), float64(vp.H))
+		if !ok {
+			return op.Errorf("target not visible")
+		}
+		r.click(pixel.X+float64(vp.X), pixel.Y+float64(vp.Y), "")
+		if a.extrude.targetRef != ref || !a.extrude.tool.TargetReady {
+			return op.Errorf("viewport did not acquire target")
+		}
 
 	case "boolean":
 		if err := r.booleanOp(op, true); err != nil {
@@ -725,6 +857,12 @@ func (r *ScriptRunner) step() { r.runFrame(r.frame()) }
 // every scripted frame, because the widget kit handles its input during the
 // draw pass: a scripted click is only seen if a frame actually runs.
 func (r *ScriptRunner) runFrame(in InputFrame) {
+	if r.Live {
+		rl.BeginDrawing()
+		r.App.Frame(in)
+		rl.EndDrawing()
+		return
+	}
 	r.ensureTarget()
 	rl.BeginDrawing()
 	rl.BeginTextureMode(r.rt)
@@ -902,7 +1040,7 @@ func (r *ScriptRunner) selectOp(op io.Op) error {
 // settle steps the clock until every animation has finished.
 func (r *ScriptRunner) settle() error {
 	for i := 0; i < SettleMaxFrames; i++ {
-		if !r.App.Anim.Active() {
+		if !r.App.Anim.Active() && !r.App.UI.Animating() && !(r.App.InChamfer() && r.App.chamfer.dirty) {
 			return nil
 		}
 		r.step()
@@ -912,6 +1050,14 @@ func (r *ScriptRunner) settle() error {
 
 // shot renders one frame into the capture target and writes it as a PNG.
 func (r *ScriptRunner) shot(name string) error {
+	if r.Live {
+		path := filepath.Join(r.OutDir, name+".png")
+		if err := r.App.captureAI(path); err != nil {
+			return err
+		}
+		r.shots = append(r.shots, path)
+		return nil
+	}
 	// A runner with nowhere to write is building a document rather than
 	// capturing one — the in-app sample ship runs the same script.
 	if r.OutDir == "" {
@@ -1831,6 +1977,7 @@ func (r *ScriptRunner) dump() {
 			a.sketch.session.Tool.String())
 	}
 	if t := a.extrude.tool; t != nil {
+		fmt.Printf("extent mode=%q ready=%d point=%v\n", t.Extent.TargetName(), boolBit(t.TargetReady), t.TargetPoint)
 		fmt.Printf("extrude depth=%.4f draft=%.2f achieved=%.2f clamped=%d dir=%q "+
 			"through=%d regions=%d result=%q targets=%d reach=%d results=%d err=%q\n",
 			t.EffectiveDepth(), t.Draft, t.AchievedDraft, boolBit(t.Clamped),
@@ -1899,7 +2046,13 @@ func (r *ScriptRunner) dump() {
 	// Where every dot is, and whether it is selected or hovered. A dot is a
 	// few pixels in a shot, so a golden cannot tell a moved one from a still
 	// one; these numbers can.
+	if len(doc.Markers) > 4 {
+		fmt.Printf("marker-page=%d\n", a.markers.page+1)
+	}
 	for i, m := range doc.Markers {
+		if m.Kind == model.MarkerAttachment {
+			fmt.Printf("attachment index=%d name=%q slot=%q append=%q\n", i, doc.MarkerLabel(i), m.Slot, m.AppendText)
+		}
 		// The dot's screen pixel comes along, for the same reason the push/pull
 		// arrow's does: a scripted click has to aim where a person would, and a
 		// test that guesses at coordinates passes by accident.

@@ -52,6 +52,10 @@ func setWindowIcon() {
 
 // Run drives the interactive frame loop until the window closes.
 func Run() {
+	RunWithAI(false)
+}
+
+func RunWithAI(enableAI bool) {
 	a := New(false)
 	defer a.Close()
 	a.box.init()
@@ -62,6 +66,11 @@ func Run() {
 	a.applySavedWindow()
 	a.layout = a.Layout(rl.GetRenderWidth(), rl.GetRenderHeight())
 	a.FrameSelection(a.layout.RenderViewport())
+	if enableAI {
+		if err := a.startAI(); err != nil {
+			a.Toast(ui.Toast{Text: err.Error(), Kind: ui.ToastError})
+		}
+	}
 
 	// A crash must not take the user's work with it (SPEC-DATA §6). The
 	// recovery copy is written first, before anything else is attempted,
@@ -79,6 +88,7 @@ func Run() {
 	// keeps running until the prompt has an answer.
 	rl.SetExitKey(0)
 	title := ""
+	wasFocused := rl.IsWindowFocused()
 	for {
 		if rl.WindowShouldClose() {
 			a.RequestClose()
@@ -91,6 +101,8 @@ func Run() {
 			dt = 1000.0 / 60.0 // first frame, or after a long stall
 		}
 		in := PollInput(dt)
+		focused := rl.IsWindowFocused()
+		in.FocusLost, wasFocused = wasFocused && !focused, focused
 
 		rl.BeginDrawing()
 		a.Frame(in)
@@ -104,6 +116,7 @@ func Run() {
 		a.RunPendingFile()
 		a.writeDueAutosave()
 		a.stepClose()
+		a.processAI()
 
 		if want := a.WindowTitle(); want != title {
 			rl.SetWindowTitle(want)

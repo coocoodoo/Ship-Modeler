@@ -261,11 +261,21 @@ func appendPreview(d *render.Overlay, v SketchView) {
 	}
 
 	// The inference guide runs from the anchor point through the snapped one.
-	if v.Snap.HasGuide() {
+	if v.Snap.Infer != sketch.InferNone {
 		d.Lines = append(d.Lines, render.OverlayLine{
 			A: d.Lift(v.Snap.From), B: d.Lift(v.Snap.Point),
 			Color: ui.Fade(ui.ColorAccent, 0.55), WidthPx: GuideWidthPx, Dashed: true,
 		})
+	}
+	if v.Session.Tool != sketch.ToolSelect {
+		for _, guide := range v.Snap.Guides {
+			if guide.Axis == sketch.InferNone || guide.From == v.Snap.Point {
+				continue
+			}
+			col := ui.Fade(ui.ColorSuccess, .85)
+			d.Lines = append(d.Lines, render.OverlayLine{A: d.Lift(guide.From), B: d.Lift(v.Snap.Point), Color: col, WidthPx: GuideWidthPx, Dashed: true})
+			d.Markers = append(d.Markers, render.OverlayMarker{P: d.Lift(guide.From), Kind: render.MarkerRing, Color: col, SizePx: SnapGlyphSizePx})
+		}
 	}
 
 	if start, ok := v.Session.ChainStart(); ok {
@@ -302,6 +312,8 @@ func appendSnapGlyph(d *render.Overlay, v SketchView) {
 		kind = render.MarkerEndpoint
 	case sketch.SnapMidpoint:
 		kind = render.MarkerMidpoint
+	case sketch.SnapAlignment:
+		kind, col = render.MarkerGrid, ui.ColorSuccess
 	case sketch.SnapGrid:
 		kind, col = render.MarkerGrid, ui.Fade(ui.ColorTextDim, 0.9)
 	default:

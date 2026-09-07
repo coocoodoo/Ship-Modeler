@@ -211,7 +211,7 @@ func (r *Renderer) pickPlanes(s *Scene) {
 // the faces, biased toward the eye so they win the depth test where they
 // overlap the surfaces they belong to (SPEC-RENDER §6.1).
 func (r *Renderer) pickEdgesAndVerts(s *Scene, vp Viewport) {
-	if s.PickFacesOnly {
+	if s.PickFacesOnly || s.PickOnly == PickFace {
 		return
 	}
 	c := r.ribbonCtx(s.Camera, vp)
@@ -223,6 +223,9 @@ func (r *Renderer) pickEdgesAndVerts(s *Scene, vp Viewport) {
 			continue
 		}
 		for _, e := range b.GPU.Edges {
+			if s.PickOnly == PickVert {
+				continue
+			}
 			id := r.Table.Add(PickRef{Kind: PickEdge, BodyID: b.BodyID, Edge: e.Index})
 			a := b.Transform.TransformPoint(e.A)
 			z := b.Transform.TransformPoint(e.B)
@@ -237,6 +240,9 @@ func (r *Renderer) pickEdgesAndVerts(s *Scene, vp Viewport) {
 			continue
 		}
 		for vi, p := range b.GPU.Verts {
+			if s.PickOnly == PickEdge {
+				continue
+			}
 			id := r.Table.Add(PickRef{Kind: PickVert, BodyID: b.BodyID, Vert: vi})
 			r.drawBillboardQuad(c, b.Transform.TransformPoint(p),
 				VertPickScreenSize, encodeID(id), EyeShrinkVertFactor)
