@@ -22,7 +22,8 @@ type editState struct {
 	// original is what the field held when editing began, so Escape can revert.
 	original string
 	// blink accumulates so the caret pulses.
-	blink float64
+	blink   float64
+	scrollY float32
 }
 
 func (e *editState) String() string { return string(e.text) }

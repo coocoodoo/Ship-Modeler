@@ -22,12 +22,14 @@ uniform mat4 matNormal;
 uniform mat4 matView;
 
 out vec2 fragTexCoord;
+out vec3 fragPositionView;
 flat out vec3 fragNormalView;
 flat out vec4 fragFaceKey;
 
 void main()
 {
     fragTexCoord = vertexTexCoord;
+    fragPositionView = vec3(matView * matModel * vec4(vertexPosition,1.0));
     // Light in view space so the model reads the same while orbiting.
     vec3 worldNormal = normalize(vec3(matNormal * vec4(vertexNormal, 0.0)));
     fragNormalView = normalize(vec3(matView * vec4(worldNormal, 0.0)));
@@ -44,9 +46,16 @@ void main()
 const shadedFS = `#version 330
 
 in vec2 fragTexCoord;
+in vec3 fragPositionView;
 flat in vec3 fragNormalView;
+flat in vec4 fragFaceKey;
 
 uniform sampler2D texture0;
+uniform sampler2D propertiesMap;
+uniform sampler2D normalAOMap;
+uniform float useMaterial;
+uniform float materialView;
+uniform float materialFace;
 uniform vec4 colDiffuse;
 uniform vec4 tint;
 uniform float alphaScale;
@@ -60,6 +69,29 @@ out vec4 finalColor;
 
 const vec3 L1 = normalize(vec3(0.4, 0.8, 0.45));
 const vec3 L2 = -L1;
+
+vec3 pbrLight(vec3 base,vec3 n,vec3 v,vec3 l,float rough,float spec) {
+    vec3 h=normalize(v+l);
+    float nl=max(dot(n,l),0.0),nv=max(dot(n,v),0.001),nh=max(dot(n,h),0.0);
+    float a=rough*rough, a2=a*a;
+    float d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));
+    float k=pow(rough+1.0,2.0)/8.0;
+    float g=(nv/(nv*(1.0-k)+k))*(nl/(nl*(1.0-k)+k));
+    vec3 f=(vec3(.04)+vec3(.96)*pow(1.0-max(dot(h,v),0.0),5.0))*spec;
+    return ((1.0-f)*base/3.14159265+d*g*f/max(4.0*nv*nl,.001))*nl;
+}
+
+vec3 materialNormal(vec3 n,vec3 sampleNormal) {
+    vec3 dp1=dFdx(fragPositionView),dp2=dFdy(fragPositionView);
+    vec2 duv1=dFdx(fragTexCoord),duv2=dFdy(fragTexCoord);
+    float det=duv1.x*duv2.y-duv1.y*duv2.x;
+    if(abs(det)<1e-12)return n;
+    vec3 t=normalize((dp1*duv2.y-dp2*duv1.y)/det);
+    t=normalize(t-n*dot(n,t));
+    vec3 b=normalize((dp2*duv1.x-dp1*duv2.x)/det);
+    b=normalize(b-n*dot(n,b)-t*dot(t,b));
+    return normalize(mat3(t,b,n)*sampleNormal);
+}
 
 void main()
 {
@@ -81,6 +113,33 @@ void main()
     }
 
     vec3 rgb = base * lit;
+    vec4 props=texture(propertiesMap,fragTexCoord);
+    vec4 normalAO=texture(normalAOMap,fragTexCoord);
+    // Evaluate derivatives outside divergent material branches.
+    vec3 mappedNormal=materialNormal(n,normalize(normalAO.rgb*2.0-1.0));
+    if(useMaterial>.5 && props.a>.5) {
+        vec3 linearBase=pow(base,vec3(2.2));
+        vec3 v=normalize(-fragPositionView);
+        float rough=clamp(props.g,.045,1.0);
+        vec3 energy=linearBase*.32*normalAO.a*openness;
+        energy+=pbrLight(linearBase,mappedNormal,v,L1,rough,props.r)*2.5;
+        energy+=pbrLight(linearBase,mappedNormal,v,normalize(vec3(-.6,.25,.7)),rough,props.r)*.8;
+        rgb=mix(pow(max(energy,vec3(0.0)),vec3(1.0/2.2)),base,flatShade);
+    }
+    // Inspection works on unpainted faces too, using the channel defaults.
+    if(useMaterial<.5 || props.a<.5) {
+        props=vec4(1.0,230.0/255.0,128.0/255.0,0.0);
+        normalAO=vec4(128.0/255.0,128.0/255.0,1.0,1.0);
+    }
+    float faceKey=floor(fragFaceKey.r*255.0+.5)+256.0*floor(fragFaceKey.g*255.0+.5);
+    if(materialFace<0.0 || abs(faceKey-materialFace)<.5) {
+        if(materialView>0.5 && materialView<1.5)rgb=base;
+        else if(materialView<2.5 && materialView>1.5)rgb=vec3(props.r);
+        else if(materialView<3.5 && materialView>2.5)rgb=vec3(normalAO.a);
+        else if(materialView<4.5 && materialView>3.5)rgb=vec3(props.b);
+        else if(materialView<5.5 && materialView>4.5)rgb=vec3(props.g);
+        else if(materialView>5.5)rgb=normalAO.rgb;
+    }
     rgb = mix(rgb, tint.rgb, tint.a);
     finalColor = vec4(rgb, colDiffuse.a * alphaScale);
 }

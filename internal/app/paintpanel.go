@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"modeler/internal/model"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 
@@ -135,6 +136,21 @@ func (a *App) buildPaintPanel(bar rl.Rectangle) {
 		body.Y += a.px(v)
 		body.Height -= a.px(v)
 	}
+	if a.UI.Button(ui.MakeID("paint.layers"), row(a.px(26)), "Layers / Match / Review…", ui.ButtonOpts{}) {
+		if h, ok := a.stickyFace(); ok {
+			a.openWorkflow(model.FaceScope{Body: h.body, Face: h.face}, 1)
+		} else {
+			a.openWorkflow(a.workflow.face, 1)
+		}
+	}
+	if a.material.open {
+		a.buildMaterialPanel(body)
+		return
+	}
+	if a.UI.Button(ui.MakeID("paint.material"), row(a.px(26)), "PBR Materials…", ui.ButtonOpts{Tooltip: "Import base color, specular, AO, height, roughness or normal images"}) {
+		a.openMaterialPanel()
+	}
+	space(6)
 
 	a.UI.Text(row(line), "Tools", ui.FontSizeSmall, ui.ColorTextDim)
 	a.paintToolRow(row(a.px(26)), paintPixelTools())

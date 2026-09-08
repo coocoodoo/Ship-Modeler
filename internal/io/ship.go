@@ -102,12 +102,9 @@ func buildShip(doc *model.Document, thumb *image.RGBA) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
 	add := func(name string, data []byte) error {
-		// Every member is STORED, not deflated. The game payload is read by
-		// engines outside this program — Iron Drift's loader is ~100 lines of
-		// dependency-free Rust because it never has to inflate anything — and
-		// what deflate would save is noise: the PNGs and the .glb's textures
-		// are already compressed, and the JSON is small.
-		w, err := zw.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Store})
+		// PXM is one compressed ZIP. These paths are archive members, never
+		// sibling files or folders. LoadShip also accepts older stored ZIPs.
+		w, err := zw.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Deflate})
 		if err != nil {
 			return fmt.Errorf("add %s: %w", name, err)
 		}
@@ -140,6 +137,21 @@ func buildShip(doc *model.Document, thumb *image.RGBA) ([]byte, error) {
 			}
 			if err := add(paintMemberName(e.Owner), png.Bytes()); err != nil {
 				return nil, err
+			}
+			if e.Paint.Material != nil {
+				for _, kind := range mesh.MaterialChannels {
+					p := e.Paint.Material.Maps[kind]
+					if p == nil || p.Image == nil {
+						continue
+					}
+					buf := new(bytes.Buffer)
+					if err := encodePNG(buf, p.Image); err != nil {
+						return nil, err
+					}
+					if err := add(materialMemberName(e.Owner, kind), buf.Bytes()); err != nil {
+						return nil, err
+					}
+				}
 			}
 		}
 	}
@@ -264,6 +276,28 @@ func attachPaint(doc *model.Document, members map[string]*zip.File) []string {
 		}
 		gone := map[*mesh.FacePaint]bool{}
 		for _, e := range b.Mesh.PaintTable() {
+			if e.Paint.Material != nil {
+				for _, kind := range mesh.MaterialChannels {
+					p := e.Paint.Material.Maps[kind]
+					if p == nil {
+						continue
+					}
+					var mapErr error
+					if f := members[materialMemberName(e.Owner, kind)]; f != nil {
+						var data []byte
+						data, mapErr = readMember(f)
+						if mapErr == nil {
+							p.Image, mapErr = decodePNG(data)
+						}
+					} else {
+						mapErr = fmt.Errorf("missing map")
+					}
+					if mapErr != nil {
+						delete(e.Paint.Material.Maps, kind)
+						missing = append(missing, fmt.Sprintf("%s face %d %s map", b.Name, e.Owner.Seq(), kind))
+					}
+				}
+			}
 			f := members[paintMemberName(e.Owner)]
 			if f == nil {
 				gone[e.Paint] = true

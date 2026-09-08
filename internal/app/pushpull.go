@@ -81,7 +81,10 @@ func (a *App) updatePushPull(in InputFrame, vp render.Viewport) {
 		return
 	}
 	length := a.arrowLength(vp)
-	ax, ay, bx, by, ok := scene.ArrowScreenEnds(a.Camera, vp, t.Origin, t.ArrowDirection(), length)
+	// Measure against the fixed outward axis. The displayed arrow can flip
+	// at zero, but changing this coordinate system would invalidate the saved
+	// grab position and make a stationary pointer alternate between push/pull.
+	ax, ay, bx, by, ok := scene.ArrowScreenEnds(a.Camera, vp, t.Origin, t.Axis, length)
 	if !ok {
 		return
 	}
@@ -95,15 +98,7 @@ func (a *App) updatePushPull(in InputFrame, vp render.Viewport) {
 		return
 	}
 	if in.Down[MouseLeft] {
-		// The sign follows the arrow, and the arrow only turns round once the
-		// drag has gone negative. Asking whether the tool is *adding* gets this
-		// backwards at the start of every drag, when the distance is still zero
-		// and adding is therefore false: the first pixel of an outward pull
-		// would be read as a push.
 		unitsPerPixel := length / tools.ArrowScreenLength
-		if t.Flipped() {
-			unitsPerPixel = -unitsPerPixel
-		}
 		t.UpdateDrag(along, unitsPerPixel, snapStep(in))
 		a.rebuildPushPullPreview()
 		return

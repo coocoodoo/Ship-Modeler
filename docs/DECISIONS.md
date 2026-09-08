@@ -2373,3 +2373,14 @@ with a trailing chevron and an early popup pass: upward-opening menus must
 claim input before any underlying settings control can answer a click. Tooltips
 share a short warm interval between adjacent controls and suppress themselves
 on input. Springs retain velocity and integrate in bounded substeps.
+
+**2026-09-07 · Compressed PXM supersedes V-131's stored-only choice.**
+
+At the user's explicit request, PXM is now a single compressed ZIP using
+Deflate (method 8) for all members. Save and Export → pxm use the same atomic
+archive writer. Geometry, paint/PBR images, pins, and attachment metadata are
+embedded; game/ and paint/ are internal archive paths, not companion folders.
+Older stored archives still load. External game readers that assumed only
+method 0 must add standard ZIP Deflate support; their source is outside this
+Modeler change. The project package preserves authored dimensions, independently
+of the multiplier for GLB/glTF/OBJ/STL exports.

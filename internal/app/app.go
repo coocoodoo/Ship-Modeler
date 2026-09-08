@@ -47,6 +47,7 @@ func (m Mode) String() string {
 
 // App is the running application: window, renderer, document and UI.
 type App struct {
+	workflow workflowState
 	ai       *aiConnection
 	aiToggle bool
 	Renderer *render.Renderer
@@ -87,8 +88,12 @@ type App struct {
 	transform     transformState
 	box           boxSelectState
 	paint         paintState
+	uv            uvViewState
 	files         fileState
 	markers       markerState
+	notePins      notePinState
+	moveTexture   moveTextureState
+	material      materialState
 	chamfer       chamferState
 	bodyClipboard bodyClipboard
 	library       partLibraryState
@@ -126,6 +131,7 @@ type App struct {
 
 	// Headless suppresses window presentation and drives a virtual clock.
 	Headless bool
+	Viewer   bool // Opened from a file association; Edit explicitly unlocks the workspace.
 
 	layout Layout
 }
@@ -203,6 +209,14 @@ func New(headless bool) *App {
 
 // Close releases GPU resources and persists the settings.
 func (a *App) Close() {
+	for _, t := range a.workflow.thumbnails {
+		if t.ID != 0 {
+			rl.UnloadTexture(t)
+		}
+	}
+	a.closeMoveTexture()
+	a.closeMaterialPanel()
+	a.dropUVTextures()
 	a.stopAI()
 	a.dropLibraryPreview()
 	a.dropChamferPreview()
@@ -227,7 +241,7 @@ func (a *App) saveSettings() {
 	if a.Headless {
 		return
 	}
-	if !rl.IsWindowFullscreen() && !rl.IsWindowMinimized() {
+	if !rl.IsWindowFullscreen() && !rl.IsWindowMinimized() && !rl.IsWindowMaximized() {
 		pos := rl.GetWindowPosition()
 		a.Settings.Window = io.WindowRect{
 			X: int(pos.X), Y: int(pos.Y),
@@ -242,6 +256,10 @@ func (a *App) saveSettings() {
 
 // onDocumentEvent keeps the derived GPU caches in step with the document.
 func (a *App) onDocumentEvent(ev model.Event) {
+	if a.moveTexture.open && (ev.Kind == model.EvDocReplaced || ((ev.Kind == model.EvBodyChanged || ev.Kind == model.EvBodyRemoved || ev.Kind == model.EvBodyPainted) && ev.BodyID == a.moveTexture.body)) {
+		a.closeMoveTexture()
+	}
+	a.onUVEvent(ev)
 	a.onExtrudeTargetEvent(ev)
 	if a.InChamfer() {
 		a.CancelEdgeChamfer()
@@ -290,6 +308,9 @@ func (a *App) Toast(t ui.Toast) { a.UI.ShowToast(t) }
 // Run executes a command through the bus, reporting a failure as an error toast
 // rather than swallowing it (SPEC-DATA §3.1).
 func (a *App) Run(cmd model.Command) bool {
+	if a.Viewer {
+		return false
+	}
 	if err := a.Bus.Run(cmd); err != nil {
 		a.Toast(ui.Toast{Text: capitalize(err.Error()), Kind: ui.ToastError})
 		return false
@@ -299,12 +320,18 @@ func (a *App) Run(cmd model.Command) bool {
 
 // Undo and Redo drive the history and announce what moved.
 func (a *App) Undo() {
+	if a.Viewer {
+		return
+	}
 	if name, ok := a.Bus.Undo(); ok {
 		a.Toast(ui.Toast{Text: "Undid: " + name})
 	}
 }
 
 func (a *App) Redo() {
+	if a.Viewer {
+		return
+	}
 	if name, ok := a.Bus.Redo(); ok {
 		a.Toast(ui.Toast{Text: "Redid: " + name})
 	}
@@ -312,6 +339,9 @@ func (a *App) Redo() {
 
 // Layout computes this frame's chrome geometry.
 func (a *App) Layout(fbW, fbH int) Layout {
+	if a.Viewer {
+		return viewerLayout(fbW, fbH, a.Scale)
+	}
 	return ComputeLayout(fbW, fbH, a.Scale, a.tree.width, a.tree.collapsed, a.paintBarWidth())
 }
 
@@ -334,6 +364,7 @@ func (a *App) Frame(in InputFrame) {
 	// After both, because what the pointer will do depends on what the widgets
 	// decided this frame as well as on the mode.
 	a.updateCursor(in)
+	a.drawCustomCursor(in)
 }
 
 // update advances the non-drawing logic: camera, picking and keys.
@@ -362,6 +393,19 @@ func (a *App) update(in InputFrame) {
 	a.Cube.Flat = a.Settings.FlatShading
 	a.Triad.Layout(vp, a.Scale)
 	a.Cube.Update(in.MouseX, in.MouseY)
+	if a.Viewer {
+		a.updateViewer(in, vp)
+		return
+	}
+	a.prepareUVView()
+	if a.moveTexture.open {
+		a.updateMoveTexture(in)
+		return
+	}
+	if a.notePins.armed && in.KeyPressed(rl.KeyEscape) {
+		a.notePins.armed = false
+		return
+	}
 	if a.showSettings {
 		return
 	}
@@ -377,10 +421,14 @@ func (a *App) update(in InputFrame) {
 		// A captured drag must finish even if released over a panel or outside
 		// the viewport. Its release cannot activate a control beneath it.
 		a.updateChamferGizmo(in, vp)
+	} else if a.uvOwnsPointer(in) {
+		a.updateUVView(in, vp)
 	} else if !a.chromeOwnsPointer(in) {
 		a.handleCubeInput(in, vp)
 		a.handleCameraInput(in, vp)
-		if a.InChamfer() {
+		if a.updateNotePinInput(in, vp) {
+			// Note placement owns the left button.
+		} else if a.InChamfer() {
 			a.updateChamfer(in, vp)
 		} else if a.InExtrude() {
 			a.updateExtrude(in, vp)
@@ -452,7 +500,7 @@ func (a *App) update(in InputFrame) {
 	// that left the modal to read the same Escape as its own answer, closing
 	// the program without saving. The shortcut sheet owns it the same way: a
 	// sheet explaining the S key must not be the thing the S key acts through.
-	if !a.markers.attachmentOpen && !a.libraryOwnsInput() && !a.pixelPasteMenuOpen() && !a.UI.WantKeyboard() && !a.UI.ModalOpen() {
+	if !a.workflow.open && !a.notePins.open && !a.markers.attachmentOpen && !a.libraryOwnsInput() && !a.pixelPasteMenuOpen() && !a.UI.WantKeyboard() && !a.UI.ModalOpen() {
 		if a.showShortcuts {
 			if in.KeyPressed(rl.KeyEscape) || (in.KeyPressed(rl.KeySlash) && in.Shift) {
 				a.showShortcuts = false
@@ -485,10 +533,13 @@ func (a *App) update(in InputFrame) {
 // chromeOwnsPointer reports whether the toolbar, tree, an overlay or a live
 // widget drag has the pointer, in which case the viewport ignores it.
 func (a *App) chromeOwnsPointer(in InputFrame) bool {
+	if a.uvOwnsPointer(in) {
+		return true
+	}
 	if a.showSettings {
 		return true
 	}
-	if a.markers.attachmentOpen || a.libraryOwnsInput() {
+	if a.workflow.open || a.notePins.open || a.markers.attachmentOpen || a.libraryOwnsInput() {
 		return true
 	}
 	if a.pixelPasteMenuOpen() {
@@ -529,10 +580,13 @@ func (a *App) chromeOwnsPointer(in InputFrame) bool {
 // (SPEC-UX §1); it is only the left button that belongs to the card. Over the
 // toolbar or the tree — real chrome — nothing does.
 func (a *App) cardOnlyOwnsPointer(in InputFrame) bool {
+	if a.uvOwnsPointer(in) {
+		return false
+	}
 	if a.showSettings {
 		return false
 	}
-	if a.markers.attachmentOpen || a.libraryOwnsInput() {
+	if a.workflow.open || a.notePins.open || a.markers.attachmentOpen || a.libraryOwnsInput() {
 		return false
 	}
 	if a.pixelPasteMenuOpen() {
@@ -573,19 +627,39 @@ func (a *App) draw(in InputFrame) {
 	a.UI.Screen = l.Screen
 	a.UI.Begin(in.ToUI())
 	chrome := func() {
+		if a.Viewer {
+			a.buildViewerShell(l)
+			a.UI.DrawToasts(l.Viewport)
+			return
+		}
 		a.drawAttachmentLabels(vp)
+		a.drawNotePins(vp)
 		if a.InChamfer() {
 			a.drawChamferGizmoLabel(vp)
 			if a.chamfer.gizmo.captured {
 				a.UI.ClaimPointer(l.Screen)
 			}
 		}
+		if a.uvBlocked() {
+			a.UI.DrawBackground(a.buildUVView)
+		} else {
+			a.buildUVView()
+		}
 		a.buildPixelPasteMenu()
 		a.buildBodyMenu()
 		a.buildAttachmentDialog()
 		a.buildLibraryDialogs()
-		a.buildShell(l)
-		if a.libraryOwnsInput() {
+		if a.workflow.open || a.notePins.open || a.moveTexture.open {
+			a.UI.DrawBackground(func() { a.buildShell(l) })
+		} else {
+			a.buildShell(l)
+		}
+		a.buildNotePinsDialog()
+		a.buildWorkflow()
+		a.buildMoveTexture()
+		if a.workflow.open {
+			// Workshop notices are shown inline in its fixed footer.
+		} else if a.libraryOwnsInput() {
 			a.UI.DrawLatestToast(l.Viewport)
 		} else {
 			a.UI.DrawToasts(l.Viewport)
@@ -614,6 +688,12 @@ func (a *App) routeModalAnswer(res ui.ModalResult) {
 		return
 	}
 	switch {
+	case a.notePins.clearing:
+		a.notePins.clearing = false
+		if res.Confirmed {
+			a.Run(&model.ClearNotePins{})
+			a.notePins.page = 0
+		}
 	case a.closing == closeAsking:
 		switch {
 		case res.Confirmed:
@@ -647,6 +727,9 @@ func (a *App) HintText() string {
 	}
 	if a.hintOverride != "" {
 		return a.hintOverride
+	}
+	if a.notePins.armed {
+		return "Click a model face to drop a note pin - Esc cancels"
 	}
 	if a.markers.armed {
 		return a.markerHint()

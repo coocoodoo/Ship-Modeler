@@ -1,10 +1,14 @@
 package app
 
 import (
+	"math"
+
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"modeler/internal/paint"
+	"modeler/internal/render"
 	"modeler/internal/tools"
+	"modeler/internal/ui"
 )
 
 // The cursor set of SPEC-UX §15.
@@ -14,10 +18,20 @@ import (
 // is set once per frame from the mode and what is under the pointer, so there
 // is one place to read and no chance of two tools disagreeing.
 //
-// The set is what the platform actually has. There is no pencil cursor and no
-// grabbing hand in the standard set, so paint takes the crosshair — a brush is
-// aimed, and that is what a crosshair means — and the view cube takes the
-// pointing hand.
+// Most of the set is what the platform actually has. Extrusion uses two small
+// drawn cursors because the platform set has no grab/grabbing pair: an open
+// hand says the arrow can be taken, and a closed hand confirms the captured
+// drag. Paint takes the crosshair — a brush is aimed, and that is what a
+// crosshair means — and the view cube takes the pointing hand.
+
+const (
+	cursorOpenHand   int32 = -1
+	cursorClosedHand int32 = -2
+)
+
+func customCursor(cursor int32) bool {
+	return cursor == cursorOpenHand || cursor == cursorClosedHand
+}
 
 // updateCursor picks this frame's pointer.
 func (a *App) updateCursor(in InputFrame) {
@@ -28,13 +42,43 @@ func (a *App) updateCursor(in InputFrame) {
 	if want == a.cursor {
 		return
 	}
+	wasCustom := customCursor(a.cursor)
 	a.cursor = want
+	if customCursor(want) {
+		if !wasCustom {
+			rl.HideCursor()
+		}
+		return
+	}
+	if wasCustom {
+		rl.ShowCursor()
+	}
 	rl.SetMouseCursor(want)
 }
 
 func (a *App) wantedCursor(in InputFrame) int32 {
+	if a.uvOwnsPointer(in) && !a.uvBlocked() && !a.UI.OverlayCapturesPointer(in.MouseX, in.MouseY) {
+		_, canvas := a.uvRects()
+		if a.uv.panning {
+			return rl.MouseCursorResizeAll
+		}
+		if uvContains(canvas, in.MouseX, in.MouseY) {
+			if a.material.open {
+				return rl.MouseCursorPointingHand
+			}
+			return rl.MouseCursorCrosshair
+		}
+	}
 	if a.InChamfer() && a.chamfer.gizmo.dragging {
 		return rl.MouseCursorResizeAll
+	}
+	// A grab remains a grab if the pointer leaves the thin arrow hit area or
+	// crosses the viewport edge. The captured tool owns it until release.
+	if a.InExtrude() && a.extrude.tool != nil && a.extrude.tool.Dragging() {
+		return cursorClosedHand
+	}
+	if a.pushPull.tool != nil && a.pushPull.tool.Dragging() {
+		return cursorClosedHand
 	}
 	// The chrome is ordinary pointing, whatever the viewport is doing.
 	if a.chromeOwnsPointer(in) {
@@ -48,6 +92,12 @@ func (a *App) wantedCursor(in InputFrame) int32 {
 		return rl.MouseCursorResizeAll
 	}
 
+	if a.notePins.armed {
+		return rl.MouseCursorCrosshair
+	}
+	if a.pinAt(in, render.Viewport{X: int(a.layout.Viewport.X), Y: int(a.layout.Viewport.Y), W: int(a.layout.Viewport.Width), H: int(a.layout.Viewport.Height)}) != nil {
+		return rl.MouseCursorPointingHand
+	}
 	switch {
 	case a.InChamfer():
 		if a.chamfer.gizmo.hovered {
@@ -55,6 +105,9 @@ func (a *App) wantedCursor(in InputFrame) int32 {
 		}
 		return rl.MouseCursorPointingHand
 	case a.InPaint():
+		if a.material.open {
+			return rl.MouseCursorPointingHand
+		}
 		if a.paint.awaitingLock {
 			return rl.MouseCursorPointingHand
 		}
@@ -76,7 +129,7 @@ func (a *App) wantedCursor(in InputFrame) int32 {
 
 	case a.InExtrude():
 		if a.extrude.hoverArrow {
-			return rl.MouseCursorResizeNS
+			return cursorOpenHand
 		}
 		return rl.MouseCursorDefault
 
@@ -86,15 +139,26 @@ func (a *App) wantedCursor(in InputFrame) int32 {
 
 	// Idle: the handles say what they are for.
 	if a.pushPull.hoverArrow {
-		return rl.MouseCursorResizeNS
+		return cursorOpenHand
 	}
 	if a.transformHoverCursor() != rl.MouseCursorDefault {
 		return a.transformHoverCursor()
 	}
-	if a.sketch.awaitingPlane || a.markers.armed {
+	if a.notePins.armed || a.sketch.awaitingPlane || a.markers.armed {
 		return rl.MouseCursorPointingHand
 	}
 	return rl.MouseCursorDefault
+}
+
+// drawCustomCursor draws the grab pair after all chrome so the hand stays
+// legible over geometry, menus and both light and dark themes. A dark keyline
+// around white fill gives it the same clarity as a native system cursor.
+func (a *App) drawCustomCursor(in InputFrame) {
+	if a.Headless || !customCursor(a.cursor) {
+		return
+	}
+	scale := math.Max(1, math.Min(a.Scale, 1.5))
+	ui.DrawHandCursor(in.MouseX, in.MouseY, scale, a.cursor == cursorClosedHand)
 }
 
 // transformHoverCursor is the gizmo's own cursor, or the default when nothing

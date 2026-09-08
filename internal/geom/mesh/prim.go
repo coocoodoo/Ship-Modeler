@@ -104,11 +104,7 @@ func Translate(m *Mesh, d geom.Vec3) {
 	for i := range m.Verts {
 		m.Verts[i] = m.Verts[i].Add(d)
 	}
-	for fi := range m.Faces {
-		if p := m.Faces[fi].Paint; p != nil {
-			p.Frame = p.Frame.Translated(d)
-		}
-	}
+	mapPaintFrames(m, func(f geom.Frame) geom.Frame { return f.Translated(d) })
 	m.InvalidateCaches()
 }
 
@@ -117,14 +113,26 @@ func Transform(m *Mesh, x geom.Mat4) {
 	for i := range m.Verts {
 		m.Verts[i] = x.TransformPoint(m.Verts[i])
 	}
-	seen := map[*FacePaint]bool{}
+	mapPaintFrames(m, func(f geom.Frame) geom.Frame { return f.Transformed(x) })
+	m.InvalidateCaches()
+}
+
+// Mesh clones share paint with snapshots. Copy the mapping before changing
+// it, and transform shared allocations just once even across split faces.
+func mapPaintFrames(m *Mesh, transform func(geom.Frame) geom.Frame) {
+	mapped := map[*FacePaint]*FacePaint{}
 	for fi := range m.Faces {
-		if p := m.Faces[fi].Paint; p != nil && !seen[p] {
-			seen[p] = true
-			p.Frame = p.Frame.Transformed(x)
+		if p := m.Faces[fi].Paint; p != nil {
+			cp := mapped[p]
+			if cp == nil {
+				clone := *p
+				clone.Frame = transform(p.Frame)
+				cp = &clone
+				mapped[p] = cp
+			}
+			m.Faces[fi].Paint = cp
 		}
 	}
-	m.InvalidateCaches()
 }
 
 // Merge appends src's geometry into dst, renumbering vertex indices. The result

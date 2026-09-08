@@ -107,6 +107,10 @@ func (a *App) buildShell(l Layout) {
 		a.showSettings = true
 		a.UI.ClearFocus()
 	}
+	uvBox, hintBox := ui.SplitRight(hintBox, a.px(104))
+	a.buildUVToggle(uvBox)
+	pinsBox, hintBox := ui.SplitRight(hintBox, a.px(88))
+	a.buildPinsToggle(pinsBox)
 	a.UI.HintBar(hintBox, a.modeName(), a.HintText(), Version)
 	a.UI.Panel(aoBox)
 	a.UI.HairlineH(aoBox.X, aoBox.Y, aoBox.Width, ui.ColorStroke)
@@ -522,7 +526,7 @@ func (a *App) bodyRow(r rl.Rectangle, b *model.Body) {
 	})
 	if res.Hovered {
 		a.tree.hovered = ref
-		if a.Mode == ModeIdle && a.UI.In.Pressed[ui.MouseRight] && !a.markers.attachmentOpen && !a.libraryOwnsInput() {
+		if a.Mode == ModeIdle && a.UI.In.Pressed[ui.MouseRight] && !a.notePins.open && !a.notePins.armed && !a.markers.attachmentOpen && !a.libraryOwnsInput() {
 			a.Sel.Set(ref)
 			a.library.menu = bodyMenuState{open: true, body: b.ID, x: a.UI.In.MouseX, y: a.UI.In.MouseY}
 		}

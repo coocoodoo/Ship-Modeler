@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 
@@ -30,15 +31,45 @@ func main() {
 	bench := flag.Int("bench", 0, "after the script, render N frames and report frame cost")
 	ai := flag.Bool("ai", false, "enable the local AI connection for this session")
 	hidden := flag.Bool("hidden", false, "hide the live window (requires -ai; for connection tests)")
+	view := flag.Bool("view", false, "open the project in viewer mode")
+	edit := flag.Bool("edit", false, "open the project directly in the editor")
 	flag.Parse()
 
-	if err := run(*headless || *script != "", *script, *out, *size, *bench, *ai, *hidden); err != nil {
+	startup, err := startupOptions(flag.Args(), *view, *edit, *headless || *script != "")
+	if err == nil {
+		err = run(*headless || *script != "", *script, *out, *size, *bench, *ai, *hidden, startup)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "modeler:", err)
 		os.Exit(1)
 	}
 }
 
-func run(headless bool, script, out, size string, bench int, ai, hidden bool) (err error) {
+func startupOptions(args []string, view, edit, headless bool) (app.StartupOptions, error) {
+	var options app.StartupOptions
+	if view && edit {
+		return options, fmt.Errorf("choose either -view or -edit")
+	}
+	if len(args) > 1 {
+		return options, fmt.Errorf("open one project at a time")
+	}
+	if (view || edit) && len(args) == 0 {
+		return options, fmt.Errorf("-view and -edit need a project filename")
+	}
+	if headless && (len(args) != 0 || view || edit) {
+		return options, fmt.Errorf("project filenames cannot be combined with a headless script")
+	}
+	if len(args) == 1 {
+		path, err := filepath.Abs(args[0])
+		if err != nil {
+			return options, err
+		}
+		options.Path, options.Viewer = path, !edit
+	}
+	return options, nil
+}
+
+func run(headless bool, script, out, size string, bench int, ai, hidden bool, startup app.StartupOptions) (err error) {
 	// A crash must never take the user's work with it silently: recover, report
 	// and exit non-zero. M8 adds the crash-save and the log file (SPEC-DATA §6).
 	defer func() {
@@ -63,6 +94,5 @@ func run(headless bool, script, out, size string, bench int, ai, hidden bool) (e
 	}
 	app.OpenWindow(app.DefaultWindowW, app.DefaultWindowH, true, hidden)
 	defer rl.CloseWindow()
-	app.RunWithAI(ai)
-	return nil
+	return app.RunStartup(ai, startup)
 }

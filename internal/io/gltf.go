@@ -80,15 +80,20 @@ type gltfTextureRef struct {
 }
 
 type gltfPBR struct {
-	BaseColorFactor  []float64       `json:"baseColorFactor,omitempty"`
-	BaseColorTexture *gltfTextureRef `json:"baseColorTexture,omitempty"`
-	MetallicFactor   float64         `json:"metallicFactor"`
-	RoughnessFactor  float64         `json:"roughnessFactor"`
+	MetallicRoughnessTexture *gltfTextureRef `json:"metallicRoughnessTexture,omitempty"`
+	BaseColorFactor          []float64       `json:"baseColorFactor,omitempty"`
+	BaseColorTexture         *gltfTextureRef `json:"baseColorTexture,omitempty"`
+	MetallicFactor           float64         `json:"metallicFactor"`
+	RoughnessFactor          float64         `json:"roughnessFactor"`
 }
 
 type gltfMaterial struct {
-	Name string  `json:"name,omitempty"`
-	PBR  gltfPBR `json:"pbrMetallicRoughness"`
+	NormalTexture    *gltfTextureRef `json:"normalTexture,omitempty"`
+	OcclusionTexture *gltfTextureRef `json:"occlusionTexture,omitempty"`
+	Extensions       map[string]any  `json:"extensions,omitempty"`
+	Extras           map[string]any  `json:"extras,omitempty"`
+	Name             string          `json:"name,omitempty"`
+	PBR              gltfPBR         `json:"pbrMetallicRoughness"`
 }
 
 type gltfTexture struct {
@@ -133,24 +138,26 @@ type gltfBuffer struct {
 }
 
 type gltfJSON struct {
-	Asset       gltfAsset        `json:"asset"`
-	Scene       int              `json:"scene"`
-	Scenes      []gltfScene      `json:"scenes"`
-	Nodes       []gltfNode       `json:"nodes"`
-	Meshes      []gltfMesh       `json:"meshes"`
-	Materials   []gltfMaterial   `json:"materials,omitempty"`
-	Textures    []gltfTexture    `json:"textures,omitempty"`
-	Samplers    []gltfSampler    `json:"samplers,omitempty"`
-	Images      []gltfImage      `json:"images,omitempty"`
-	Accessors   []gltfAccessor   `json:"accessors"`
-	BufferViews []gltfBufferView `json:"bufferViews"`
-	Buffers     []gltfBuffer     `json:"buffers"`
+	ExtensionsUsed []string         `json:"extensionsUsed,omitempty"`
+	Asset          gltfAsset        `json:"asset"`
+	Scene          int              `json:"scene"`
+	Scenes         []gltfScene      `json:"scenes"`
+	Nodes          []gltfNode       `json:"nodes"`
+	Meshes         []gltfMesh       `json:"meshes"`
+	Materials      []gltfMaterial   `json:"materials,omitempty"`
+	Textures       []gltfTexture    `json:"textures,omitempty"`
+	Samplers       []gltfSampler    `json:"samplers,omitempty"`
+	Images         []gltfImage      `json:"images,omitempty"`
+	Accessors      []gltfAccessor   `json:"accessors"`
+	BufferViews    []gltfBufferView `json:"bufferViews"`
+	Buffers        []gltfBuffer     `json:"buffers"`
 }
 
 // gltfBuilder accumulates the binary buffer and the views into it.
 type gltfBuilder struct {
-	doc gltfJSON
-	bin bytes.Buffer
+	doc   gltfJSON
+	bin   bytes.Buffer
+	scale float64
 }
 
 // view appends bytes to the buffer and returns the index of a view over them.
@@ -185,10 +192,10 @@ func (b *gltfBuilder) accessor(a gltfAccessor) int {
 // ExportGLTF writes the scene as glTF 2.0. The extension decides the spelling:
 // `.glb` is one self-contained file, anything else writes JSON with a `.bin`
 // and the textures beside it.
-func ExportGLTF(outPath string, doc *model.Document) error {
+func ExportGLTF(outPath string, doc *model.Document, scales ...float64) error {
 	binary := strings.EqualFold(filepath.Ext(outPath), ".glb")
 	stem := strings.TrimSuffix(filepath.Base(outPath), filepath.Ext(outPath))
-	jsonData, bin, external, err := buildGLTF(doc, binary, stem)
+	jsonData, bin, external, err := buildGLTF(doc, binary, stem, scales...)
 	if err != nil {
 		return err
 	}
@@ -229,13 +236,17 @@ func BuildGLB(doc *model.Document) ([]byte, error) {
 // buildGLTF assembles the document into glTF parts: the JSON, the binary
 // buffer, and — for the text flavour only — the external images to write
 // beside it.
-func buildGLTF(doc *model.Document, binary bool, stem string) ([]byte, []byte, map[string]*image.RGBA, error) {
+func buildGLTF(doc *model.Document, binary bool, stem string, scales ...float64) ([]byte, []byte, map[string]*image.RGBA, error) {
+	scale, err := modelExportScale(scales)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	bodies := visibleBodies(doc)
 	if len(bodies) == 0 {
 		return nil, nil, nil, fmt.Errorf("there is nothing visible to export")
 	}
 
-	b := &gltfBuilder{}
+	b := &gltfBuilder{scale: scale}
 	b.doc.Asset = gltfAsset{Version: "2.0", Generator: gltfGeneratorName}
 
 	// One sampler for everything, and it is NEAREST. There is no case in this
@@ -258,6 +269,9 @@ func buildGLTF(doc *model.Document, binary bool, stem string) ([]byte, []byte, m
 
 	for _, attachment := range BuildGameMarkers(doc).Attachments {
 		point := attachment
+		for i := range point.At {
+			point.At[i] *= scale
+		}
 		rotation := attachmentRotation(point.Dir)
 		b.doc.Nodes = append(b.doc.Nodes, gltfNode{
 			Name: point.Name, Translation: &point.At, Rotation: &rotation, Extras: &point,
@@ -339,6 +353,9 @@ func buildGLTFBody(b *gltfBuilder, body *model.Body, embed bool,
 			},
 		})
 		paintMat[e.Paint] = len(b.doc.Materials) - 1
+		if err := buildGLTFMaterialMaps(b, &b.doc.Materials[len(b.doc.Materials)-1], e, embed, external); err != nil {
+			return gltfNode{}, err
+		}
 	}
 
 	// Group the triangles by the material they will use: a primitive is one
@@ -421,13 +438,14 @@ func buildGLTFPrimitive(b *gltfBuilder, m *mesh.Mesh, tris []mesh.Tri,
 		n := m.FaceNormal(t.Face)
 		for _, vi := range [3]int{t.A, t.B, t.C} {
 			v := m.Verts[vi]
-			putVec3(pos, v)
+			putVec3(pos, v.Mul(b.scale))
 			putVec3(nrm, n)
 			if paint != nil {
 				u, w := gltfUV(paint, v)
 				putFloat(uvs, u)
 				putFloat(uvs, w)
 			}
+			v = v.Mul(b.scale)
 			for k, c := range [3]float64{v.X, v.Y, v.Z} {
 				min[k] = math.Min(min[k], float64(float32(c)))
 				max[k] = math.Max(max[k], float64(float32(c)))

@@ -24,8 +24,9 @@ import (
 // the pending command with a longer version of itself each frame and commits
 // once on release, so the history holds "a stroke" and not four hundred texels.
 type StrokeFace struct {
-	Body uint32
-	Face mesh.FaceUID
+	beforeStale bool
+	Body        uint32
+	Face        mesh.FaceUID
 
 	// Tool is anything but Pick, which never reaches here: sampling a colour
 	// changes the palette, and the palette is settings, not document state.
@@ -125,6 +126,7 @@ func (c *StrokeFace) Do(doc *model.Document) error {
 			m.Faces[fi].Paint = c.paint
 		}
 		Blit(c.paint, c.rect, c.after)
+		c.paint.PBRStale = true
 		return nil
 	}
 
@@ -178,6 +180,8 @@ func (c *StrokeFace) Do(doc *model.Document) error {
 	}
 	c.paint, c.allocated = p, allocated
 	c.rect, c.before, c.after = wrote, before, after
+	c.beforeStale = p.PBRStale
+	p.PBRStale = true
 	return nil
 }
 
@@ -194,6 +198,7 @@ func (c *StrokeFace) Undo(doc *model.Document) {
 		return
 	}
 	Blit(c.paint, c.rect, c.before)
+	c.paint.PBRStale = c.beforeStale
 }
 
 func (c *StrokeFace) Events() []model.Event {
@@ -388,3 +393,8 @@ func crop(src *image.RGBA, have, want image.Rectangle) *image.RGBA {
 	}
 	return out
 }
+
+func (c *StrokeFace) TargetFace() (uint32, mesh.FaceUID) { return c.Body, c.Face }
+func (c *StrokeFace) PaintsLayer() bool                  { return true }
+
+func (c *ResampleFace) TargetFace() (uint32, mesh.FaceUID) { return c.Body, c.Face }

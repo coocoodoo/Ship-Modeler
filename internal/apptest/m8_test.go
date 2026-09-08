@@ -253,7 +253,7 @@ func TestASavedDocumentIsNotOfferedBack(t *testing.T) {
 
 func TestEveryExportFormatWritesSomething(t *testing.T) {
 	dir := t.TempDir()
-	names := []string{"ship.glb", "ship.gltf", "ship.obj", "ship.stl", "ship.png"}
+	names := []string{"ship.glb", "ship.gltf", "ship.obj", "ship.stl", "ship.png", "ship.pxm"}
 	var ops []string
 	ops = append(ops, `{"op":"paint.begin"}`,
 		`{"op":"paint.color","hex":"F2542D"}`,

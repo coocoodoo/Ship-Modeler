@@ -6,6 +6,7 @@ package io
 import (
 	"encoding/json"
 	"fmt"
+	"modeler/internal/geom/mesh"
 	"os"
 )
 
@@ -15,7 +16,12 @@ import (
 // Ops are executed through the real command bus and camera controller, so a
 // script and a user session go down identical code paths.
 type Op struct {
-	Op string `json:"op"`
+	Op     string `json:"op"`
+	Status string `json:"status,omitempty"`
+	Scope  string `json:"scope,omitempty"` // material preview: whole or face
+	PinID  uint32 `json:"pinID,omitempty"`
+	Text   string `json:"text,omitempty"`
+	Done   *bool  `json:"done,omitempty"`
 
 	// Sketch ops.
 	Plane string      `json:"plane,omitempty"`
@@ -183,6 +189,10 @@ func LoadScript(path string) (*Script, error) {
 // landed yet still parse, so scripts can be written ahead of the milestone that
 // executes them; the executor reports the unimplemented op at run time.
 var knownOps = map[string]bool{
+	"material.open": true, "material.import": true, "material.clear": true, "material.preview": true,
+	"material.export": true, "material.export_set": true,
+	"workshop.open": true, "review.begin": true, "review.propose": true, "review.open": true, "material.reference": true, "material.match": true, "material.generate": true, "material.health": true, "layer.edit": true, "inspection.capture": true,
+	"pins.open": true, "pin.add": true, "pin.update": true, "pin.delete": true,
 	"sketch.begin": true, "sketch.line": true, "sketch.rect": true,
 	"sketch.circle": true, "sketch.finish": true, "sketch.tool": true,
 	"sketch.face": true, "sketch.project": true, "sketch.grid": true,
@@ -225,7 +235,7 @@ var knownOps = map[string]bool{
 	"import.commit": true, "import.cancel": true,
 	"file.export": true, "file.autosave": true, "file.recover": true,
 	"file.discard": true, "export.begin": true, "export.format": true,
-	"export.cancel": true, "export.scale": true, "export.alpha": true,
+	"export.cancel": true, "export.scale": true, "export.alpha": true, "export.model_scale": true,
 	"body.visible": true, "plane.visible": true, "sketch.visible": true,
 	"deselect": true, "delete": true, "undo": true, "redo": true,
 	"hover": true, "click": true, "drag": true, "drag.release": true,
@@ -235,7 +245,7 @@ var knownOps = map[string]bool{
 	"camera.lookat": true,
 	"camera.zoom":   true, "camera.project": true,
 	"settle": true, "wait": true, "shot": true, "pick": true, "dump": true,
-	"view.ao": true, "view.shading": true,
+	"view.ao": true, "view.shading": true, "view.uv": true,
 	"palette.browse": true, "palette.search": true, "palette.apply": true,
 }
 
@@ -247,6 +257,18 @@ func (o Op) validate() error {
 		return o.Errorf("unknown op %q", o.Op)
 	}
 	switch o.Op {
+	case "review.begin":
+		if o.PinID == 0 {
+			return o.Errorf("needs pinID")
+		}
+	case "review.propose":
+		if o.Text == "" {
+			return o.Errorf("describe what changed in text")
+		}
+	case "material.reference", "material.match", "material.generate", "layer.edit", "workshop.open":
+		if o.Body == "" || o.Face < 0 {
+			return o.Errorf("needs body and nonnegative face index")
+		}
 	case "ui.key":
 		if o.Name == "" {
 			return o.Errorf("needs a key name")
@@ -266,6 +288,38 @@ func (o Op) validate() error {
 	case "sketch.rect":
 		if o.A == nil || o.B == nil {
 			return o.Errorf("needs a and b")
+		}
+	case "pin.add":
+		if o.Body == "" || o.Dot == nil || o.Text == "" {
+			return o.Errorf("needs body, face, dot [x,y,z], and text")
+		}
+	case "material.import", "material.clear", "material.open":
+		if o.Body == "" || o.Face < 0 {
+			return o.Errorf("needs body and a nonnegative face index")
+		}
+		if o.Op != "material.open" && !mesh.ValidMaterialChannel(o.Kind) {
+			return o.Errorf("unknown texture type %q", o.Kind)
+		}
+		if o.Op == "material.import" && o.Path == "" {
+			return o.Errorf("needs an image path")
+		}
+	case "material.export", "material.export_set":
+		if o.Body == "" || o.Face < 0 || o.Path == "" {
+			return o.Errorf("needs body, a nonnegative face index, and output path")
+		}
+		if o.Op == "material.export" && !mesh.ValidMaterialChannel(o.Kind) {
+			return o.Errorf("unknown texture type %q", o.Kind)
+		}
+	case "material.preview":
+		if o.Scope != "" && o.Scope != "whole" && o.Scope != "face" {
+			return o.Errorf("material scope must be whole or face")
+		}
+		if o.Kind != "" && o.Kind != "shaded" && !mesh.ValidMaterialChannel(o.Kind) {
+			return o.Errorf("unknown texture type %q", o.Kind)
+		}
+	case "pin.update", "pin.delete":
+		if o.PinID == 0 {
+			return o.Errorf("needs pinID")
 		}
 	case "sketch.circle":
 		if o.C == nil || o.R <= 0 {
@@ -298,6 +352,10 @@ func (o Op) validate() error {
 	case "view.shading":
 		if o.On == nil {
 			return o.Errorf("needs on (true for shaded, false for flat)")
+		}
+	case "view.uv":
+		if o.On == nil {
+			return o.Errorf("needs on (true to open the UV viewer)")
 		}
 	case "wheel":
 		if o.Degrees == 0 {
@@ -370,6 +428,13 @@ func (o Op) validate() error {
 	case "export.format":
 		if o.Kind == "" {
 			return o.Errorf("needs a format extension, without the dot")
+		}
+	case "export.model_scale":
+		if o.Scale == nil {
+			return o.Errorf("export.model_scale needs scale")
+		}
+		if err := ValidateModelExportScale(*o.Scale); err != nil {
+			return o.Wrap(err)
 		}
 	case "export.alpha":
 		if o.Visible == nil {

@@ -113,8 +113,81 @@ func (r *ScriptRunner) Run(s *io.Script) error {
 func (r *ScriptRunner) runOp(op io.Op) error {
 	a := r.App
 	vp := a.Viewport(r.Size.W, r.Size.H)
+	if a.Viewer && !viewerAllowsOp(op.Op) {
+		return op.Errorf("click Edit to unlock the modeling workspace")
+	}
 
+	if a.Bus.Review() != nil && (strings.HasPrefix(op.Op, "file.") || strings.HasPrefix(op.Op, "library.") || strings.HasPrefix(op.Op, "import.") || strings.HasPrefix(op.Op, "export.")) {
+		return op.Errorf("accept or reject the AI request before changing files or library parts")
+	}
 	switch op.Op {
+	case "workshop.open":
+		f, e := r.faceByIndex(op)
+		if e != nil {
+			return e
+		}
+		a.openWorkflow(model.FaceScope{Body: f.body.ID, Face: f.uid}, 1)
+	case "review.begin":
+		if e := a.startPinWork(op.PinID); e != nil {
+			return e
+		}
+		a.workflow.open = false
+	case "review.propose":
+		if e := a.Bus.ProposeReview(op.Text); e != nil {
+			return e
+		}
+		a.workflow.description = op.Text
+		a.workflow.tab = 0
+		a.workflow.open = true
+	case "review.open":
+		a.openWorkflow(a.workflow.face, 0)
+	case "material.health":
+		a.workflow.issues = model.MaterialHealth(a.Doc())
+		a.openWorkflow(a.workflow.face, 2)
+	case "inspection.capture":
+		if op.Path != "" {
+			r.OutDir = op.Path
+		}
+		if e := r.inspection(); e != nil {
+			return e
+		}
+		a.workflow.inspectionPaths = r.Shots()
+	case "material.reference", "material.match", "material.generate", "layer.edit":
+		f, e := r.faceByIndex(op)
+		if e != nil {
+			return e
+		}
+		switch op.Op {
+		case "material.reference":
+			ref, e := paint.AnalyzeReference(a.Doc(), f.body.ID, f.uid)
+			if e != nil {
+				return e
+			}
+			a.workflow.reference = &ref
+		case "material.match":
+			if a.workflow.reference == nil {
+				return op.Errorf("choose a reference face first")
+			}
+			if e := a.Bus.Run(&paint.MatchReference{Body: f.body.ID, Face: f.uid, Reference: *a.workflow.reference}); e != nil {
+				return e
+			}
+		case "material.generate":
+			if e := a.Bus.Run(&paint.RefreshPBR{Body: f.body.ID, Face: f.uid}); e != nil {
+				return e
+			}
+		case "layer.edit":
+			value := 1.0
+			if op.Strength != nil {
+				value = *op.Strength
+			}
+			on := true
+			if op.On != nil {
+				on = *op.On
+			}
+			if e := a.Bus.Run(&paint.EditLayer{Body: f.body.ID, Face: f.uid, Action: op.Kind, Label: op.Name, Index: op.Tile, Value: value, On: on}); e != nil {
+				return e
+			}
+		}
 	case "chamfer.begin":
 		if !a.BeginEdgeChamfer() {
 			return op.Errorf("select solid edges first")
@@ -251,6 +324,13 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 
 	case "view.shading":
 		a.Settings.FlatShading = !*op.On
+	case "view.uv":
+		if *op.On != a.uvVisible() {
+			a.toggleUVView()
+		}
+		if *op.On != a.uvVisible() {
+			return op.Errorf("UV view needs a visible body and no active modeling operation")
+		}
 
 	case "palette.browse":
 		if *op.On {
@@ -330,6 +410,104 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 	case "rotate":
 		if err := r.rotateOp(op); err != nil {
 			return err
+		}
+
+	case "pins.open":
+		a.notePins.open = true
+		a.notePins.editing = false
+	case "material.preview":
+		if op.Scope == "face" {
+			f, err := r.faceByIndex(op)
+			if err != nil {
+				return err
+			}
+			a.material.body, a.material.face = f.body.ID, f.uid
+		}
+		a.material.faceOnly = op.Scope == "face"
+		a.syncMaterialScope()
+		a.Renderer.MaterialView = 0
+		if op.Kind != "" && op.Kind != "shaded" {
+			if !mesh.ValidMaterialChannel(op.Kind) {
+				return op.Errorf("unknown texture type")
+			}
+			for i, k := range mesh.MaterialChannels {
+				if k == op.Kind {
+					a.Renderer.MaterialView = i + 1
+					a.material.channel = i
+				}
+			}
+		}
+	case "material.export", "material.export_set":
+		f, err := r.faceByIndex(op)
+		if err != nil {
+			return err
+		}
+		kind := op.Kind
+		if op.Op == "material.export_set" {
+			kind = "textures"
+		}
+		if err := a.ExportMaterialImages(f.body.ID, f.uid, kind, op.Path); err != nil {
+			return op.Errorf("%v", err)
+		}
+	case "material.open", "material.import", "material.clear":
+		f, err := r.faceByIndex(op)
+		if err != nil {
+			return err
+		}
+		if op.Op == "material.open" {
+			a.BeginPaint()
+			a.openMaterialPanel()
+			a.material.body = f.body.ID
+			a.material.face = f.uid
+			a.syncMaterialScope()
+		} else if op.Op == "material.import" {
+			if err := a.ImportMaterialMap(f.body.ID, f.uid, op.Kind, op.Path); err != nil {
+				return op.Errorf("%v", err)
+			}
+		} else if !a.Run(&paint.SetMaterialMap{Body: f.body.ID, Face: f.uid, Kind: op.Kind, Res: a.paint.res}) {
+			return op.Errorf("could not clear material map")
+		}
+	case "pin.add":
+		f, err := r.faceByIndex(op)
+		if err != nil {
+			return err
+		}
+		p, err := model.AnchorNotePin(f.body, f.face, geom.Vec3{X: op.Dot[0], Y: op.Dot[1], Z: op.Dot[2]})
+		if err != nil {
+			return op.Errorf("%v", err)
+		}
+		p.Text = op.Text
+		if op.Done != nil {
+			p.Done = *op.Done
+		}
+		if err := a.Bus.Run(&model.SetNotePin{Pin: p}); err != nil {
+			return op.Errorf("%v", err)
+		}
+	case "pin.update":
+		p := a.Doc().NotePinByID(op.PinID)
+		if p == nil {
+			return op.Errorf("note pin not found")
+		}
+		next := *p
+		if op.Status != "" {
+			if op.Status != "Open" && op.Status != "In progress" && op.Status != "Needs review" && op.Status != "Done" {
+				return op.Errorf("invalid pin status")
+			}
+			next.Status = op.Status
+			next.Done = op.Status == "Done"
+		}
+		if op.Text != "" {
+			next.Text = op.Text
+		}
+		if op.Done != nil {
+			next.Done = *op.Done
+		}
+		if err := a.Bus.Run(&model.SetNotePin{Pin: next}); err != nil {
+			return op.Errorf("%v", err)
+		}
+	case "pin.delete":
+		if err := a.Bus.Run(&model.DeleteNotePin{ID: op.PinID}); err != nil {
+			return op.Errorf("%v", err)
 		}
 
 	case "marker.front", "marker.top", "marker.thruster", "marker.attachment":
@@ -833,7 +1011,7 @@ func (r *ScriptRunner) runOp(op io.Op) error {
 		"file.importmesh", "import.scale", "import.center",
 		"import.commit", "import.cancel",
 		"export.begin", "export.format", "export.cancel",
-		"export.scale", "export.alpha":
+		"export.scale", "export.alpha", "export.model_scale":
 		if err := r.fileOp(op); err != nil {
 			return err
 		}
@@ -1498,6 +1676,10 @@ func (r *ScriptRunner) fileOp(op io.Op) error {
 
 	case "export.scale":
 		a.files.exportScale = op.Res
+	case "export.model_scale":
+		if err := a.SetModelExportScale(*op.Scale); err != nil {
+			return op.Wrap(err)
+		}
 
 	case "export.alpha":
 		a.files.exportAlpha = *op.Visible
@@ -1937,6 +2119,16 @@ func (r *ScriptRunner) constructionOp(op io.Op) error {
 // tests assert on these rather than on pixels, so a behavioural regression is
 // reported as a behaviour, not as a picture that changed.
 func (r *ScriptRunner) dump() {
+	if r.App.uvVisible() {
+		a := r.App
+		a.prepareUVView()
+		panel, canvas := a.uvRects()
+		fmt.Printf("UV body=%d zoom=%.6f panel=%v canvas=%v\n", a.uv.body, a.uv.zoom, panel, canvas)
+		for _, is := range a.uv.islands {
+			p := a.uvScreen(is.at.Add(geom.Vec2{X: float64(is.bounds.Dx()) / 2, Y: float64(is.bounds.Dy()) / 2}))
+			fmt.Printf("UV face=%d center=(%.2f,%.2f) bounds=%v\n", is.index, p.X, p.Y, is.bounds)
+		}
+	}
 	a := r.App
 	doc := a.Doc()
 
@@ -2051,6 +2243,10 @@ func (r *ScriptRunner) dump() {
 				sk.ID, sk.Body, boolBit(a.faceRefAlive(sk)))
 		}
 	}
+	for _, p := range doc.NotePins {
+		at, attached := p.Position(doc)
+		fmt.Printf("note-pin id=%d done=%t attached=%t at=%.3f,%.3f,%.3f text=%q\n", p.ID, p.Done, attached, at.X, at.Y, at.Z, p.Text)
+	}
 	r.dumpPaint()
 	// Where every dot is, and whether it is selected or hovered. A dot is a
 	// few pixels in a shot, so a golden cannot tell a moved one from a still
@@ -2099,6 +2295,9 @@ func stickyTargetSeq(a *App) uint32 {
 // cannot make for you.
 func (r *ScriptRunner) dumpPaint() {
 	a := r.App
+	if a.material.open {
+		fmt.Printf("material body=%d face=%d faceOnly=%d view=%d\n", a.material.body, a.material.face.Seq(), boolBit(a.material.faceOnly), a.Renderer.MaterialView)
+	}
 	st := &a.paint
 	fmt.Printf("paint mode=%d tool=%q size=%d res=%d color=%q color2=%q "+
 		"dither=%q fill=%d slot=%d textures=%d locked=%d lockface=%d target=%d "+

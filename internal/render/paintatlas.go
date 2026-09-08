@@ -45,7 +45,10 @@ type atlas struct {
 	W, H  int
 
 	// img is the packed picture, held only until it reaches the GPU.
-	img *image.RGBA
+	img                       *image.RGBA
+	properties, normals       *image.RGBA
+	propertiesTex, normalsTex rl.Texture2D
+	hasMaterial               bool
 
 	tex   rl.Texture2D
 	ready bool
@@ -94,7 +97,8 @@ func buildAtlas(m *mesh.Mesh) *atlas {
 		if size > MaxAtlasSize {
 			size = MaxAtlasSize
 		}
-		pack := shelf{w: size, h: size}
+		// UV (0,0) is the transparent fallback for unpainted faces.
+		pack := shelf{w: size, h: size, x: AtlasPadding, y: AtlasPadding}
 		placed := make([]image.Point, len(list))
 		fits := true
 		for i, e := range list {
@@ -125,6 +129,31 @@ func buildAtlas(m *mesh.Mesh) *atlas {
 	a.img = image.NewRGBA(image.Rect(0, 0, a.W, a.H))
 	for p, slot := range a.slots {
 		blitInto(a.img, p.Img, slot.Origin)
+		if p.Material != nil {
+			a.hasMaterial = true
+		}
+	}
+	if a.hasMaterial {
+		a.properties = image.NewRGBA(a.img.Bounds())
+		a.normals = image.NewRGBA(a.img.Bounds())
+		for p, slot := range a.slots {
+			if p.Material == nil {
+				continue
+			}
+			for y := 0; y < slot.Texels.Dy(); y++ {
+				for x := 0; x < slot.Texels.Dx(); x++ {
+					u, v := float64(x+slot.Texels.Min.X)+.5, float64(y+slot.Texels.Min.Y)+.5
+					s := p.Material.Sample("specular", u, v)
+					rough := p.Material.Sample("roughness", u, v)
+					h := p.Material.Sample("height", u, v)
+					n := p.Material.SurfaceNormal(u, v)
+					ao := p.Material.Sample("ao", u, v)
+					a.properties.SetRGBA(slot.Origin.X+x, slot.Origin.Y+y, color.RGBA{s.R, rough.R, h.R, 255})
+					n.A = ao.R
+					a.normals.SetRGBA(slot.Origin.X+x, slot.Origin.Y+y, n)
+				}
+			}
+		}
 	}
 	return a
 }
@@ -179,6 +208,12 @@ func (a *atlas) upload() {
 	rl.UpdateTexture(a.tex, a.img)
 	rl.SetTextureFilter(a.tex, rl.FilterPoint)
 	a.ready = true
+	if a.hasMaterial {
+		a.propertiesTex = uploadMaterialAtlas(a.properties)
+		a.normalsTex = uploadMaterialAtlas(a.normals)
+		a.properties = nil
+		a.normals = nil
+	}
 	// The CPU copy has done its job. The FacePaint images remain the source of
 	// truth, and every later upload reads from them.
 	a.img = nil
@@ -189,7 +224,20 @@ func (a *atlas) unload() {
 		return
 	}
 	rl.UnloadTexture(a.tex)
+	if a.hasMaterial {
+		rl.UnloadTexture(a.propertiesTex)
+		rl.UnloadTexture(a.normalsTex)
+	}
 	a.ready = false
+}
+
+func uploadMaterialAtlas(img *image.RGBA) rl.Texture2D {
+	blank := rl.GenImageColor(img.Rect.Dx(), img.Rect.Dy(), color.RGBA{})
+	t := rl.LoadTextureFromImage(blank)
+	rl.UnloadImage(blank)
+	rl.UpdateTexture(t, img)
+	rl.SetTextureFilter(t, rl.FilterPoint)
+	return t
 }
 
 // uv maps a world point on a painted face into atlas texture coordinates.

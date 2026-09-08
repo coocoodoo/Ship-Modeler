@@ -177,6 +177,9 @@ func (a *App) PastePixelsAt(body uint32, face mesh.FaceUID, at image.Point) bool
 
 // rotatePixelPasteWheel consumes the gesture before camera zoom can use it.
 func (a *App) rotatePixelPasteWheel(in InputFrame) bool {
+	if a.material.open {
+		return false
+	}
 	if !a.InPaint() || a.paint.tool != paint.ToolPaste || a.paint.awaitingLock ||
 		!in.Ctrl || in.Wheel == 0 || a.paint.pixels.clipboard == nil {
 		return false

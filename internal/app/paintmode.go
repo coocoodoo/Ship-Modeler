@@ -242,6 +242,8 @@ func (a *App) BeginPaint() bool {
 
 // ExitPaint leaves paint mode, keeping every stroke.
 func (a *App) ExitPaint() {
+	a.closeMaterialPanel()
+	a.closeUVView()
 	if !a.InPaint() {
 		return
 	}
@@ -455,6 +457,10 @@ func (a *App) canPaint() (bool, string) {
 
 // updatePaint runs one frame of paint mode with the pointer in the viewport.
 func (a *App) updatePaint(in InputFrame, vp render.Viewport) {
+	if a.material.open {
+		a.updateMaterialSelection(in, vp)
+		return
+	}
 	if !a.paint.awaitingLock && (a.paint.tool == paint.ToolSelect || a.paint.tool == paint.ToolPaste) {
 		a.updatePixelClipboard(in, vp)
 		return
@@ -588,6 +594,10 @@ func (a *App) stickyFace() (paintHover, bool) {
 
 // refreshPaintHover resolves the face and texel under the pointer.
 func (a *App) refreshPaintHover(in InputFrame, vp render.Viewport) {
+	if a.uv.input {
+		a.refreshUVHover(in)
+		return
+	}
 	if !vp.Contains(int(in.MouseX), int(in.MouseY)) ||
 		a.Cube.Contains(in.MouseX, in.MouseY) || a.orbiting || a.panning || a.cubeDrag {
 		// Off the viewport or navigating: no cursor, but the panel still knows
@@ -702,6 +712,9 @@ func (a *App) mappingFor(f faceRef) (*mesh.FacePaint, bool) {
 
 // pointOnFace intersects the cursor ray with a face's plane.
 func (a *App) pointOnFace(mouseX, mouseY float64, vp render.Viewport, frame geom.Frame) (geom.Vec3, bool) {
+	if a.uv.input {
+		return a.uvPointOnFace(mouseX, mouseY)
+	}
 	origin, dir := a.Camera.Ray(vp.Local(mouseX, mouseY), float64(vp.W), float64(vp.H))
 	denom := dir.Dot(frame.N)
 	if denom > -geom.NormalEps && denom < geom.NormalEps {
@@ -1022,6 +1035,9 @@ func (a *App) FaceView() bool {
 
 // paintCursorOverlay is the texel cursor for this frame, or nil.
 func (a *App) paintCursorOverlay() *render.Overlay {
+	if a.material.open {
+		return nil
+	}
 	if a.paint.tool == paint.ToolPaste && !a.paint.awaitingLock {
 		return a.pixelPastePreview()
 	}
@@ -1107,6 +1123,9 @@ var paintToolKeys = []struct {
 // handlePaintKeys is the paint-mode keyboard map: the tools, the colour swap,
 // and Escape stepping back out (SPEC-UX §1, §13).
 func (a *App) handlePaintKeys(in InputFrame) {
+	if a.material.open {
+		return
+	}
 	if in.Ctrl {
 		if in.KeyPressed(rl.KeyC) {
 			a.CopySelectedPixels()
@@ -1148,6 +1167,9 @@ func (a *App) handlePaintKeys(in InputFrame) {
 
 // paintHint is what the hint bar says in paint mode.
 func (a *App) paintHint() string {
+	if a.material.open {
+		return "Click a face to inspect PBR · Whole ship / Selected face controls the preview · Back to Paint resumes painting"
+	}
 	st := &a.paint
 	if !st.awaitingLock {
 		if st.tool == paint.ToolPaste {

@@ -10,6 +10,8 @@ modeler.exe
 # Runtime / debug artifacts
 /debug/
 /dist/
+/output/
+/.codex-remote-attachments/
 
 # Test scratch (goldens under testdata/golden ARE committed)
 /testdata/tmp/

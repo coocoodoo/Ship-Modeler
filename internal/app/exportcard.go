@@ -1,9 +1,12 @@
 package app
 
 import (
+	"fmt"
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"modeler/internal/geom"
 	"modeler/internal/io"
+	"modeler/internal/model"
 	"modeler/internal/ui"
 )
 
@@ -15,13 +18,18 @@ import (
 // the dialog should offer: picking PNG has to change the filter it opens with.
 // So the card decides the format, then the dialog decides the path.
 
-const exportCardWidth = 260
+const exportCardWidth = 320
 
 // InExport reports whether the export options are open.
 func (a *App) InExport() bool { return a.files.exportOpen }
 
 // BeginExport opens the card.
 func (a *App) BeginExport() {
+	if a.Bus.Review() != nil {
+		a.openWorkflow(a.workflow.face, 0)
+		return
+	}
+	a.workflow.issues = model.MaterialHealth(a.Doc())
 	if len(a.Doc().Bodies) == 0 {
 		a.Toast(ui.Toast{
 			Text: "There is nothing to export yet — sketch and extrude a body first",
@@ -35,6 +43,21 @@ func (a *App) BeginExport() {
 // CancelExport closes it without writing anything.
 func (a *App) CancelExport() { a.files.exportOpen = false }
 
+func (a *App) modelExportScale() float64 {
+	if a.files.exportModelScale == 0 {
+		return 1
+	}
+	return a.files.exportModelScale
+}
+
+func (a *App) SetModelExportScale(scale float64) error {
+	if err := io.ValidateModelExportScale(scale); err != nil {
+		return err
+	}
+	a.files.exportModelScale = scale
+	return nil
+}
+
 // buildExportCard runs the options panel.
 func (a *App) buildExportCard(viewport rl.Rectangle) {
 	formats := io.ExportFormats()
@@ -43,11 +66,14 @@ func (a *App) buildExportCard(viewport rl.Rectangle) {
 	}
 	f := formats[a.files.exportFormat]
 	isPNG := f.Extension == ".png"
+	isProject := io.IsShipFile(f.Extension)
 
 	line := a.UI.Fonts.LineHeight(ui.FontSizeUI) + a.px(2)
-	h := a.px(38) + line + a.px(24+8) + line*3 + a.px(8+28)
+	h := a.px(72) + line + a.px(24+8) + line*3 + a.px(8+28)
 	if isPNG {
 		h += line + a.px(24+6) + a.px(24+6)
+	} else if !isProject {
+		h += line*3 + a.px(34)
 	}
 	box := ui.Rect(
 		viewport.X+viewport.Width-a.px(exportCardWidth)-a.px(ui.Spacing*2),
@@ -70,6 +96,9 @@ func (a *App) buildExportCard(viewport rl.Rectangle) {
 		body.Height -= a.px(v)
 	}
 
+	if a.UI.Button(ui.MakeID("export.health"), row(a.px(30)), fmt.Sprintf("Material health · %d issues", len(a.workflow.issues)), ui.ButtonOpts{}) {
+		a.openWorkflow(a.workflow.face, 2)
+	}
 	a.UI.Text(row(line), "Format", ui.FontSizeSmall, ui.ColorTextDim)
 	labels := make([]string, len(formats))
 	for i, fm := range formats {
@@ -105,6 +134,29 @@ func (a *App) buildExportCard(viewport rl.Rectangle) {
 			a.files.exportAlpha = !a.files.exportAlpha
 		}
 		space(6)
+	} else if !isProject {
+		a.UI.Text(row(line), "Ship scale", ui.FontSizeSmall, ui.ColorTextDim)
+		field, reset := ui.SplitLeft(row(a.px(28)), a.px(236))
+		scale, result := a.UI.DragNumber(ui.MakeID("export.model_scale"), field, a.modelExportScale(), ui.NumberOpts{
+			Unit: "×", Step: .1, FineStep: .01, Min: io.MinModelExportScale, Max: io.MaxModelExportScale, Decimals: 6,
+			Tooltip: "Click to type. 0.5 = half size; 2 = double size. Scales around the model origin.",
+		})
+		if result.Changed {
+			_ = a.SetModelExportScale(scale)
+		}
+		if a.UI.Button(ui.MakeID("export.model_scale.reset"), reset, "Reset", ui.ButtonOpts{}) {
+			_ = a.SetModelExportScale(1)
+		}
+		space(6)
+		bounds := geom.Empty()
+		for _, b := range a.Doc().Bodies {
+			if b.Visible && b.Mesh != nil {
+				bounds = bounds.Union(b.Mesh.AABB())
+			}
+		}
+		size := bounds.Size().Mul(a.modelExportScale())
+		a.UI.Text(row(line), fmt.Sprintf("Size: X %.4g · Y %.4g · Z %.4g u", size.X, size.Y, size.Z), ui.FontSizeSmall, ui.ColorTextDim)
+		a.UI.Text(row(line), "Export only · project stays the same", ui.FontSizeSmall, ui.ColorTextDim)
 	}
 
 	// The caveat, in the card rather than in a README nobody opens.

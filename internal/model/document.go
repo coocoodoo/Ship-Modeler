@@ -24,8 +24,9 @@ const FormatVersion = 1
 // they survive save and load, which is what makes FaceUIDs stable references
 // for paint and boolean provenance (SPEC-DATA §1).
 type Sequences struct {
-	Body   uint32 `json:"body"`
-	Sketch uint32 `json:"sketch"`
+	NotePin uint32 `json:"notePin,omitempty"`
+	Body    uint32 `json:"body"`
+	Sketch  uint32 `json:"sketch"`
 }
 
 // NextBody returns the next body id.
@@ -144,6 +145,8 @@ type Document struct {
 	// thruster positions (the user's request, 2026-08-28). Absent in files
 	// saved before they existed, which the tolerant reader treats as none.
 	Markers []Marker `json:"markers,omitempty"`
+	// NotePins are authoring requests, never game attachment markers.
+	NotePins []NotePin `json:"notePins,omitempty"`
 
 	// DirtySinceSave drives the autosave timer and the close prompt.
 	DirtySinceSave bool `json:"-"`

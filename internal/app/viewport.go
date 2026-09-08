@@ -20,6 +20,9 @@ import (
 // BuildScene assembles this frame's draw list from the document.
 func (a *App) BuildScene() render.Scene {
 	doc := a.Doc()
+	if a.workflow.beforeView && a.Bus.Review() != nil {
+		doc = a.Bus.OriginalDocument()
+	}
 	s := render.Scene{
 		Camera:    a.Camera,
 		DimFactor: 1,
@@ -29,7 +32,10 @@ func (a *App) BuildScene() render.Scene {
 		// the cursor would be a stroke that lands on nothing, on exactly the
 		// meshes where the wires are densest — except for the edge tool, whose
 		// whole job is picking them.
-		PickFacesOnly: a.InPaint() && !a.InEdgePaint(),
+		PickFacesOnly: a.InPaint() && (!a.InEdgePaint() || a.material.open),
+	}
+	if a.material.open {
+		s.Flat = false
 	}
 
 	for _, b := range doc.Bodies {
@@ -48,9 +54,15 @@ func (a *App) BuildScene() render.Scene {
 			// The Textures eye shows the bare geometry under the pixels
 			// (SPEC-UX §13.2). It is a view setting, not an edit: the images
 			// are untouched and the eye puts them straight back.
-			HideTexture: a.paint.hideTextures,
+			HideTexture: a.paint.hideTextures && !a.material.open,
 		}
 		// While an extrude is pending against this body, the body as it would
+		if a.moveTexture.open && a.moveTexture.body == b.ID {
+			if g := a.moveTextureGPU(b); g != nil {
+				d.GPU = g
+			}
+			d.HideTexture = false
+		}
 		// stand after the commit takes its place (V-150). A nil entry is a
 		// body the cut takes entirely — the commit would delete it, so nothing.
 		if g, ok := a.extrude.resultPreview[b.ID]; ok {
@@ -77,12 +89,25 @@ func (a *App) BuildScene() render.Scene {
 		if faces := a.selectedFacesOf(b.ID); len(faces) > 0 {
 			d.SelectedFaces = faces
 		}
+		if review := a.Bus.Review(); review != nil && !a.workflow.beforeView {
+			for _, f := range review.Changed {
+				if f.Body == b.ID {
+					if d.SelectedFaces == nil {
+						d.SelectedFaces = map[mesh.FaceUID]bool{}
+					}
+					d.SelectedFaces[f.Face] = true
+				}
+			}
+		}
 		// A body picked for a boolean is tinted by the part it plays, so the
 		// viewport and the card always agree about what is about to happen.
 		if tint, ok := a.booleanTint(b.ID); ok {
 			d.Tint = tint
 		}
 		s.Bodies = append(s.Bodies, d)
+	}
+	if a.Viewer {
+		return s
 	}
 
 	// The default planes step out of the way entirely while material is being
@@ -523,10 +548,10 @@ func (a *App) handleCameraInput(in InputFrame, vp render.Viewport) {
 	if a.cubeDrag {
 		return
 	}
-	if a.handlePixelPasteRightClick(&in, vp) {
+	if !a.Viewer && a.handlePixelPasteRightClick(&in, vp) {
 		return
 	}
-	if a.handleBodyRightClick(&in, vp) {
+	if !a.Viewer && a.handleBodyRightClick(&in, vp) {
 		return
 	}
 	inViewport := vp.Contains(int(in.MouseX), int(in.MouseY))
@@ -769,6 +794,8 @@ func (a *App) beginSketchFromSelection() {
 // escape walks one level back up the interaction stack (SPEC-UX §1).
 func (a *App) escape() {
 	switch {
+	case a.notePins.armed:
+		a.notePins.armed = false
 	case a.CancelTransform():
 		// A live drag is the innermost thing there is: Escape puts the model
 		// back where it started and records nothing (SPEC-DATA §2).

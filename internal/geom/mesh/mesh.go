@@ -39,11 +39,16 @@ func (u FaceUID) Seq() uint32 { return uint32(u) }
 // (SPEC-GEOMETRY §8.1). The struct lives here because mesh.Face owns it;
 // package paint owns the brush and mapping operations over it.
 type FacePaint struct {
-	Res   int         // 16|32|128|256|512, the chip chosen at creation
-	Texel float64     // world units per texel, fixed at creation
-	Frame geom.Frame  // persistent paint anchor
-	Img   *image.RGBA // alpha 0 means unpainted: the body color shows through
-	Off   image.Point // texel index of Img's origin, so the image can grow
+	Layers      []PaintLayer
+	ActiveLayer int
+	PaintMask   bool
+	PBRStale    bool
+	Material    *Material
+	Res         int         // 16|32|128|256|512, the chip chosen at creation
+	Texel       float64     // world units per texel, fixed at creation
+	Frame       geom.Frame  // persistent paint anchor
+	Img         *image.RGBA // alpha 0 means unpainted: the body color shows through
+	Off         image.Point // texel index of Img's origin, so the image can grow
 }
 
 // UV maps a world point to continuous texel coordinates on this face's texture

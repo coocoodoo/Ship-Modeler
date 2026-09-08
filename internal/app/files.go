@@ -82,10 +82,11 @@ type fileState struct {
 
 	// exportOpen is the options card; exportFormat indexes io.ExportFormats,
 	// and exportScale and exportAlpha apply to the PNG one.
-	exportOpen   bool
-	exportFormat int
-	exportScale  int
-	exportAlpha  bool
+	exportOpen       bool
+	exportFormat     int
+	exportScale      int
+	exportAlpha      bool
+	exportModelScale float64
 
 	// sinceAutosave counts up in milliseconds while the document is dirty.
 	sinceAutosave float64
@@ -103,6 +104,7 @@ type fileState struct {
 // behind by a session that did not end cleanly.
 func (a *App) initFiles() {
 	a.files.exportScale = 1
+	a.files.exportModelScale = 1
 	// A headless run normally looks nowhere: a golden shot must not depend on
 	// whether whoever is running it happens to have crashed this week, and a
 	// recovery card over the viewport would do exactly that. Given its own
@@ -240,6 +242,10 @@ func (act fileAction) verb() string {
 
 // NewDocument replaces everything with an empty document.
 func (a *App) NewDocument() {
+	if a.Bus.Review() != nil {
+		a.openWorkflow(a.workflow.face, 0)
+		return
+	}
 	a.leaveModes()
 	a.Bus.Replace(model.NewDocument())
 	a.Sel.Clear()
@@ -279,6 +285,10 @@ func (a *App) OpenPath(path string) bool { return a.openShip(path, true) }
 // recovery file does not — its path is a hidden folder and a generated name,
 // and neither belongs on the welcome card.
 func (a *App) openShip(path string, remember bool) bool {
+	if a.Bus.Review() != nil {
+		a.openWorkflow(a.workflow.face, 0)
+		return false
+	}
 	res, err := io.LoadShip(path)
 	if err != nil {
 		a.Toast(ui.Toast{Text: capitalize(err.Error()), Kind: ui.ToastError})
@@ -308,6 +318,9 @@ func (a *App) openShip(path string, remember bool) bool {
 // Save writes the document where it already lives, asking for a place the
 // first time.
 func (a *App) Save() bool {
+	if a.Viewer {
+		return false
+	}
 	if a.files.path == "" || a.files.readOnly {
 		return a.SaveAs()
 	}
@@ -321,6 +334,9 @@ func (a *App) Save() bool {
 // save-before-acting step (V-143) has to see a plain "no" so it leaves the
 // document alone.
 func (a *App) SaveAs() bool {
+	if a.Viewer {
+		return false
+	}
 	if a.Headless {
 		return false
 	}
@@ -341,6 +357,15 @@ func (a *App) SaveAs() bool {
 
 // saveTo does the write, with a fresh thumbnail of the current view.
 func (a *App) saveTo(path string) bool {
+	if a.Bus.Review() != nil {
+		a.workflowError(fmt.Errorf("accept or reject the AI request before saving"))
+		a.openWorkflow(a.workflow.face, 0)
+		return false
+	}
+	a.workflow.issues = model.MaterialHealth(a.Doc())
+	if a.Viewer {
+		return false
+	}
 	a.captureCameraState()
 	if err := io.SaveShip(path, a.Doc(), a.thumbnail()); err != nil {
 		a.Toast(ui.Toast{Text: capitalize(err.Error()), Kind: ui.ToastError})
@@ -357,7 +382,11 @@ func (a *App) saveTo(path string) bool {
 	a.Settings.LastDir = filepath.Dir(path)
 	a.Settings.AddRecentFile(path)
 	a.saveSettings()
-	a.Toast(ui.Toast{Text: "Saved " + filepath.Base(path)})
+	if len(a.workflow.issues) > 0 {
+		a.Toast(ui.Toast{Text: fmt.Sprintf("Saved %s · %d material issues in Workshop / Health", filepath.Base(path), len(a.workflow.issues)), Kind: ui.ToastWarn})
+	} else {
+		a.Toast(ui.Toast{Text: "Saved " + filepath.Base(path)})
+	}
 	return true
 }
 
@@ -436,6 +465,8 @@ func (a *App) applyCameraState(s model.CameraState) {
 // leaveModes puts every transient tool away before the document underneath it
 // is replaced.
 func (a *App) leaveModes() {
+	a.closeMoveTexture()
+	a.notePins = notePinState{}
 	a.markers.attachmentOpen, a.markers.armed = false, false
 	a.library.menu = bodyMenuState{}
 	a.dropLibraryPreview()
@@ -474,7 +505,7 @@ func (a *App) forgetRecent(path string) {
 // stepAutosave counts down the interval and writes a recovery copy when the
 // document has unsaved work in it.
 func (a *App) stepAutosave(dtMillis float64) {
-	if a.Headless || !a.Doc().DirtySinceSave {
+	if a.Viewer || a.Headless || !a.Doc().DirtySinceSave {
 		a.files.sinceAutosave = 0
 		return
 	}
@@ -515,7 +546,7 @@ func (a *App) writeAutosave(crash bool) {
 	a.captureCameraState()
 	// No thumbnail: a recovery file is opened from a list of names, and
 	// rendering one costs a frame that a crash handler does not have.
-	if err := io.SaveShip(path, a.Doc(), nil); err != nil {
+	if err := io.SaveShip(path, a.Bus.OriginalDocument(), nil); err != nil {
 		return
 	}
 	_ = io.WriteSidecar(path, a.files.path, crash)
@@ -588,16 +619,7 @@ func (a *App) runExport() {
 		return
 	}
 
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".png":
-		err = a.exportPNG(path)
-	case ".stl":
-		err = io.ExportSTL(path, a.Doc())
-	case ".glb", ".gltf":
-		err = io.ExportGLTF(path, a.Doc())
-	default:
-		err = io.ExportOBJ(path, a.Doc())
-	}
+	err = a.ExportTo(path, a.files.exportScale, a.files.exportAlpha)
 	if err != nil {
 		a.Toast(ui.Toast{Text: capitalize(err.Error()), Kind: ui.ToastError})
 		return
@@ -730,19 +752,27 @@ func WriteCrashLog(panicValue any, savedTo string) string {
 // ExportTo writes an export chosen by its extension, which is what the export
 // op and the dialog both come down to.
 func (a *App) ExportTo(path string, scale int, transparent bool) error {
+	if a.Bus.Review() != nil {
+		return fmt.Errorf("accept or reject the AI request before exporting")
+	}
+	a.workflow.issues = model.MaterialHealth(a.Doc())
 	if scale < 1 {
 		scale = 1
 	}
 	switch strings.ToLower(filepath.Ext(path)) {
+	case io.ShipExtension, io.LegacyShipExtension:
+		// A project package includes authoring data and all hidden bodies too.
+		// Never route this suffix through OBJ/glTF's external texture writers.
+		return io.SaveShip(path, a.Doc(), a.thumbnail())
 	case ".png":
 		a.files.exportScale, a.files.exportAlpha = scale, transparent
 		return a.exportPNG(path)
 	case ".stl":
-		return io.ExportSTL(path, a.Doc())
+		return io.ExportSTL(path, a.Doc(), a.modelExportScale())
 	case ".glb", ".gltf":
-		return io.ExportGLTF(path, a.Doc())
+		return io.ExportGLTF(path, a.Doc(), a.modelExportScale())
 	case ".obj":
-		return io.ExportOBJ(path, a.Doc())
+		return io.ExportOBJ(path, a.Doc(), a.modelExportScale())
 	}
 	return fmt.Errorf("%s is not a format this exports", filepath.Ext(path))
 }
@@ -797,6 +827,11 @@ const (
 // has never seen, under a name they did not choose. Work that has a name it
 // could be saved under deserves to be asked about.
 func (a *App) RequestClose() {
+	if a.Bus.Review() != nil {
+		a.workflowError(fmt.Errorf("accept or reject the pending AI request before closing"))
+		a.openWorkflow(a.workflow.face, 0)
+		return
+	}
 	if !a.Doc().DirtySinceSave {
 		a.closing = closeConfirmed
 		return

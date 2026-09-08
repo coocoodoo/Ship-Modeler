@@ -60,8 +60,9 @@ func stampRect(p *mesh.FacePaint, tile *image.RGBA, at image.Point, clip image.R
 // commits once, so the history holds "a trail" and not one entry per cell
 // (SPEC-DATA §3.2, §3.3).
 type StampFace struct {
-	Body uint32
-	Face mesh.FaceUID
+	beforeStale bool
+	Body        uint32
+	Face        mesh.FaceUID
 
 	// Res is the chip a first stamp allocates at, ignored once the face has a
 	// texture (SPEC-GEOMETRY §8.2).
@@ -130,6 +131,7 @@ func (c *StampFace) Do(doc *model.Document) error {
 			m.Faces[fi].Paint = c.paint
 		}
 		Blit(c.paint, c.rect, c.after)
+		c.paint.PBRStale = true
 		return nil
 	}
 
@@ -181,6 +183,8 @@ func (c *StampFace) Do(doc *model.Document) error {
 	}
 	c.paint, c.allocated = p, allocated
 	c.rect, c.before, c.after = wrote, before, after
+	c.beforeStale = p.PBRStale
+	p.PBRStale = true
 	return nil
 }
 
@@ -196,6 +200,7 @@ func (c *StampFace) Undo(doc *model.Document) {
 		return
 	}
 	Blit(c.paint, c.rect, c.before)
+	c.paint.PBRStale = c.beforeStale
 }
 
 func (c *StampFace) Events() []model.Event {
@@ -206,3 +211,6 @@ func (c *StampFace) Events() []model.Event {
 		Kind: model.EvBodyPainted, BodyID: c.Body, Paint: c.paint, Rect: c.rect,
 	}}
 }
+
+func (c *StampFace) TargetFace() (uint32, mesh.FaceUID) { return c.Body, c.Face }
+func (c *StampFace) PaintsLayer() bool                  { return true }

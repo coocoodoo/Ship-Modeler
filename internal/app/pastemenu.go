@@ -50,6 +50,9 @@ func (a *App) pixelPasteMenuOpen() bool {
 // A short right-click opens the menu. Crossing the drag threshold hands the
 // same press back to camera navigation, preserving right-drag orbit and pan.
 func (a *App) handlePixelPasteRightClick(in *InputFrame, vp render.Viewport) bool {
+	if a.material.open {
+		return false
+	}
 	st := &a.paint.pixels.menu
 	if !a.InPaint() || a.paint.tool != paint.ToolPaste || a.paint.awaitingLock || a.paint.pixels.clipboard == nil {
 		*st = pasteMenuState{}

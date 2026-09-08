@@ -1,0 +1,112 @@
+[
+  {
+    "op": "file.new"
+  },
+  {
+    "op": "sketch.begin",
+    "plane": "Top"
+  },
+  {
+    "op": "sketch.rect",
+    "a": [
+      -2,
+      -2
+    ],
+    "b": [
+      2,
+      2
+    ]
+  },
+  {
+    "op": "extrude",
+    "depth": 2,
+    "result": "new"
+  },
+  {
+    "op": "camera.view",
+    "view": "iso"
+  },
+  {
+    "op": "camera.frame"
+  },
+  {
+    "op": "settle"
+  },
+  {
+    "op": "deselect"
+  },
+  {
+    "op": "wait",
+    "frames": 180
+  },
+  {
+    "op": "click",
+    "kind": "right",
+    "at": [
+      680,
+      300
+    ]
+  },
+  {
+    "op": "shot",
+    "name": "drop_pin_menu"
+  },
+  {
+    "op": "click",
+    "at": [
+      740,
+      317
+    ]
+  },
+  {
+    "op": "wait",
+    "frames": 30
+  },
+  {
+    "op": "shot",
+    "name": "drop_pin_editor"
+  },
+  {
+    "op": "click",
+    "at": [
+      700,
+      292
+    ]
+  },
+  {
+    "op": "ui.type",
+    "name": "Add a copper vent at this exact point."
+  },
+  {
+    "op": "click",
+    "at": [
+      950,
+      574
+    ]
+  },
+  {
+    "op": "dump"
+  },
+  {
+    "op": "shot",
+    "name": "drop_pin_saved"
+  },
+  {
+    "op": "click",
+    "kind": "right",
+    "at": [
+      800,
+      300
+    ]
+  },
+  {
+    "op": "click",
+    "at": [
+      845,
+      370
+    ]
+  },
+  {
+    "op": "dump"
+  }
+]

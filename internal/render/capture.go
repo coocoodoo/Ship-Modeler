@@ -32,6 +32,10 @@ func (r *Renderer) Capture(s *Scene, opts CaptureOpts) *image.RGBA {
 	if opts.W <= 0 || opts.H <= 0 || s == nil {
 		return nil
 	}
+	// Debug map views must not leak into project thumbnails or model exports.
+	materialView := r.MaterialView
+	r.MaterialView = 0
+	defer func() { r.MaterialView = materialView }()
 	rt := rl.LoadRenderTexture(int32(opts.W), int32(opts.H))
 	defer rl.UnloadRenderTexture(rt)
 

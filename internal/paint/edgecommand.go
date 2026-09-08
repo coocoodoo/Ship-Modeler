@@ -162,6 +162,11 @@ func (c *StrokeEdges) Do(doc *model.Document) error {
 			work[fi] = append(work[fi], seg{wa, wb})
 		}
 	}
+	for fi := range work {
+		if p := m.Faces[fi].Paint; p != nil && len(p.Layers) > 0 {
+			return fmt.Errorf("use the Line tool to paint edges on an editable layer")
+		}
+	}
 	if len(work) == 0 {
 		return fmt.Errorf("those edges touch no faces")
 	}

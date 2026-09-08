@@ -47,6 +47,18 @@ To build one yourself:
 The hint bar at the bottom always says what to do next. If a control is greyed
 out, its tooltip says how to turn it on.
 
+**UV Map**, at the bottom right, opens a 2D view of the selected body's faces
+and the Paint sidebar. Choose another body from the viewer's dropdown. Use the
+mouse wheel or **− / +** to zoom, middle-drag or Space+left-drag to pan,
+**Fit** for all faces, **Face** for the last pointed face, and **Size** to expand
+the viewer. **Grid** shows individual texels when zoomed in. All Paint tools,
+including selection/copy/paste, tile stamps, wand and edge painting, use the
+same textures and Undo history as the 3D view. Ctrl+wheel rotates a paste by
+90°; right-click opens its corner, rotation and cancel menu. Mirror controls
+remain in the Paint sidebar.
+The sheet displays existing face mappings; arranging this view does not
+rearrange the exported texture atlas.
+
 ## Working with solids
 
 To **chamfer solid edges**, click an edge and choose **Chamfer edges…** in
@@ -243,8 +255,17 @@ edge covers, and the brush's alpha lands on all of them.
 
 Exports carry the same promise as far as the format allows:
 
+For 3D formats, the Export dialog has a **Ship scale** multiplier and an X/Y/Z
+size readout. Click the multiplier to type (0.5× halves the size; 2× doubles it),
+or drag to adjust. Reset returns to 1×. Scaling uses the model origin and affects
+exported geometry and glTF attachment positions, preserving textures and PBR
+maps. It does not resize the project. PNG keeps its separate image-scale control.
+
 - **glTF** (`.glb` or `.gltf`) writes `NEAREST` filtering into the file, so an
-  engine loads it looking right without being told.
+  engine loads it looking right without being told. Both options are available
+  in Export and include PBR materials. Choose **glb** for one self-contained
+  file, or **gltf** for separate files; keep the `.gltf`, matching `.bin`, and
+  `paint` folder together when moving or importing the export.
 - **OBJ** (`+ .mtl + paint/*.png`) has no way to say that, so set your renderer
   to nearest filtering by hand. The file says so in its header.
 - **STL** is geometry only — the format carries no colour at all.
@@ -253,11 +274,15 @@ Exports carry the same promise as far as the format allows:
 
 ## Files
 
-Ships are saved as `.pxm` ("pixel model"): a zip holding the document, one
-PNG per painted face, a thumbnail — and a `game/` folder made for game
-engines: `ship.glb` (the render-ready model, textures embedded, NEAREST
-filtering baked in) and `markers.json` (the orientation dots and everything
-derived from them). Files saved under the old `.ship` name still open.
+Save and **Export → pxm** write a single compressed ZIP with the `.pxm`
+("pixel model") extension. It contains the complete document, geometry,
+sketches, hidden bodies, base-color textures, PBR maps, note pins, attachment
+markers, and a thumbnail when available. No companion folder is needed.
+The `paint/` and `game/` paths are inside the archive. The embedded game payload
+contains `ship.glb` (render-ready geometry and textures) and `markers.json`.
+Project exports preserve authored dimensions; Ship scale applies to GLB/glTF,
+OBJ, and STL. Older stored ZIP `.pxm` and `.ship` files still open.
+Game loaders must support standard ZIP Deflate compression (method 8).
 
 The **Markers** section of the tree places the dots a game engine reads: one
 for the ship's front, one for its top, and one per thruster. Each dot lands
@@ -374,3 +399,5 @@ Patina's in `third_party/patina/`.
 The 32-colour palette is original to this program: four ramps of eight, tuned
 for hull plating rather than for covering the colour wheel. Lospec `.hex`
 palettes can be imported over it, or chosen from the bundled library.
+
+Model notes: **Pins**, immediately left of **UV Map**, lets you drop numbered text notes onto a face. Click a pin to edit, mark done, or delete it. Notes save with the project, follow body transformations, and are readable through the AI connection when you ask the assistant to work on the model.

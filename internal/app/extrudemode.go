@@ -572,7 +572,9 @@ func (a *App) updateExtrude(in InputFrame, vp render.Viewport) {
 		return
 	}
 	length := a.arrowLength(vp)
-	ax, ay, bx, by, ok := scene.ArrowScreenEnds(a.Camera, vp, t.Origin, t.ArrowDirection(), length)
+	// Keep the input axis fixed even when the visual arrow flips at zero.
+	// BeginDrag's saved position and every update must use the same direction.
+	ax, ay, bx, by, ok := scene.ArrowScreenEnds(a.Camera, vp, t.Origin, t.Axis, length)
 	if !ok {
 		return
 	}
@@ -587,9 +589,6 @@ func (a *App) updateExtrude(in InputFrame, vp render.Viewport) {
 		if in.Down[MouseLeft] {
 			// One screen pixel along the arrow is this much depth.
 			unitsPerPixel := length / tools.ArrowScreenLength
-			if t.Flipped() {
-				unitsPerPixel = -unitsPerPixel
-			}
 			t.UpdateDrag(along, unitsPerPixel, snapStep(in))
 			a.rebuildExtrudePreview()
 		} else {

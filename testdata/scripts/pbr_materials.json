@@ -1,0 +1,395 @@
+[
+  {
+    "op": "file.new"
+  },
+  {
+    "op": "view.shading",
+    "on": true
+  },
+  {
+    "op": "sketch.begin",
+    "plane": "Top"
+  },
+  {
+    "op": "sketch.rect",
+    "a": [
+      -2,
+      -2
+    ],
+    "b": [
+      2,
+      2
+    ]
+  },
+  {
+    "op": "extrude",
+    "depth": 2,
+    "result": "new"
+  },
+  {
+    "op": "camera.view",
+    "view": "iso"
+  },
+  {
+    "op": "camera.frame"
+  },
+  {
+    "op": "settle"
+  },
+  {
+    "op": "deselect"
+  },
+  {
+    "op": "paint.res",
+    "res": 32
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 0,
+    "kind": "base_color",
+    "path": "testdata/fixtures/pbr/base_color.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 0,
+    "kind": "specular",
+    "path": "testdata/fixtures/pbr/specular.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 0,
+    "kind": "ao",
+    "path": "testdata/fixtures/pbr/ao.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 0,
+    "kind": "height",
+    "path": "testdata/fixtures/pbr/height.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 0,
+    "kind": "roughness",
+    "path": "testdata/fixtures/pbr/roughness.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 0,
+    "kind": "normal",
+    "path": "testdata/fixtures/pbr/normal.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 1,
+    "kind": "base_color",
+    "path": "testdata/fixtures/pbr/base_color.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 1,
+    "kind": "specular",
+    "path": "testdata/fixtures/pbr/specular.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 1,
+    "kind": "ao",
+    "path": "testdata/fixtures/pbr/ao.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 1,
+    "kind": "height",
+    "path": "testdata/fixtures/pbr/height.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 1,
+    "kind": "roughness",
+    "path": "testdata/fixtures/pbr/roughness.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 1,
+    "kind": "normal",
+    "path": "testdata/fixtures/pbr/normal.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 2,
+    "kind": "base_color",
+    "path": "testdata/fixtures/pbr/base_color.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 2,
+    "kind": "specular",
+    "path": "testdata/fixtures/pbr/specular.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 2,
+    "kind": "ao",
+    "path": "testdata/fixtures/pbr/ao.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 2,
+    "kind": "height",
+    "path": "testdata/fixtures/pbr/height.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 2,
+    "kind": "roughness",
+    "path": "testdata/fixtures/pbr/roughness.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 2,
+    "kind": "normal",
+    "path": "testdata/fixtures/pbr/normal.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 3,
+    "kind": "base_color",
+    "path": "testdata/fixtures/pbr/base_color.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 3,
+    "kind": "specular",
+    "path": "testdata/fixtures/pbr/specular.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 3,
+    "kind": "ao",
+    "path": "testdata/fixtures/pbr/ao.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 3,
+    "kind": "height",
+    "path": "testdata/fixtures/pbr/height.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 3,
+    "kind": "roughness",
+    "path": "testdata/fixtures/pbr/roughness.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 3,
+    "kind": "normal",
+    "path": "testdata/fixtures/pbr/normal.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 4,
+    "kind": "base_color",
+    "path": "testdata/fixtures/pbr/base_color.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 4,
+    "kind": "specular",
+    "path": "testdata/fixtures/pbr/specular.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 4,
+    "kind": "ao",
+    "path": "testdata/fixtures/pbr/ao.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 4,
+    "kind": "height",
+    "path": "testdata/fixtures/pbr/height.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 4,
+    "kind": "roughness",
+    "path": "testdata/fixtures/pbr/roughness.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 4,
+    "kind": "normal",
+    "path": "testdata/fixtures/pbr/normal.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 5,
+    "kind": "base_color",
+    "path": "testdata/fixtures/pbr/base_color.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 5,
+    "kind": "specular",
+    "path": "testdata/fixtures/pbr/specular.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 5,
+    "kind": "ao",
+    "path": "testdata/fixtures/pbr/ao.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 5,
+    "kind": "height",
+    "path": "testdata/fixtures/pbr/height.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 5,
+    "kind": "roughness",
+    "path": "testdata/fixtures/pbr/roughness.png"
+  },
+  {
+    "op": "material.import",
+    "body": "Body 1",
+    "face": 5,
+    "kind": "normal",
+    "path": "testdata/fixtures/pbr/normal.png"
+  },
+  {
+    "op": "wait",
+    "frames": 90
+  },
+  {
+    "op": "shot",
+    "name": "material_shaded"
+  },
+  {
+    "op": "material.preview",
+    "kind": "base_color"
+  },
+  {
+    "op": "shot",
+    "name": "material_base_color"
+  },
+  {
+    "op": "material.preview",
+    "kind": "specular"
+  },
+  {
+    "op": "shot",
+    "name": "material_specular"
+  },
+  {
+    "op": "material.preview",
+    "kind": "ao"
+  },
+  {
+    "op": "shot",
+    "name": "material_ao"
+  },
+  {
+    "op": "material.preview",
+    "kind": "height"
+  },
+  {
+    "op": "shot",
+    "name": "material_height"
+  },
+  {
+    "op": "material.preview",
+    "kind": "roughness"
+  },
+  {
+    "op": "shot",
+    "name": "material_roughness"
+  },
+  {
+    "op": "material.preview",
+    "kind": "normal"
+  },
+  {
+    "op": "shot",
+    "name": "material_normal"
+  },
+  {
+    "op": "material.preview",
+    "kind": "shaded"
+  },
+  {
+    "op": "material.open",
+    "body": "Body 1",
+    "face": 1
+  },
+  {
+    "op": "settle"
+  },
+  {
+    "op": "shot",
+    "name": "material_panel"
+  },
+  {
+    "op": "material.export",
+    "body": "Body 1",
+    "face": 1,
+    "kind": "base_color",
+    "path": "testdata/tmp/pbr-authoring/base_color.png"
+  },
+  {
+    "op": "material.export_set",
+    "body": "Body 1",
+    "face": 1,
+    "path": "testdata/tmp/pbr-authoring/textures.zip"
+  },
+  {
+    "op": "wheel",
+    "at": [
+      1160,
+      570
+    ],
+    "degrees": -3
+  },
+  {
+    "op": "shot",
+    "name": "material_export_controls"
+  }
+]

@@ -13,8 +13,15 @@ import (
 // Renderer owns every GPU resource: shaders, materials, the pick render texture
 // and the shared 1x1 textures. One instance lives for the whole process.
 type Renderer struct {
-	shaded rl.Shader
-	pick   rl.Shader
+	// MaterialView: 0 shaded, 1 base, 2 specular, 3 AO, 4 height, 5 roughness, 6 normal.
+	MaterialView                 int
+	MaterialFaceOnly             bool
+	MaterialBody                 uint32
+	MaterialFace                 mesh.FaceUID
+	locMaterialFace              int32
+	locMaterial, locMaterialView int32
+	shaded                       rl.Shader
+	pick                         rl.Shader
 
 	locTint       int32
 	locAlphaScale int32
@@ -72,6 +79,11 @@ func NewRenderer() *Renderer {
 	r.pick = rl.LoadShaderFromMemory(shadedVS, pickFS)
 
 	r.locTint = rl.GetShaderLocation(r.shaded, "tint")
+	r.locMaterial = rl.GetShaderLocation(r.shaded, "useMaterial")
+	r.locMaterialView = rl.GetShaderLocation(r.shaded, "materialView")
+	r.locMaterialFace = rl.GetShaderLocation(r.shaded, "materialFace")
+	r.shaded.UpdateLocation(rl.ShaderLocMapNormal, rl.GetShaderLocation(r.shaded, "normalAOMap"))
+	r.shaded.UpdateLocation(rl.ShaderLocMapRoughness, rl.GetShaderLocation(r.shaded, "propertiesMap"))
 	r.locAlphaScale = rl.GetShaderLocation(r.shaded, "alphaScale")
 	r.locUseTexture = rl.GetShaderLocation(r.shaded, "useTexture")
 	r.locAOStrength = rl.GetShaderLocation(r.shaded, "aoStrength")
@@ -250,6 +262,29 @@ func (r *Renderer) drawBody(b *BodyDraw, dim float64) {
 	}
 	r.shadedMat.GetMap(rl.MapDiffuse).Texture = tex
 	r.shadedMat.GetMap(rl.MapDiffuse).Color = col
+	material := float32(0)
+	r.shadedMat.GetMap(rl.MapNormal).Texture = r.blankTex
+	r.shadedMat.GetMap(rl.MapRoughness).Texture = r.blankTex
+	if textured && b.GPU.Paint.hasMaterial {
+		material = 1
+		r.shadedMat.GetMap(rl.MapNormal).Texture = b.GPU.Paint.normalsTex
+		r.shadedMat.GetMap(rl.MapRoughness).Texture = b.GPU.Paint.propertiesTex
+	}
+	rl.SetShaderValue(r.shaded, r.locMaterial, []float32{material}, rl.ShaderUniformFloat)
+	view, face := float32(r.MaterialView), float32(-1)
+	if r.MaterialFaceOnly {
+		view = 0
+		if b.BodyID == r.MaterialBody {
+			for i, uid := range b.GPU.FaceUIDs {
+				if uid == r.MaterialFace {
+					face, view = float32(i), float32(r.MaterialView)
+					break
+				}
+			}
+		}
+	}
+	rl.SetShaderValue(r.shaded, r.locMaterialView, []float32{view}, rl.ShaderUniformFloat)
+	rl.SetShaderValue(r.shaded, r.locMaterialFace, []float32{face}, rl.ShaderUniformFloat)
 	rl.SetShaderValue(r.shaded, r.locTint, colorToVec4(b.Tint), rl.ShaderUniformVec4)
 	rl.SetShaderValue(r.shaded, r.locAlphaScale, []float32{float32(b.Alpha)}, rl.ShaderUniformFloat)
 	rl.SetShaderValue(r.shaded, r.locUseTexture, []float32{use}, rl.ShaderUniformFloat)

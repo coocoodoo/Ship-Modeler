@@ -133,6 +133,25 @@ func Resample(m *mesh.Mesh, fi int, src *mesh.FacePaint, res int) (*mesh.FacePai
 	if src == nil {
 		return out, nil
 	}
+	if src.Material != nil {
+		out.Material = &mesh.Material{Maps: map[string]*mesh.MaterialMap{}}
+		for kind := range src.Material.Maps {
+			img := image.NewRGBA(out.Img.Bounds())
+			for y := 0; y < img.Rect.Dy(); y++ {
+				for x := 0; x < img.Rect.Dx(); x++ {
+					uv := src.UV(World(out, image.Pt(x+out.Off.X, y+out.Off.Y)))
+					c := src.Material.Sample(kind, uv.X, uv.Y)
+					if kind == "normal" {
+						n := src.Frame.U.Normalize().Mul(float64(c.R)/127.5 - 1).Add(src.Frame.V.Normalize().Mul(float64(c.G)/127.5 - 1)).Add(src.Frame.N.Normalize().Mul(float64(c.B)/127.5 - 1)).Normalize()
+						encode := func(v float64) uint8 { return uint8(max(0, min(255, int(math.Round((v+1)*127.5))))) }
+						c.R, c.G, c.B = encode(n.Dot(out.Frame.U.Normalize())), encode(n.Dot(out.Frame.V.Normalize())), encode(n.Dot(out.Frame.N.Normalize()))
+					}
+					img.SetRGBA(x, y, c)
+				}
+			}
+			out.Material.Maps[kind] = &mesh.MaterialMap{Bounds: out.TexelBounds(), Image: img}
+		}
+	}
 	b := out.Img.Bounds()
 	for y := 0; y < b.Dy(); y++ {
 		for x := 0; x < b.Dx(); x++ {
@@ -142,6 +161,35 @@ func Resample(m *mesh.Mesh, fi int, src *mesh.FacePaint, res int) (*mesh.FacePai
 			}
 		}
 	}
+
+	out.PBRStale = src.PBRStale
+	out.ActiveLayer = src.ActiveLayer
+	out.PaintMask = src.PaintMask
+	out.Layers = append([]mesh.PaintLayer(nil), src.Layers...)
+	for i, l := range src.Layers {
+		for _, mask := range []bool{false, true} {
+			img := l.Pixels
+			if mask {
+				img = l.Mask
+			}
+			if img == nil {
+				continue
+			}
+			dst := image.NewRGBA(out.Img.Bounds())
+			for y := 0; y < dst.Rect.Dy(); y++ {
+				for x := 0; x < dst.Rect.Dx(); x++ {
+					uv := Texel(src, World(out, image.Pt(x+out.Off.X, y+out.Off.Y)))
+					dst.SetRGBA(x, y, img.RGBAAt(uv.X-src.Off.X, uv.Y-src.Off.Y))
+				}
+			}
+			if mask {
+				out.Layers[i].Mask = dst
+			} else {
+				out.Layers[i].Pixels = dst
+			}
+		}
+	}
+	out.CompositeLayers()
 	return out, nil
 }
 

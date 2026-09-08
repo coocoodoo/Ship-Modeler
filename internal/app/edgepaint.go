@@ -41,7 +41,7 @@ type edgeRef struct {
 
 // InEdgePaint reports whether the edge tool is the armed one.
 func (a *App) InEdgePaint() bool {
-	return a.InPaint() && a.paint.tool == paint.ToolEdge
+	return a.InPaint() && !a.material.open && a.paint.tool == paint.ToolEdge
 }
 
 // toggleEdge adds an edge to the selection, or takes it out again — and it
@@ -113,6 +113,10 @@ func (a *App) ClearEdgeSelection() bool {
 // edge win the pixel under the cursor would be a stroke that landed on
 // nothing. This tool wants exactly the opposite, so it says so.
 func (a *App) pickPaintEdge(in InputFrame, vp render.Viewport) {
+	if a.uv.input {
+		a.pickUVEdge(in)
+		return
+	}
 	a.paint.hoverEdge = -1
 	a.paint.hoverEdgeBody = 0
 	if !vp.Contains(int(in.MouseX), int(in.MouseY)) ||

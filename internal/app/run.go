@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"modeler/assets"
@@ -56,6 +57,15 @@ func Run() {
 }
 
 func RunWithAI(enableAI bool) {
+	_ = RunStartup(enableAI, StartupOptions{})
+}
+
+type StartupOptions struct {
+	Path   string
+	Viewer bool
+}
+
+func RunStartup(enableAI bool, startup StartupOptions) error {
 	a := New(false)
 	defer a.Close()
 	a.box.init()
@@ -64,7 +74,21 @@ func RunWithAI(enableAI bool) {
 	// here meant every launch opened on three debug boxes and the welcome card
 	// — New, Open, the sample ship, the recents — could never show at all.
 	a.applySavedWindow()
+	// Restore the preferred monitor first, then maximize every visible launch.
+	// Hidden automation/capture windows retain their requested dimensions.
+	if !rl.IsWindowHidden() {
+		rl.MaximizeWindow()
+	}
 	a.layout = a.Layout(rl.GetRenderWidth(), rl.GetRenderHeight())
+	if startup.Path != "" {
+		if !a.OpenPath(startup.Path) {
+			return fmt.Errorf("could not open project %q", startup.Path)
+		}
+		if startup.Viewer {
+			a.enterViewer()
+		}
+		a.layout = a.Layout(rl.GetRenderWidth(), rl.GetRenderHeight())
+	}
 	a.FrameSelection(a.layout.RenderViewport())
 	if enableAI {
 		if err := a.startAI(); err != nil {
@@ -117,6 +141,7 @@ func RunWithAI(enableAI bool) {
 		a.writeDueAutosave()
 		a.stepClose()
 		a.processAI()
+		a.processInspection()
 
 		if want := a.WindowTitle(); want != title {
 			rl.SetWindowTitle(want)
@@ -125,10 +150,14 @@ func RunWithAI(enableAI bool) {
 	}
 	// Leaving on purpose is not a crash: there is nothing to recover.
 	a.clearAutosave()
+	return nil
 }
 
 // WindowTitle is what the OS window is called: the document, then the program.
 func (a *App) WindowTitle() string {
+	if a.Viewer {
+		return a.DocumentTitle() + " — Modeler Viewer"
+	}
 	return a.DocumentTitle() + " — " + WindowTitle
 }
 

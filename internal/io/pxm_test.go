@@ -15,8 +15,8 @@ import (
 
 // The .pxm game payload (the user's request, 2026-08-28): the file an engine
 // consumes without knowing this program exists. These pin the three promises
-// the format makes — the payload is there, it is STORED so a dependency-free
-// reader can take it, and the numbers in it are the ones an engine needs.
+// the format makes — the payload is there, the archive is compressed and
+// self-contained, and the numbers in it are the ones an engine needs.
 
 // markedDoc is shipDoc with the three orientation dots placed: front out the
 // +X end, top on the +Y roof, one thruster firing out the -X stern.
@@ -45,7 +45,7 @@ func zipMembers(t *testing.T, path string) map[string]*zip.File {
 	return out
 }
 
-func TestPXMCarriesTheGamePayloadStored(t *testing.T) {
+func TestPXMCarriesTheGamePayloadCompressed(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "scout.pxm")
 	if err := SaveShip(path, markedDoc(t), nil); err != nil {
 		t.Fatalf("save: %v", err)
@@ -57,14 +57,14 @@ func TestPXMCarriesTheGamePayloadStored(t *testing.T) {
 		if !ok {
 			t.Fatalf("the .pxm has no %s — the payload is the point of the format", want)
 		}
-		if f.Method != zip.Store {
-			t.Errorf("%s is compressed (method %d) — the engine's reader is stored-only by design", want, f.Method)
+		if f.Method != zip.Deflate {
+			t.Errorf("%s is not compressed (method %d)", want, f.Method)
 		}
 	}
-	// Every member, in fact: the whole file must be readable without inflate.
+	// Every entry, including document data, uses standard ZIP compression.
 	for name, f := range members {
-		if f.Method != zip.Store {
-			t.Errorf("%s is compressed — the archive promises stored-only", name)
+		if f.Method != zip.Deflate {
+			t.Errorf("%s is not compressed", name)
 		}
 	}
 

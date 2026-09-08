@@ -103,6 +103,8 @@ func TestTexelSizeSurvivesTranslateAndQuarterTurn(t *testing.T) {
 
 	x := geom.Translate(geom.Vec3{X: 5, Y: 0, Z: -2}).Mul(geom.RotateY(math.Pi / 2))
 	mesh.Transform(m, x)
+	// Rigid edits replace the mapping so mesh/undo snapshots retain theirs.
+	p = m.Faces[fi].Paint
 
 	if p.Texel != texelBefore {
 		t.Errorf("texel size changed under a rigid motion: %v -> %v", texelBefore, p.Texel)

@@ -10,6 +10,7 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 	"modeler/internal/bridge"
 	"modeler/internal/geom"
+	"modeler/internal/geom/mesh"
 	"modeler/internal/io"
 	"modeler/internal/ui"
 )
@@ -124,6 +125,9 @@ func (a *App) runAIRequest(req bridge.Request, dir string) (result any, err erro
 		defer runner.Close()
 		completed := 0
 		for _, op := range script.Ops {
+			if a.Bus.Review() != nil && (op.Op == "click" || op.Op == "ui.key" || op.Op == "drag" || op.Op == "mouse.down" || op.Op == "mouse.up" || op.Op == "drag.release" || op.Op == "wheel") {
+				return map[string]any{"completed": completed, "state": a.aiState()}, fmt.Errorf("use face commands during a request; approval and scope expansion are reserved for the user")
+			}
 			if err := runner.runOp(op); err != nil {
 				return map[string]any{"completed": completed, "checkpoint": checkpoint, "state": a.aiState()}, err
 			}
@@ -182,7 +186,11 @@ func (a *App) aiState() map[string]any {
 				face := map[string]any{"index": fi, "id": fmt.Sprint(f.ID), "normal": b.Mesh.FaceNormal(fi), "loops": f.Loops}
 				if f.Paint != nil {
 					p := f.Paint
+					face["layers"] = layerMetadata(p)
 					face["paint"] = map[string]any{"resolution": p.Res, "texelSize": p.Texel, "frame": p.Frame, "offset": p.Off, "bounds": p.TexelBounds()}
+					if p.Material != nil {
+						face["material"] = p.Material
+					}
 				}
 				faces = append(faces, face)
 			}
@@ -190,8 +198,9 @@ func (a *App) aiState() map[string]any {
 		}
 		bodies = append(bodies, entry)
 	}
-	return map[string]any{"document": a.DocumentName(), "path": a.files.path, "dirty": doc.DirtySinceSave, "mode": a.modeName(),
-		"bodies": bodies, "sketches": doc.Sketches, "markers": doc.Markers, "planes": doc.Planes, "selection": a.Sel.Refs(),
+	return map[string]any{"document": a.DocumentName(), "path": a.files.path, "dirty": doc.DirtySinceSave, "mode": a.modeName(), "viewer": a.Viewer,
+		"review": a.Bus.Review(), "materialReference": a.workflow.reference, "materialHealth": a.workflow.issues, "inspectionViews": a.workflow.inspectionPaths,
+		"notePins": a.aiNotePins(), "bodies": bodies, "sketches": doc.Sketches, "markers": doc.Markers, "planes": doc.Planes, "selection": a.Sel.Refs(),
 		"camera": a.Camera, "viewport": a.layout.Viewport, "window": a.layout.Screen, "uiScale": a.Scale, "controls": a.UI.Controls,
 		"undo": a.Bus.UndoDepth(), "canUndo": a.Bus.CanUndo(), "canRedo": a.Bus.CanRedo(), "modalOpen": a.UI.ModalOpen(),
 		"hint": a.HintText(), "pick": a.Hover, "library": a.library.parts, "toasts": toasts, "paint": map[string]any{"tool": a.paint.tool.String(), "color": a.paint.color, "size": a.paint.size, "resolution": a.paint.res}}
@@ -212,4 +221,12 @@ func automationKey(name string) (int32, bool) {
 		}
 	}
 	return 0, false
+}
+
+func layerMetadata(p *mesh.FacePaint) any {
+	layers := []any{}
+	for i, l := range p.Layers {
+		layers = append(layers, map[string]any{"index": i, "name": l.Name, "visible": l.Visible, "opacity": l.Opacity, "hasMask": l.Mask != nil})
+	}
+	return map[string]any{"active": p.ActiveLayer, "paintMask": p.PaintMask, "items": layers, "pbrStale": p.PBRStale}
 }

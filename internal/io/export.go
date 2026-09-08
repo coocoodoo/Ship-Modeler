@@ -64,7 +64,11 @@ func flattenPaint(img *image.RGBA, under color.RGBA) *image.RGBA {
 	return out
 }
 
-func ExportOBJ(objPath string, doc *model.Document) error {
+func ExportOBJ(objPath string, doc *model.Document, scales ...float64) error {
+	scale, err := modelExportScale(scales)
+	if err != nil {
+		return err
+	}
 	bodies := visibleBodies(doc)
 	if len(bodies) == 0 {
 		return fmt.Errorf("there is nothing visible to export")
@@ -110,6 +114,7 @@ func ExportOBJ(objPath string, doc *model.Document) error {
 
 		fmt.Fprintf(obj, "\no %s\n", objName(b.Name))
 		for _, v := range b.Mesh.Verts {
+			v = v.Mul(scale)
 			fmt.Fprintf(obj, "v %.6f %.6f %.6f\n", v.X, v.Y, v.Z)
 		}
 
@@ -226,7 +231,11 @@ func writeKd(w *bytes.Buffer, c interface {
 
 // ExportSTL writes a binary STL. Geometry only — STL carries no colour, which
 // the export dialog says out loud (SPEC-DATA §5).
-func ExportSTL(path string, doc *model.Document) error {
+func ExportSTL(path string, doc *model.Document, scales ...float64) error {
+	scale, err := modelExportScale(scales)
+	if err != nil {
+		return err
+	}
 	bodies := visibleBodies(doc)
 	if len(bodies) == 0 {
 		return fmt.Errorf("there is nothing visible to export")
@@ -270,9 +279,9 @@ func ExportSTL(path string, doc *model.Document) error {
 			n = geom.Vec3{Z: 1}
 		}
 		put(n)
-		put(t.a)
-		put(t.b)
-		put(t.c)
+		put(t.a.Mul(scale))
+		put(t.b.Mul(scale))
+		put(t.c.Mul(scale))
 		binary.Write(buf, binary.LittleEndian, uint16(0))
 	}
 	return writeFileAtomic(path, buf.Bytes())
@@ -348,9 +357,11 @@ type ExportFormat struct {
 func ExportFormats() []ExportFormat {
 	return []ExportFormat{
 		{Name: "glTF binary", Extension: ".glb",
-			Note: "One file with the geometry, the colours and the paint. " +
-				"The nearest-neighbour filtering is written into the file, so " +
-				"engines load it looking right."},
+			Note: "One file with geometry, paint and PBR materials. Keeps pixel textures crisp."},
+		{Name: "Modeler compressed project", Extension: ".pxm",
+			Note: "One compressed file: complete project, textures, PBR, pins and attachments. No separate folder."},
+		{Name: "glTF", Extension: ".gltf",
+			Note: "Geometry, paint and PBR materials. Keep the .gltf, .bin and paint folder together."},
 		{Name: "Wavefront OBJ", Extension: ".obj",
 			Note: "Geometry, colours and paint. Set your renderer to nearest filtering."},
 		{Name: "Binary STL", Extension: ".stl",

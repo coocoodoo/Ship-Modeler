@@ -61,11 +61,15 @@ type faceJSON struct {
 
 // paintJSON is one picture's mapping. The image is absent by design.
 type paintJSON struct {
-	Owner FaceUID     `json:"owner"`
-	Res   int         `json:"res"`
-	Texel float64     `json:"texel"`
-	Frame geom.Frame  `json:"frame"`
-	Off   image.Point `json:"off"`
+	Layers      []PaintLayer `json:"layers,omitempty"`
+	ActiveLayer int          `json:"activeLayer,omitempty"`
+	PBRStale    bool         `json:"pbrStale,omitempty"`
+	Material    *Material    `json:"material,omitempty"`
+	Owner       FaceUID      `json:"owner"`
+	Res         int          `json:"res"`
+	Texel       float64      `json:"texel"`
+	Frame       geom.Frame   `json:"frame"`
+	Off         image.Point  `json:"off"`
 }
 
 type meshJSON struct {
@@ -85,6 +89,8 @@ func (m *Mesh) MarshalJSON() ([]byte, error) {
 	for i, e := range table {
 		index[e.Paint] = i + 1
 		out.Paints = append(out.Paints, paintJSON{
+			Material: e.Paint.Material,
+			Layers:   e.Paint.Layers, ActiveLayer: e.Paint.ActiveLayer, PBRStale: e.Paint.PBRStale,
 			Owner: e.Owner,
 			Res:   e.Paint.Res,
 			Texel: e.Paint.Texel,
@@ -115,7 +121,7 @@ func (m *Mesh) UnmarshalJSON(data []byte) error {
 	}
 	paints := make([]*FacePaint, len(in.Paints))
 	for i, p := range in.Paints {
-		paints[i] = &FacePaint{Res: p.Res, Texel: p.Texel, Frame: p.Frame, Off: p.Off}
+		paints[i] = &FacePaint{Res: p.Res, Texel: p.Texel, Frame: p.Frame, Off: p.Off, Material: p.Material, Layers: p.Layers, ActiveLayer: p.ActiveLayer, PBRStale: p.PBRStale}
 	}
 
 	out := Mesh{

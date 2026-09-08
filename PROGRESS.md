@@ -1,5 +1,70 @@
 # Progress Journal
 
+## 2026-09-07 — Reset numbering when clearing pins
+**Done:** Clear all pins now resets the note counter to zero, so the next pin is number 1. Undo restores the prior notes and counter; redo of a new pin correctly restores its new sequence. Clear remains available for an empty project with a stale counter from an older build. Yes/No confirmation unchanged.
+**Verified:** Model and app suites passed, including clear → add pin 1 → undo both → redo both → add pin 2, cancellation preserving the counter, and empty-project reset/undo. Both executables compiled and installed to `C:\Program Files\Modeler`; all four workspace/installed copies match SHA256 `A7C9B289CC81E956A32316EACB8C433E13073BADE0FBC1E08E2CE83BDF1C424A`. Gracefully closed the clean saved session and reopened its ship using installed PID 2308. Compared live body/material data and notes before/after restart; preserved. Evidence retained under `output/pin-counter-reset`.
+
+## 2026-09-07 — Move Texture and confirmed Clear all pins
+**Done:** Added Move Texture to the model face context menu. Live GPU-only preview, on-screen-direction arrow keys and direction buttons, one-pixel steps (Shift = eight), wrapping Base Color and existing PBR channels together on the persistent texel grid. Apply/Enter commits one undoable edit; Cancel/Escape leaves document data unchanged. Edits detach only the clicked face from shared paint. Added Clear all pins beside Hide/Show pins, explicit Yes/No modal, Escape cancellation, and one-command Undo/Redo preserving pin IDs/anchors/text/completion.
+**Verified:** Paint, model and app suites passed. Isolated live UI verified arrow/Shift offsets, clean document during preview, Apply adding one undo step, Undo, and pin confirmation counts 20 → No:20 → Yes:0 → Undo:20. Captures retained in `output/texture-move-ui`. Both executables compiled and installed to `C:\Program Files\Modeler`; all workspace/installed copies match SHA256 `9AA368D48DF3705ACCD23DCEB684E6AFCDE98953AAD4CCB129F3FC3CBDAB98C8`. Installer preserved association and copied libraries. Reopened the user's saved ship in edit mode using installed PID 39500; no model/paint/pin edits made to the user's project for testing.
+
+## 2026-09-07 — Face-specific Starhauler pin revisions
+**Done:** Reworked reopened pins 6/7 and new pins 19/20 using the replacement chunky pixel-art sheet. The user rejected the first smooth sheet; it was never applied. Interrupted broader texture propagation immediately after the user clarified that pins apply only to their attached faces, restored unpinned faces, and recorded that rule in AGENTS.md. Final changes affect only body 1 faces 3/13, body 8 face 0, and body 80 face 4. Matched revised ivory and blue-gray to existing rear armor; preserved 32 px/u and updated all five PBR channels for the four faces.
+**Verified:** All 24 revised channel images match the authored files. All 1,782 unpinned Base Color images match native re-encoding of original paint; all 8,910 other PBR images are unchanged. Geometry, face IDs, frames and notes preserved. Shaded close-up inspected. Saved the final project in `output/starhauler-734/Starhauler 734.pxm`; sources, prompts, snapped art and checks are under `pin-revisions`. No application code/build changes.
+
+## 2026-09-07 — Starhauler 734 recreation and 18 pin notes
+**Done:** Created the reference-inspired cargo ship in the user's new live Modeler session: 104 named bodies, 53 separate containers, bridge, exposed cargo frame, twin gantry cranes, aft engine pod, fins, antennas, and five nozzles. Applied editable pixel-art Base Color at 32 px/u and all five PBR channels to 1,786 faces. Processed all 18 user notes: replaced circular machinery artwork, corrected collar/chamfer alignment, removed hatch stretching, fitted fin borders and vent slats, straightened rail details, roughened both nameplates, and mirrored both marked buttress faces. Preserved the container artwork praised in note 12. Saved the live project, including all completed notes, to `output/starhauler-734/Starhauler 734.pxm`; left it open with pin markers hidden.
+**Verified:** Both sides reviewed in shaded Modeler. Native six-channel exports for hatch, vent, and mirrored face match authored imports, accounting for body-color compositing. Final 10,501,028-byte PXM uses Deflate for every archive member, contains all 8,930 PBR maps, and reopens without warnings. All closed meshes, face IDs, 32 px/u frames, pin text/anchors, and 1,590 container PBR images verified. All 318 container Base Color images match native re-encoding of the original artwork. Final save reports a clean document. Sources, generation prompts, snapped atlases, review captures, and verification reports retained under `output/starhauler-734`. No Modeler application source changes; no application rebuild or installation change was needed.
+
+## 2026-09-07 — PXM viewer and Program Files installation
+**Done:** Added command-line project opening, default viewer mode for file paths, explicit `-view`/`-edit`, a full-width model view with navigation and a top-right Edit button. Viewer input hides editing tools, planes and pin overlays, blocks modeling/saving shortcuts and automation mutations, and preserves the loaded document when Edit unlocks the workspace. Added a repeatable Windows installer and installed both executables plus icon in `C:\Program Files\Modeler`; copied parts and tilesets into `Library` while retaining writable AppData libraries. Registered per-user `.pxm` open/view and edit shell verbs.
+**Verified:** Startup argument tests and app tests pass. Live isolated warp-gate viewer ignored editing shortcuts/clicks, orbited, and switched through its real Edit button to all 83 editor controls with the same 10 bodies, 16 pins and clean document. Windows shell-open launched `C:\Program Files\Modeler\modeler.exe -view "...\Warpgate.pxm"`, title `Warpgate — Modeler Viewer`. Both installed executables match SHA256 `D6E542618AA3ECA07213FD9B13D1D290B0CF4AC2F4F5418EE31A45F57C1F42F0`; all six copied library files match their sources. PBR/pin application and IO compatibility checks passed; the broader UV viewer test passed its functional paint/undo/zoom assertions but its four screenshot baselines differ (not updated). Live test captures/state retained in `output/viewer-install`. Existing user modeling session left untouched.
+
+## 2026-09-07 — Armor fastener texture/PBR detail
+**Done:** Investigated the fasteners: all maps existed, but Base Color and every PBR channel were uniform. Added native pixel screw slots, rim highlights, and shaded shanks across 48 head faces and 144 side faces at 32 px/u. Regenerated all 960 fastener PBR maps using slot/bevel normal detail, rough recesses, brighter steel specular, and broad head height.
+**Verified:** Front/rear close-ups inspected. Live exported front/rear texture sets exactly match authored Base Color and five non-uniform PBR maps. Geometry, pins, and 32 px/u preserved; changes remain live and unsaved. Files retained under `output/fasteners-fix`. Both executables compiled with matching SHA256 `05224596A6F684ABF15AA7C1F204F2FE3A8D8FB45EE90ACC86D20AFE47DD1F24`.
+
+## 2026-09-07 — Full warp gate PBR pass and standing preference
+**Done:** Generated and applied roughness, specular, cavity AO, height, and OpenGL normal maps for all 732 live gate faces (3,660 maps), derived from the current corrected Base Color artwork. Material classes distinguish satin armor, rough grooves, copper trim, steel fasteners, and smooth cyan glass. Preserved exact image canvases at 32 px/u. Added standing instructions to always generate/apply PBR in Modeler and refresh affected maps after paint edits. The user had saved the gate as Warpgate.pxm; this pass leaves PBR changes live and unsaved.
+**Verified:** All 732 faces contain all five channels. Exported Base Color before/after and compared every image pixel: unchanged. Geometry, face IDs, visibility, pins, project path, and 32 px/u preserved. Inspected front/rear combined shaded PBR captures and whole-model channel counts. Source snapshots, generated maps, manifest, parameters, checksum report, and captures retained under `output/gate-pbr`. Both executables compiled successfully with matching SHA256 `05224596A6F684ABF15AA7C1F204F2FE3A8D8FB45EE90ACC86D20AFE47DD1F24`. No application source changes.
+
+## 2026-09-07 — Pins 2–16 and opposite armor faces
+**Done:** Applied the pin-1 native pixel-stamping repair to all 15 newly pinned ring/fin armor faces and the geometrically matching rear faces of pins 1–16. Repaired 31 additional faces using the existing snapped atlas at 1 source pixel per texel, preserving 32 px/u. Matched rear faces by their XY outlines and opposite normals. Marked pins 2–16 done after front/rear inspection; pin 1 remains done. Project remains live and unsaved.
+**Verified:** Front and rear captures retained under `output/new-pins-fix`. All body vertices, face IDs/loops, and paint densities preserved. An initial batch stopped at an out-of-face allocation-margin stamp; resumed from the reported completed index and skipped only margin-only stamps, without replaying earlier edits. Both executables compiled successfully with matching SHA256 `05224596A6F684ABF15AA7C1F204F2FE3A8D8FB45EE90ACC86D20AFE47DD1F24`. No application source changes.
+
+## 2026-09-07 — Pin 1: stretched armor texture
+**Done:** Read the live pin on Segmented titanium armor face 57. Replaced the face-fitted square texture with native 1:1 tile stamps from the existing snapped atlas, retaining 32 px/u and square pixel proportions. Changed only the pinned face; inspected the close-up and marked note 1 done. Model remains unsaved.
+**Verified:** Native stamping copies each source pixel to one face texel without scaling. Close-up retained at `output/pin-1-fix/after.png`. Initial 181-pixel-wide tile request was rejected by the 64-pixel tile cap before any stamps; continued with valid 45×42 tiles. Both executables compiled successfully with matching SHA256 `05224596A6F684ABF15AA7C1F204F2FE3A8D8FB45EE90ACC86D20AFE47DD1F24`. No application source changes.
+
+## 2026-09-07 — Warp gate pixel-art painting
+**Done:** Painted the live floating warp gate with a generated and pixel-snapped 24-color sci-fi atlas: worn titanium, navy machinery, copper locks, cyan generator cores, and segmented aperture highlights. All 732 faces across ten bodies now have editable Base Color paint at 32 px/u. Raw source, 181×174 snapped atlas, seven cropped panels, generation prompt, operations, and live captures are retained under `output/warp-gate-paint`.
+**Verified:** Front and rear angled views inspected. Compared all vertices, face IDs, and loops with the initial state: geometry unchanged. Every face reports 32 px/u and 0.03125-u texels. Project remains live and unsaved; no save/export/library writes. Both executables compiled successfully with matching SHA256 `05224596A6F684ABF15AA7C1F204F2FE3A8D8FB45EE90ACC86D20AFE47DD1F24`. No application source changes or PBR generation in this painting task.
+
+## 2026-09-07 — Floating space warp gate
+**Done:** Built the requested gate in the new empty live project (PID 48964), with no floor or landing structure. Hollow 24-sided chassis, cyan aperture rail, twelve segmented armor sections, four diagonal stabilizer spines, four generator housings/lenses, copper bands, cooling slots, and fasteners. Ten named editable body groups, 1,856 triangles; geometry and body colors only.
+**Verified:** Inspected front, rear, and angled live captures (`output/warp-gate/final.png`, `rear.png`, `completed.png`). Every component mesh has exactly two face uses per edge. All ten names/colors verified from live state; no paint textures. The opening stays clear and both sides carry the same detail. Project remains live and unsaved; no library or export writes. Construction operations and results retained under `output/warp-gate`.
+
+## 2026-09-07 — Compressed, self-contained PXM
+**Done:** Stopped the teleporter work at the user's request. Save now compresses every PXM member with standard ZIP Deflate. Added Export → pxm and routed project extensions directly through the archive writer, preserving full authored geometry, hidden bodies, textures, PBR images, note pins, and attachments without external asset folders. Project packages ignore the separate geometry-export scale. Prior stored ZIP projects remain readable. Updated format documentation; external stored-only game loaders need Deflate support.
+**Verified:** Application and IO suites passed. New regression moved only a PXM file into an isolated folder and verified base-color pixels, five PBR maps, attached pins, markers, sketches, and hidden bodies. Confirmed one output file, compressed ZIP entries, and legacy stored-ZIP loading. Save/export and PBR application integration tests passed. Visually inspected `output/pxm-bundle/pxm-export.png`; headless export created only `portable/sample.pxm`. Both executables compiled with matching SHA256 `05224596A6F684ABF15AA7C1F204F2FE3A8D8FB45EE90ACC86D20AFE47DD1F24`.
+**Try it:** Save ongoing work, reopen Modeler, then Save or Export → pxm. Newly written files are compressed all-in-one archives. The active session and existing external folders were left intact.
+
+## 2026-09-07 — Ship scale in Export
+**Done:** Added a draggable/typeable Ship scale multiplier, Reset, and scaled X/Y/Z dimensions to the 3D export dialog. GLB/glTF, OBJ, and STL scale output positions around the model origin without editing the document or resampling paint/PBR maps. glTF attachment positions and accessor bounds follow the scale. PNG retains separate image-size controls. Added `export.model_scale` for AI/script exports.
+**Verified:** Application and IO suites passed, including scaled output checks for all four 3D formats, unchanged UV/material checks, attachment positions, invalid-value file preservation, and unchanged project/undo state. Relevant application export and PBR integration tests passed. Visually inspected `output/export-scale/half-scale.png` and `png-scale.png`. Both executables compiled with matching SHA256 `99CA433D7BA21037F2EEED61822A112358FAA379FCEE61ED2743A4165FBA0318`.
+**Try it:** Save and reopen Modeler → Export → choose a 3D format → Ship scale. Click to type 0.5 for half size or 2 for double size. Choose file exports at that scale; Reset returns to 1. The live session was left open.
+
+## 2026-09-07 — PBR inspection selects without painting
+**Build:** Compiled `modeler.exe` and `modeler-release.exe`; matching SHA256 `A91A31129F706AF1B6AA3C1FD12BB71CB0698B1B348FDA544A6D7D3A98974706`.
+**Done:** PBR inspection consumes viewport and UV clicks before every paint tool, ignores paint locks when selecting, and suppresses brush/paste/edge interactions. Added Whole ship / Selected face and Shaded PBR / Texture map controls, visible-face map counts, neutral previews for missing channels, and matching AI preview scope. The panel displays lit textures even if the paint view was flat or textures hidden. Back to Paint restores painting.
+**Verified:** Application, renderer, and IO tests passed. PBR render tests and new real-viewport click/scope regression passed: Fill-active selection changes the chosen face while preserving all six texture checksums and undo depth; image pixels verify face-only versus whole-ship maps. UV selection regression covers seven tools and a conflicting paint lock. Inspected `output/pbr-inspection/material_panel.png` and `output/pbr-inspection/check/whole.png` / `face.png`.
+**Try it:** Save the project, reopen the rebuilt Modeler, enter Paint → PBR Materials, and click a face. Choose a texture channel, Texture map, then Whole ship or Selected face. Back to Paint resumes painting. Existing live session left open.
+
+## 2026-09-07 — Visible glTF export option
+**Done:** Added `.gltf` beside `.glb` in Export using the existing glTF/PBR writer. Widened the card to fit all five formats and clarified companion-file handling in the panel and README.
+**Verified:** glTF/GLB and PBR persistence/export tests passed; application export-format and file-writing tests passed. Headless selection reports `.gltf`; visually inspected `output/gltf-menu/gltf-menu.png`. Built both executables successfully, matching SHA256 `3DA4A5D773E1251EB87B3EDCB3C97CC48CCB8F66695387704B501DB9829388B1`.
+**Try it:** Save your current project and reopen the rebuilt Modeler, then Export → gltf → Choose file. Keep the generated `.gltf`, `.bin`, and `paint` directory together. The running session was left open.
+
 > Executor: append an entry per working session. Newest entry at the TOP. Keep entries honest — failed attempts and open bugs belong here, not just wins.
 
 **Current state:** A shared Parts Library saves named/category-tagged body
@@ -16,6 +81,183 @@ consistent outline icons and clearer typography. Live screen-space ambient
 occlusion replaces the vertex bake, with a persistent bottom-left toggle.
 Full suite green; modeler.exe and modeler-release.exe rebuilt. Committed and
 pushed to both remotes on 2026-09-07; README restructured to cover it all.
+
+---
+
+## 2026-09-07 — Proto Miner pins 4/5 and whole-ship PBR
+
+Connected to the user's live Proto_miner.pxm session (PID 38668), read notes and captured the model before editing. Pin 4 requested details on upper rear copper face 300; pin 5 requested details on orange door-surround face 313. Generated a compact twin vent through built-in image generation, snapped it with the user's Pixel Art Snapper workflow to 63x24 and 46x20 pixels / seven colors, and stamped the targeted panels. Preserved the gray doors and marked notes 4/5 done after inspecting the live result.
+
+Exported the updated base colors of all 316 faces and authored 1,580 aligned roughness, specular, AO, height, and normal maps using semantic palette classes. Applied in checked batches through the normal command bus. Height is shallow structural relief; normal microdetail is separate. Verified all 316 live faces have all five material channels, geometry is unchanged, every generated map matches its base canvas, and checked rear-panel/door-surround/laser base colors are identical after PBR. Inspected front and rear captures and restored the original camera angle. No project save or library write was issued; live changes remain for the user to save.
+
+Assets, raw generated vent, snapping reports, prompt/art notes, live results, final captures and reusable texture ZIP are retained under output/pins45. Texture bundle: Proto_miner_PBR_textures.zip. No application source changes were needed for this modeling pass.
+
+## 2026-09-07 — PBR texture authoring export
+
+**Done:** Added Export Map (PNG) and Export Texture Set (ZIP) to the PBR sidebar. The set contains six aligned, face-fitted PNGs, material.json metadata and README instructions. Base color includes the underlying body color without viewport lighting; scalar maps export as grayscale. Normal images keep height separate to prevent double relief on reimport. Missing channels export as clearly identified neutral starter images for authoring from the main texture. Shared import/export face bounds remove allocation margins and prevent reimport shifts. Unpainted faces use a temporary mapping, leaving model state and history untouched. Added material.export and material.export_set to the AI connection and documented the authoring workflow.
+
+**Validation:** App, IO, paint, and mesh package tests passed. New checks cover pixel alignment through PNG export/reimport for all six channels, ZIP contents and starter metadata, unpainted export without document changes, and preservation of existing files after invalid export requests. The rendered PBR integration test passed and exercised both AI export operations. Visually inspected the new buttons and scrolling sidebar; diff whitespace check passed. Compiled modeler.exe and modeler-release.exe; matching SHA-256: FEBF0A9EDFFF5A7BF4582211A114C61AAA881A409FA97B2F8BC558F0B1B0EE89. The user's running model was not changed or restarted.
+
+## 2026-09-07 — PBR image materials
+
+**Done:** Added Paint > PBR Materials with a face target, six texture-type selectors (Base Color, Specular, Ambient Occlusion, Displacement / Height, Roughness, Normal), PNG/JPEG import/replace/remove, image thumbnails, model channel previews, and a scrolling sidebar. Base-color imports remain editable with existing paint tools. Other channels use immutable images anchored in the same face coordinates. Added GGX dielectric lighting, tangent-space normal maps, roughness/specular intensity and AO; height provides surface relief without changing geometry. Fixed atlas fallback coordinates so unpainted faces cannot inherit a populated map.
+
+**Persistence/export:** Maps survive project/library saves, body copies/transforms, resampling, and undo/redo. GLB/glTF exports carry roughness/AO/normal and KHR_materials_specular; height relief is baked into normals and its original image is retained through material extras. PNG captures/thumbnails use shaded materials rather than debug channel views. Added material.open/import/clear/preview AI operations and face material metadata. Usage and limitations are documented in docs/AI_CONTROL.md. OBJ/STL have no new PBR payload; this is a dielectric workflow, not a metallic map workflow.
+
+**Validation:** All packages outside internal/apptest passed, plus TestPBRMaterialPreviews (real hidden-window shader rendering and six channel pixel assertions). New tests cover import ownership, base-color brush editing, shared fragments, undo/redo, transformed copies, resampling, deterministic save/load, GLTF channel packing, and the unpainted atlas fallback. Inspected the rendered sidebar and shaded/channel images. A compile error in the resampling helper's integer clamp was corrected before the passing checks. Final affected io/paint tests passed. Compiled both modeler.exe and modeler-release.exe with tools/modeler.ps1 -Action Build; matching SHA-256: 3E591BB18617C6F2A421B3325C4F2135DC51515FB00F5F2191C174AEA3017D76. The running user session was not restarted or edited.
+
+## 2026-09-07 — Drop Pin in the body context menu
+
+**Done:** Added Drop Pin above Save to Library and Cancel. Viewport right-clicks retain their surface anchor before the menu is positioned, so choosing Drop Pin opens the note editor at the original hit. Body-tree menus arm the next surface click. Cancel does not create a pin; existing library actions and right-drag orbit behavior remain intact.
+
+**Verified:** internal/app tests and TestNotePinsRightClickMenu pass. Ran the parts_library and library_update scripts with updated menu-row coordinates. Inspected output/pins-menu/drop_pin_menu.png. Compiled modeler.exe and modeler-release.exe with matching hashes using tools/modeler.ps1 -Action Build.
+
+**Try it:** Save and restart Modeler, right-click a body face, then choose Drop Pin and enter the note.
+
+---
+
+## 2026-09-07 — Model note pins for AI requests
+
+**Done:** Added Pins immediately left of UV Map. Drop a pin onto a face in model or paint mode, write a multiline note (up to 2,000 characters), and click the pin or list row to edit, mark done/reopen, or delete. Show/hide controls, pagination, cancellation, and responsive note-editor sizing. Pins persist in project files, use stable IDs and barycentric surface anchors, follow body/vertex transformations, and remain available as detached notes if their original face disappears. Pin changes use normal undo/redo and dirty/save tracking. Notes are excluded from game markers and exported geometry. AI State includes note text, status, resolved position/body/face, and attachment validity; added pins.open and pin.add/update/delete commands and documented request handling.
+
+**Verified:** All non-visual packages pass via go test; dedicated real-app API and mouse workflow tests pass. Unit tests cover anchor movement/undo, stale-face detection, edit/delete history, project save/load, export isolation, AI state, and dialog input ownership. Inspected output/pins-check/pin_on_model.png, pins_list.png, and output/pins-ui-final/pin_text.png. Compiled modeler.exe and modeler-release.exe with tools/modeler.ps1 -Action Build; matching hashes. Existing unrelated source changes and golden images preserved.
+
+**Limits:** A removed/replaced face requires reviewing the detached note's target. AI work begins only when requested, and Done is recorded after a request is fulfilled. The running older window needs a restart to load the new feature.
+
+**Try it:** Save your current project and restart Modeler. Pins → Drop a pin → click a face → write a note → Save note. Ask the AI to work on the model when ready.
+
+---
+
+## 2026-09-07 — UV map viewer and shared 2D painting
+
+**Requested:** A bottom-right UV Map viewer with zoom and the existing Paint tools.
+
+**Added:** A status-bar UV Map toggle opens Paint and a floating sheet of the
+selected body's face mappings, including bare faces and polygon holes. A body
+dropdown, wheel/button zoom, middle-drag or Space+left-drag pan, Fit, Face, pixel
+Grid and expanded Size controls keep the sheet navigable. The sheet is a view
+of the face mappings rather than a replacement export atlas.
+
+The viewer routes its pointer through the same paint commands as the 3D view:
+pencil, brush, eraser, fill, line, rectangle, ellipse, gradient, eyedropper,
+wand, edge selection/painting, tile stamps and pixel selection/copy/paste.
+Paste retains all four Ctrl+wheel rotations, sidebar mirrors and its right-click
+anchor/rotation/cancel menu. Edits update both displays and share Undo/Redo.
+Texture uploads follow document events; topology and resolution changes rebuild
+the sheet, while first paint allocation and Undo preserve its zoom and position.
+Painting cannot pass through the UV panel into the model; captured strokes end
+when released outside it. `view.uv` and UV dump coordinates support automation.
+
+**Verified:** UV regression tests cover each painting path, capture/release,
+cursor tracking, holes, texture clipping, body selection, density changes,
+pan/zoom and UI sizes through 200%. Native scripted mouse strokes update model
+pixels, Undo/Redo restore them, and wheel/expanded-view screenshots pass.
+Inspected the native viewer in Dark and Light themes, at 200%, and with its
+copy/paste preview and placement menu. Refreshed 204 existing screenshots for
+the status-bar button; image comparison confirmed every changed pixel remains
+inside the status bar. Added four UV screenshots. Final `go test ./... -count=1`
+passed (native application suite: 175.308s). Rebuilt both executables; matching
+SHA-256: `9E33C0364091D1189108D85935B1D5520AC2DB5F56CCCBDDD6D251EAAC6EC064`.
+
+## 2026-09-07 — Paint stays attached when positioning library parts
+
+**Reported:** Moving an inserted library body left its texture behind.
+
+**Fixed:** The shared vertex-edit path now carries paint frames with fully
+moved faces during live translations and rotations. Undo, redo and cancelled
+drags restore exact paint pointers along with geometry. Partially edited faces
+retain their existing mapping/density. Rigid mesh translation and rotation now
+copy paint mappings before changing them, preserving source meshes and undo
+snapshots; shared allocations across split faces transform only once.
+
+**Verified:** New regressions failed before the fixes, then passed. Coverage
+includes XYZ movement, quarter/free rotation, successive live drag updates,
+cancel, undo/redo, shared allocations, clone isolation, library save/insertion,
+project save/reopen, and a second independent library insertion. Full
+`go test ./... -count=1` passed (native app suite: 165.945 s). Ran the rebuilt
+executable on a painted-copy move/rotation script and inspected the before,
+moved and rotated screenshots under `testdata/tmp/librarypaint/shots`.
+
+**Build:** Both executables compiled via `tools/modeler.ps1 -Action Build`.
+SHA256: `92B95E1DA2FF5E72BCC2F17CC9C44C9DEB34FBB14DB2DD7D3FADB5E6066DAE5E`.
+
+---
+
+## 2026-09-07 — Removed the hand cursor cuffs
+
+**Done:** Removed the small wrist cuff and its dividing line from both extrusion
+hand pointers, closing each silhouette with a rounded palm base.
+**Verified:** App/UI tests and the cursor artwork preview checked; both
+executables rebuilt with `tools/modeler.ps1 -Action Build`.
+
+---
+
+## 2026-09-07 — Redrawn extrusion hand pointers
+
+**Done:** Replaced the overlapping rectangles/circles with curved vector hand
+silhouettes: distinct fingers, a consistent thumb, subtle palm/knuckle creases,
+and a clean dark keyline around the white fill. Both poses share the same palm
+hotspot and wrist. The existing icon renderer supersamples the artwork and
+caches it per size; textures are released with the icon cache on shutdown.
+
+**Verified:** App and UI tests passed. Rendered the actual cursor drawing code
+at 100%, 125%, and 150%, plus an enlarged detail view, on dark/light backgrounds;
+inspected `testdata/tmp/cursorpreview/hands.png`. Hover/drag behavior is unchanged.
+Both executables rebuilt using `tools/modeler.ps1 -Action Build`.
+
+---
+
+## 2026-09-07 — Open and closed hand cursors for extrusion
+
+**Done:** Regular extrusion and direct face push/pull now show a custom open
+hand when their arrow is ready to grab and a closed fist for the entire captured
+drag. The hand cursors have a light fill and dark keyline so they remain clear
+over either theme and over model geometry. Cursor size follows UI scale within
+a practical pointer-size range, and the standard cursor returns on release.
+
+**Verified:** Added a cursor-state regression covering both extrusion paths,
+including leaving the arrow hit area while dragging and returning to the
+default pointer after release. App and tool tests passed. Focused native app
+tests passed for face push/pull, zero crossing, extrusion and gizmos.
+
+**Build:** Both `modeler.exe` and `modeler-release.exe` compiled through
+`tools/modeler.ps1 -Action Build`; SHA256 for both:
+`2F12B71EEEE09611A77DC5EB3C401D3C25312FECD4704E8B4DC37C996925F7FB`.
+
+**Try it:** Hover an extrusion arrow to see the open hand, press and drag to
+see it close, then release to restore the normal pointer.
+
+---
+
+## 2026-09-07 — Face extrusion no longer fights the mouse
+
+**Reported:** Face extrusion flickered between pushing and pulling in the
+attached hauler001 recording. Reviewed frames from the recording.
+
+**Fixed:** Face push/pull and regular extrusion now measure the pointer against
+the fixed outward axis. Previously, crossing zero reversed the input projection
+but retained the original grab coordinate, causing alternating depths on
+successive frames. The visual arrow still flips to show push/pull direction;
+its flip no longer changes the drag calculation.
+
+**Verified:** Added an app regression that failed before the fix and passes
+afterward across seven face directions, orthographic/perspective views, all
+three snapping modes, and positive/negative starting depths. Checks cover
+repeated zero crossings, held positions, perpendicular movement and release.
+App, tools, model, extrusion geometry and IO tests passed. Focused native app
+tests passed, including existing push/pull and gizmo checks and the new
+`extrude_drag_direction` script. It verifies stable +3/-1/+1/-1 previews,
+unchanged geometry during the drag, the correct 20-unit volume removal on
+release, and restoration with one Undo. Ran that script with the rebuilt
+release executable and inspected `inward_preview.png` and
+`inward_applied.png` in `testdata/tmp/extrude-drag/verified`.
+
+**Build:** Both `modeler.exe` and `modeler-release.exe` compiled through
+`tools/modeler.ps1 -Action Build`; SHA256 for both:
+`DBF44A88F76B31AC67EDDD9F701B5D647C0AC94994D627D73DE6A3C0E2F312B2`.
+
+**Try it:** Restart Modeler, select a face and drag its arrow inward, outward,
+and back through zero. Holding the pointer still should keep the depth steady.
 
 ---
 
@@ -3512,3 +3754,70 @@ c:\go\bin\go.exe run ./cmd/modeler
 **Next:** the first concrete task of the next session
 **Try it (user):** up to 6 steps to feel what changed, e.g. "Run modeler.exe → press S → click Front plane → draw a rectangle → E → drag the arrow"
 ```
+
+
+## 2026-09-07 — Model Workshop / safe AI face requests
+
+Implemented all seven requested workflow additions: command-bus pin-face scope
+with isolated shared paint and user-only expansion; staged Accept/Reject and a
+single whole-request undo; material reference palette/resolution/weathering/PBR
+matching; face paint layers with masks, ordering, opacity and visibility;
+six-view inspection captures plus edited-face closeups; save/export material
+health reports; and Open/In progress/Needs review/Done pin history with before/
+after thumbnails and change descriptions. Layers and review metadata live inside
+the compressed PXM. Existing brush/stamp/image paths route into the active layer.
+Base edits flag stale PBR; face-local regeneration and reference matching refresh
+it. AI operations and usage are documented in docs/AI_CONTROL.md.
+
+Validation: affected model/paint/mesh/io/app/render package tests pass, including
+new scope rejection/shared-image isolation, accept/reject/undo/redo, active layer
+and mask history, material matching and layered PXM round-trip tests. Hidden
+1280x800 UI verification captured Review, Layers, Health, six standard views and
+an edited-face closeup in output/workshop. Compile/install verified separately.
+
+Deployment verified: both workspace and Program Files executables match SHA256 C2D932D4F304188F806EB8351E6F8017C76D7148BD007B413C7F59A628BC83FE. Installed session PID 11660 reopened Starhauler 734: 104 bodies, 0 pins, clean document, unchanged project hash. Opened Model Workshop for the user; screenshot output/workshop/installed.png.
+
+## 2026-09-07 — Model Workshop UI polish
+
+Rebuilt Workshop presentation into a responsive, themed panel: fixed icon tabs
+and footer, guided pin-review welcome, framed before/after previews, clear review
+actions, material-reference card and palette swatches, active-layer rows with eye
+icons and opacity/mask indicators, a continuous opacity slider, compact layer
+actions, and health summary cards with tagged issues and proper pagination.
+Added a dimmed backdrop, bounded content scrolling with a visible scrollbar,
+compact controls at large UI scales, and inline warnings that do not cover
+buttons. Opacity dragging commits once on release, including the final sample.
+
+Verification: app and paint regression tests passed; compiled modeler.exe and
+modeler-release.exe. Rendered welcome/review/layers/health tabs at 1280x900, and
+checked light-theme 200% UI at the top and bottom of the scrollable panel.
+A 12-step opacity drag produced one undo record and the expected 25% opacity.
+Artifacts are in output/workshop-polish. Compiled executable SHA256:
+25DF8B40D2B5ABAC8A86472B9F040D8E1D777F1143112A01A76A7F6201DE1168.
+
+Deployment remains pending: the Windows administrator prompt was canceled by the user. Program Files still contains the prior C2D932D4 build. Reopened the saved Starhauler project in that installed copy; its file hash is unchanged.
+
+## 2026-09-07 — Always start maximized
+
+Visible editor and PXM viewer launches now maximize after restoring the saved
+monitor position. Hidden automation windows retain their dimensions. Saving
+settings no longer overwrites the restored window rectangle with maximized
+bounds. The launcher and collaboration instructions also use maximized windows.
+
+Validation: internal/app and cmd/modeler tests passed; both executables compiled
+with SHA256 A142866899E7E534FB97464683F2458A21C3809C5958016220A043D7C029A4E6.
+Maximized the currently installed Modeler window (PID 619912) in place and
+verified IsZoomed=true; the open project was not restarted or edited.
+Deployment of this change and Workshop polish remains pending after the previous
+Windows administrator prompt was canceled. No further installation was attempted.
+
+## 2026-09-07 — Prepare Ship-Modeler source update
+
+Prepared accumulated source, documentation, fixtures and visual baselines.
+Local generated output, attachments and executable builds stay out of Git.
+Validation: go test ./... -count=1 passed all package suites except
+internal/apptest (visual baseline mismatches) and internal/io
+(TestMaterialPersistenceAndExport: material save is not deterministic).
+These failures remain unresolved; baselines were not regenerated to hide them.
+Both executables compiled successfully during the preceding startup change.
+Publish on a review branch; the default branch is not changed by this upload.

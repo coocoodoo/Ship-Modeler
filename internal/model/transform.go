@@ -159,6 +159,9 @@ type vertEdit struct {
 	// bentBefore remembers which faces were already flagged, so undo restores
 	// the flags rather than merely clearing them.
 	bentBefore map[uint32][]bool
+	// Paint anchors are snapshots too: drag replacement and undo must restore
+	// them along with the vertices, without mutating shared mesh/CSG history.
+	paintBefore map[uint32][]*mesh.FacePaint
 	// facesBefore and seqBefore snapshot what folding rewrites: the face list
 	// and the identity counter. Nil for bodies that did not fold.
 	facesBefore map[uint32][]mesh.Face
@@ -186,7 +189,7 @@ func (e *vertEdit) Folded() int { return e.folded }
 func (e *vertEdit) LeftTheGrid() bool { return e.leftGrid }
 
 // apply runs a point map over the selected vertices.
-func (e *vertEdit) apply(doc *Document, move func(geom.Vec3) geom.Vec3) error {
+func (e *vertEdit) apply(doc *Document, move func(geom.Vec3) geom.Vec3, rotate func(geom.Vec3) geom.Vec3) error {
 	if len(e.Verts) == 0 {
 		return fmt.Errorf("nothing is selected to move")
 	}
@@ -214,6 +217,7 @@ func (e *vertEdit) apply(doc *Document, move func(geom.Vec3) geom.Vec3) error {
 
 	e.before = make(map[uint32][]geom.Vec3, len(targets))
 	e.bentBefore = make(map[uint32][]bool, len(targets))
+	e.paintBefore = make(map[uint32][]*mesh.FacePaint, len(targets))
 	e.facesBefore = make(map[uint32][]mesh.Face, len(targets))
 	e.seqBefore = make(map[uint32]uint32, len(targets))
 	e.bent = 0
@@ -227,6 +231,48 @@ func (e *vertEdit) apply(doc *Document, move func(geom.Vec3) geom.Vec3) error {
 			flags[i] = m.Faces[i].NonPlanar
 		}
 		e.bentBefore[t.body.ID] = flags
+		paints := make([]*mesh.FacePaint, len(m.Faces))
+		for i := range m.Faces {
+			paints[i] = m.Faces[i].Paint
+		}
+		e.paintBefore[t.body.ID] = paints
+		movedSet := make(map[int]bool, len(t.verts))
+		for _, vi := range t.verts {
+			movedSet[vi] = true
+		}
+		// Fully moved faces undergo the same rigid motion as their paint.
+		// Partially moved faces retain their mapping and texel density while
+		// their outline stretches. Shared allocations are copied once, so
+		// stationary faces and undo snapshots keep their original anchors.
+		movedPaint := map[*mesh.FacePaint]*mesh.FacePaint{}
+		for fi := range m.Faces {
+			f := &m.Faces[fi]
+			if f.Paint == nil {
+				continue
+			}
+			whole := true
+			for _, loop := range f.Loops {
+				for _, vi := range loop {
+					whole = whole && movedSet[vi]
+				}
+			}
+			if !whole {
+				continue
+			}
+			p := movedPaint[f.Paint]
+			if p == nil {
+				cp := *f.Paint
+				cp.Frame.O = move(cp.Frame.O)
+				if rotate != nil {
+					cp.Frame.U = rotate(cp.Frame.U)
+					cp.Frame.V = rotate(cp.Frame.V)
+					cp.Frame.N = rotate(cp.Frame.N)
+				}
+				p = &cp
+				movedPaint[f.Paint] = p
+			}
+			f.Paint = p
+		}
 
 		saved := make([]geom.Vec3, len(t.verts))
 		for i, vi := range t.verts {
@@ -247,10 +293,6 @@ func (e *vertEdit) apply(doc *Document, move func(geom.Vec3) geom.Vec3) error {
 			// only ever reads the old Face structs, never edits their loops.
 			e.facesBefore[t.body.ID] = append([]mesh.Face(nil), m.Faces...)
 			e.seqBefore[t.body.ID] = t.body.FaceSeq
-			movedSet := make(map[int]bool, len(t.verts))
-			for _, vi := range t.verts {
-				movedSet[vi] = true
-			}
 			e.folded += mesh.FoldBent(m, movedSet, t.body.NextFaceUID)
 			bent = m.RecheckPlanarity()
 		}
@@ -269,6 +311,9 @@ func (e *vertEdit) undo(doc *Document) {
 		if faces := e.facesBefore[id]; faces != nil {
 			b.Mesh.Faces = faces
 			b.FaceSeq = e.seqBefore[id]
+		}
+		for fi, p := range e.paintBefore[id] {
+			b.Mesh.Faces[fi].Paint = p
 		}
 		for i, vi := range e.Verts[id] {
 			if vi >= 0 && vi < len(b.Mesh.Verts) {
@@ -327,7 +372,7 @@ func (c *MoveVerts) Name() string {
 }
 
 func (c *MoveVerts) Do(doc *Document) error {
-	return c.apply(doc, func(p geom.Vec3) geom.Vec3 { return p.Add(c.Delta) })
+	return c.apply(doc, func(p geom.Vec3) geom.Vec3 { return p.Add(c.Delta) }, nil)
 }
 
 func (c *MoveVerts) Undo(doc *Document) { c.undo(doc) }
@@ -366,12 +411,12 @@ func (c *RotateVerts) Do(doc *Document) error {
 		// that is enough to take every vertex off the grid and keep it off.
 		return c.apply(doc, func(p geom.Vec3) geom.Vec3 {
 			return c.Pivot.Add(turn(p.Sub(c.Pivot)))
-		})
+		}, turn)
 	}
 	rot := geom.RotateAxis(c.Axis, c.Degrees*math.Pi/180)
 	return c.apply(doc, func(p geom.Vec3) geom.Vec3 {
 		return c.Pivot.Add(rot.TransformDir(p.Sub(c.Pivot)))
-	})
+	}, rot.TransformDir)
 }
 
 func (c *RotateVerts) Undo(doc *Document) { c.undo(doc) }

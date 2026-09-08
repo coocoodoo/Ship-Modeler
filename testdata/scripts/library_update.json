@@ -1,7 +1,7 @@
 [
  {"op":"library.testdir"},
  {"op":"click","at":[100,224],"kind":"right"},
- {"op":"click","at":[190,241]},
+ {"op":"click","at":[190,267]},
  {"op":"click","at":[730,284]},
  {"op":"ui.type","name":"Reusable hull"},
  {"op":"click","at":[875,493]},

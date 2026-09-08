@@ -118,6 +118,7 @@ func (e *Events) Emit(ev Event) {
 
 // Bus runs commands against a document and keeps the undo history.
 type Bus struct {
+	review *Review
 	doc    *Document
 	Events Events
 
@@ -143,6 +144,7 @@ func (b *Bus) Doc() *Document { return b.doc }
 // Replace swaps in a whole new document, clearing the history. Used by New,
 // Open and crash recovery.
 func (b *Bus) Replace(doc *Document) {
+	b.review = nil
 	b.doc = doc
 	b.undo, b.redo, b.pending = nil, nil, nil
 	b.Events.Emit(Event{Kind: EvDocReplaced})
@@ -152,6 +154,11 @@ func (b *Bus) Replace(doc *Document) {
 // redo stack, appends a feature record and marks the document dirty. On error
 // nothing at all changes.
 func (b *Bus) Run(cmd Command) error {
+	var err error
+	cmd, err = b.prepareCommand(cmd)
+	if err != nil {
+		return err
+	}
 	if b.pending != nil {
 		return fmt.Errorf("cannot run %q while a drag is in progress", cmd.Name())
 	}
@@ -164,6 +171,19 @@ func (b *Bus) Run(cmd Command) error {
 }
 
 func (b *Bus) push(cmd Command) {
+	if b.review != nil {
+		b.review.commands = append(b.review.commands, cmd)
+		if c, ok := cmd.(*isolatedFaceCommand); ok {
+			found := false
+			for _, s := range b.review.Changed {
+				found = found || s == c.scope
+			}
+			if !found {
+				b.review.Changed = append(b.review.Changed, c.scope)
+			}
+		}
+		return
+	}
 	b.undo = append(b.undo, cmd)
 	if len(b.undo) > UndoCap {
 		b.undo = append(b.undo[:0], b.undo[len(b.undo)-UndoCap:]...)
@@ -216,10 +236,10 @@ func (b *Bus) emitFor(cmd Command) {
 }
 
 // CanUndo reports whether there is anything to undo.
-func (b *Bus) CanUndo() bool { return b.pending == nil && len(b.undo) > 0 }
+func (b *Bus) CanUndo() bool { return b.review == nil && b.pending == nil && len(b.undo) > 0 }
 
 // CanRedo reports whether there is anything to redo.
-func (b *Bus) CanRedo() bool { return b.pending == nil && len(b.redo) > 0 }
+func (b *Bus) CanRedo() bool { return b.review == nil && b.pending == nil && len(b.redo) > 0 }
 
 // UndoName and RedoName are what the toolbar tooltips show.
 func (b *Bus) UndoName() string {
@@ -276,6 +296,11 @@ func (b *Bus) RedoDepth() int { return len(b.redo) }
 
 // BeginDrag applies a command live without recording it.
 func (b *Bus) BeginDrag(cmd Command) error {
+	var err error
+	cmd, err = b.prepareCommand(cmd)
+	if err != nil {
+		return err
+	}
 	if b.pending != nil {
 		b.CancelDrag()
 	}
@@ -292,6 +317,11 @@ func (b *Bus) BeginDrag(cmd Command) error {
 func (b *Bus) UpdateDrag(cmd Command) error {
 	if b.pending == nil {
 		return b.BeginDrag(cmd)
+	}
+	var prepErr error
+	cmd, prepErr = b.prepareCommand(cmd)
+	if prepErr != nil {
+		return prepErr
 	}
 	prev := b.pending
 	prev.Undo(b.doc)

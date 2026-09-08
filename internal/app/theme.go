@@ -42,6 +42,9 @@ func (a *App) modeAccent() color.RGBA {
 // modeName is the word the hint bar's chip carries — the same partition as
 // modeAccent, so the chip and the colour never disagree.
 func (a *App) modeName() string {
+	if a.Viewer {
+		return "VIEWER"
+	}
 	switch {
 	case a.InChamfer():
 		return "CHAMFER"

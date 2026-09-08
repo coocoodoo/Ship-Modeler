@@ -52,7 +52,7 @@ if ($Action -eq 'Launch') {
     $previousConfig = $env:MODELER_CONFIG_DIR
     try {
         $env:MODELER_CONFIG_DIR = $ConfigDir
-        $process = Start-Process -FilePath $exe -ArgumentList '-ai' -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru
+        $process = Start-Process -FilePath $exe -ArgumentList '-ai' -WorkingDirectory $projectRoot -WindowStyle Maximized -PassThru
         $ProcessId = $process.Id
     } finally { $env:MODELER_CONFIG_DIR = $previousConfig }
     for ($attempt = 0; $attempt -lt 100; $attempt++) {

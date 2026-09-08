@@ -1,0 +1,118 @@
+[
+  {
+    "op": "file.new"
+  },
+  {
+    "op": "sketch.begin",
+    "plane": "Top"
+  },
+  {
+    "op": "sketch.rect",
+    "a": [
+      -2,
+      -2
+    ],
+    "b": [
+      2,
+      2
+    ]
+  },
+  {
+    "op": "extrude",
+    "depth": 2,
+    "result": "new"
+  },
+  {
+    "op": "camera.view",
+    "view": "iso"
+  },
+  {
+    "op": "camera.frame"
+  },
+  {
+    "op": "settle"
+  },
+  {
+    "op": "deselect"
+  },
+  {
+    "op": "wait",
+    "frames": 180
+  },
+  {
+    "op": "click",
+    "at": [
+      1128,
+      707
+    ]
+  },
+  {
+    "op": "wait",
+    "frames": 30
+  },
+  {
+    "op": "click",
+    "at": [
+      640,
+      245
+    ]
+  },
+  {
+    "op": "click",
+    "at": [
+      680,
+      300
+    ]
+  },
+  {
+    "op": "wait",
+    "frames": 30
+  },
+  {
+    "op": "shot",
+    "name": "pin_editor"
+  },
+  {
+    "op": "click",
+    "at": [
+      700,
+      292
+    ]
+  },
+  {
+    "op": "ui.type",
+    "name": "Make this panel copper, with two narrow cyan vents."
+  },
+  {
+    "op": "shot",
+    "name": "pin_text"
+  },
+  {
+    "op": "click",
+    "at": [
+      950,
+      574
+    ]
+  },
+  {
+    "op": "dump"
+  },
+  {
+    "op": "shot",
+    "name": "pin_saved"
+  },
+  {
+    "op": "click",
+    "at": [
+      680,
+      276
+    ]
+  },
+  {
+    "op": "ui.key",
+    "name": "Escape"
+  },
+  {
+    "op": "dump"
+  }
+]
